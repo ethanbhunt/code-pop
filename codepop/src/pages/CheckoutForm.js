@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { useStripe } from '@stripe/stripe-react-native';
 import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -13,7 +12,6 @@ export default function CheckoutForm(totalPrice) {
   const [drinks, setDrinks] = useState([]);
   const [stripeNum, setStripeNum] = useState(null);
 
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
 
   const fetchPaymentSheetParams = async () => {
@@ -28,16 +26,7 @@ export default function CheckoutForm(totalPrice) {
   };
 
   const initializePaymentSheet = async () => {
-    const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
-    const { error } = await initPaymentSheet({
-      merchantDisplayName: "Example, Inc.",
-      customerId: customer,
-      customerEphemeralKeySecret: ephemeralKey,
-      paymentIntentClientSecret: paymentIntent,
-      allowsDelayedPaymentMethods: true,
-    });
-    if (!error) setLoading(true);
-    else Alert.alert("Error", error.message);
+    setLoading(true);
   };
 
   // function to remove all drinks from cart list after sucessful checkout
@@ -118,28 +107,22 @@ export default function CheckoutForm(totalPrice) {
   }
 
   const openPaymentSheet = async () => {
-    const { error } = await presentPaymentSheet();
-  
-    if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
-      Alert.alert('Success', 'Your order is confirmed!', [
-        {
-          text: 'OK',
-          onPress: async () => {
-            await removeAllDrinks();
-            await addRevenue();
-            const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-            navigation.navigate('PostCheckout');
-          },
+    Alert.alert('Success', 'Your order is confirmed!', [
+      {
+        text: 'OK',
+        onPress: async () => {
+          await removeAllDrinks();
+          await addRevenue();
+          const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          navigation.navigate('PostCheckout');
         },
-      ]);
-    }
+      },
+    ]);
   };
 
   return { initializePaymentSheet, openPaymentSheet, loading };

@@ -6,7 +6,6 @@ import RatingCarosel from '../components/RatingCarosel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
 
 const PostCheckout = () => {
   const navigation = useNavigation();
@@ -257,24 +256,13 @@ const PostCheckout = () => {
         {/* Map Image Box */}
         <View style={[styles.section, styles.mapSection]}>
                 {location ? (
-                  <MapView
-                    style={styles.map}
-                    region={{
-                      latitude: location.coords.latitude,
-                      longitude: location.coords.longitude,
-                      latitudeDelta: 0.0922,
-                      longitudeDelta: 0.0421,
-                    }}
-                  >
-                    <Marker
-                      coordinate={{
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                      }}
-                      title="You are here"
-                      description="Current location"
-                    />
-                  </MapView>
+                  <View style={[styles.map, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', minHeight: 200 }]}>
+                    <Text style={{ color: '#666', fontSize: 16, textAlign: 'center', padding: 20 }}>
+                      Location{'\n'}
+                      Lat: {location.coords.latitude.toFixed(6)}{'\n'}
+                      Lng: {location.coords.longitude.toFixed(6)}
+                    </Text>
+                  </View>
                 ) : (
                   <View style={styles.arrivalButtonContainer}>
                     {errorMsg ? (

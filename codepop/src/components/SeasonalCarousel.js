@@ -1,7 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Carousel from 'react-native-reanimated-carousel';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -115,15 +114,18 @@ const SeasonalCarousel = () => {
 
     return (
         <View style={{ height: 250 }}>
-            <Carousel
-                width={250}
-                sliderWidth={windowWidth}
-                itemWidth={windowWidth * 0.8}
-                height={250}
-                autoPlay={true}
-                data={data}
-                renderItem={renderItem}
-            />
+            <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={{ height: 250 }}
+            >
+                {data.map((item, index) => (
+                    <View key={index} style={{ width: windowWidth * 0.8 }}>
+                        {renderItem({ item, index })}
+                    </View>
+                ))}
+            </ScrollView>
         </View>
     );
 };

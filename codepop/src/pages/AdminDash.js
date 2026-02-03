@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert, Modal, Image, TextInput } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TextInput } from 'react-native-gesture-handler';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import RNPickerSelect from 'react-native-picker-select';
 
 const AdminDash = () => {
@@ -200,7 +198,7 @@ const AdminDash = () => {
 
   const renderUser = ({ item }) => {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <View style={styles.box}>
           <View>
             <Text style={styles.mainText}>{item.username}</Text>
@@ -254,7 +252,7 @@ const AdminDash = () => {
               </View>
             </Modal>
         </View>
-      </GestureHandlerRootView>
+      </View>
     );
   };
 

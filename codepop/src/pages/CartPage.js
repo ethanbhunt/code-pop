@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView } from '
 import NavBar from '../components/NavBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect, NavigationContainer } from '@react-navigation/native';
-import { useStripe, StripeProvider } from '@stripe/stripe-react-native';
 import CheckoutForm from './CheckoutForm';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -159,8 +158,7 @@ const CartPage = () => {
   
 
   return (
-    <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
-        <View style={styles.container}>
+    <View style={styles.container}>
         <Text style={styles.headerText}>Your Drinks</Text>
 
         {Array.isArray(drinks) && drinks.length === 0 ? (
@@ -188,8 +186,7 @@ const CartPage = () => {
         </View>
 
         <NavBar />
-        </View>
-    </StripeProvider>
+    </View>
   );
 };
 

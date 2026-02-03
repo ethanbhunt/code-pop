@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
-import { useStripe, } from "@stripe/stripe-react-native";
 
 // https://docs.stripe.com/payments/quickstart (add payment to database post confirmation)
 
@@ -28,12 +27,11 @@ const STATUS_CONTENT_MAP = {
 };
 
 export default function CompletePage() {
-  const stripe = useStripe();
   const [status, setStatus] = useState("default");
   const [intentId, setIntentId] = useState(null);
 
   useEffect(() => {
-    if (!stripe) return;
+    // Payment status handling removed for cross-platform compatibility
 
     // Retrieve clientSecret from route params if passed from previous screen
     const { clientSecret } = route.params || {};

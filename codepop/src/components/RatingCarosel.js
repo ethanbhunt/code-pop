@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import { View, StyleSheet, TouchableOpacity, FlatList, Text, Dimensions, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, FlatList, Text, Dimensions, Alert, ScrollView } from 'react-native';
 import StarRating from './StarRating';
-import Carousel from 'react-native-reanimated-carousel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import Gif from './Gif';
@@ -135,16 +134,18 @@ const RatingCarosel = ({ purchasedDrinks }) => {
 
     return (
         <View style={{ height: 250 }}>
-          <Carousel
-            width={windowWidth}
-            sliderWidth={windowWidth}
-            itemWidth={windowWidth * 0.8}
-            height={400}
-            autoPlay={true}
-            autoPlayInterval={5000} // Delay of 5 seconds between slides
-            data={purchasedDrinks}
-            renderItem={renderItem}
-          /> 
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={{ height: 400 }}
+          >
+            {purchasedDrinks.map((item, index) => (
+              <View key={index} style={{ width: windowWidth * 0.8 }}>
+                {renderItem({ item, index })}
+              </View>
+            ))}
+          </ScrollView>
         </View>
       );
 };

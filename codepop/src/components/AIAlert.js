@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Button, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
-import Modal from 'react-native-modal';
 
 const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
   const navigation = useNavigation();
@@ -127,13 +126,12 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
 
   return (
     <Modal
-      isVisible={isModalVisible}
-      onBackdropPress={toggleModal}
-      style={styles.modal}
-      swipeToClose={true}
-      animationIn="slideInUp"
-      animationOut="slideOutDown"
+      visible={isModalVisible}
+      onRequestClose={toggleModal}
+      transparent={true}
+      animationType="slide"
     >
+      <View style={[styles.modal, { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }]}>
       <View style={styles.modalContent}>
         <Text style={styles.modalTitle}>Your Drink is ...</Text>
         <Text style={styles.modalText}>
@@ -167,6 +165,7 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
             <Gif layers={layers} />
           </View>
         </View>
+      </View>
       </View>
     </Modal>
 
