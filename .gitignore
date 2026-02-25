@@ -19,3 +19,4 @@ codepop_virtual_environment/
 venv/
 **/venv/
 
+AGENTS.md
