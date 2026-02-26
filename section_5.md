@@ -146,3 +146,9 @@
   - Load testing tools: Apache JMeter, Locust
   - Stress testing scenarios
   - Capacity planning
+
+
+
+
+
+  3 hours on feb 25
