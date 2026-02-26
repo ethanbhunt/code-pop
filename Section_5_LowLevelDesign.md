@@ -1,15 +1,7 @@
 # Section 5: Security, Performance & Monitoring – Low-Level Design
 
-**Document Version**: 1.0  
-**Last Updated**: February 2026  
-**Audience**: Internal Development Team  
-**Scope**: Technical design for implementing security controls, performance optimization, and observability
-
----
-
 ## Executive Summary
 
-CodePop is a **decentralized, multi-store, multi-role system** requiring comprehensive security, performance, and observability. This document defines the architectural design for:
 
 1. **Security Architecture** – Multi-role RBAC (user, manager, admin, super admin, logistics manager, repair staff), authentication flows, decentralized inter-store communication security, and token lifecycle management
 2. **Security Controls** – Mitigation strategies for 7 OWASP-aligned threats plus decentralized architecture risks (SQL injection, XSS, CSRF, auth bypass, data exposure, IDOR, misconfiguration, service discovery spoofing, man-in-the-middle attacks)
@@ -2158,8 +2150,3 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
 - [Celery Task Queue](https://docs.celeryproject.org/)
 - [Prometheus Monitoring](https://prometheus.io/docs/introduction/overview/)
 - [PostgreSQL Security](https://www.postgresql.org/docs/current/sql-syntax.html)
-
----
-
-**Document Status**: Complete  
-**Next Steps**: Review with development team, begin implementation with Section 5.1
