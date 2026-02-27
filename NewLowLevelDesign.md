@@ -1,64 +1,204 @@
-# CodePop Low-Level Design Document Structure
+# CodePop Low-Level Design Document
 
-## Document Overview
+## Document Overview & Introduction
 
-This document outlines the structure for the Low-Level Design (LLD) document that builds upon the High-Level Design. The LLD provides detailed technical specifications, class-level designs, database schemas, and implementation details needed for development.
+This document is the **Low-Level Design (LLD)** which outlines user accounts, orders, payments, inventory, AI recommendations, and manager/admin tooling. It translates the High-Level Design into concrete technical specifications for our team to implement.
 
-**Team Assignment Strategy**: The document is divided into 6 major sections, each assigned to one team member. Each section is designed to be independently workable with minimal dependencies, allowing parallel development.
+The LLD covers:
+
+- **System architecture** — Client-server, three-tier layout (Frontend, Backend, Database), and how components interact.
+- **Subsystem designs** — User management, orders, payments, catalog, inventory, and AI recommendations, with class-level responsibilities and interfaces.
+- **Data and persistence** — Database schema (PostgreSQL), tables, normalization, indexes, and data access patterns.
+- **Cross-cutting concerns** — Security, performance, monitoring, deployment, and consistency (naming, docs, testing).
+
+Each major area is specified with classes, methods, relationships, design choices, and (where applicable) UML diagrams and ERDs, so the team can build from a single, consistent blueprint.
 
 ---
 
-## Document Structure
+### **Section 1: System Architecture & User Management Subsystem**
 
-### **Section 1: System Architecture & User Management Subsystem** 
-**Assigned to: Team Member 1**
+---
 
 #### 1.1 System Architecture Overview
-- **Clear and concise description** of the overall system architecture
-  - Client-server architecture details
-  - Three-tier architecture (Frontend, Middleware/Backend, Database)
-  - Component interaction patterns
-  - Request/response flow diagrams
-- **Architecture justification**: Why client-server over alternatives (microservices, serverless, etc.)
-- **Technology stack summary** (detailed justifications in Section 6)
+
+**Architecture style and tiers**
+
+CodePop follows a **client–server**, **three-tier** architecture:
+
+- **Presentation tier (frontend)** — React-based single-page application(s) serving the customer ordering experience, manager dashboard, and admin interface. The frontend communicates with the backend exclusively over HTTPS via REST APIs; no direct database access.
+- **Application tier (backend)** — Django-based REST API that implements business logic, authentication, authorization, and integrations with external services (Stripe, AI provider, email, maps). All user-facing and internal operations flow through this tier.
+- **Data tier** — PostgreSQL database storing users, orders, payments, catalog, inventory, preferences, and related data. Access is only through the backend (Django ORM); see Section 4 for schema and data access.
+
+**Core runtime components**
+
+| Component                      | Responsibility                                                    | Technology / Interaction                                           |
+| ----------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Web client(s)                 | Customer UI, manager UI, admin UI                                 | React; HTTP/JSON to backend                                       |
+| Django API server             | Request routing, auth middleware, business logic                  | Gunicorn/uWSGI + Django; HTTP to DB and external APIs              |
+| User Management module        | Registration, login, profiles, preferences, guests                | Part of Django backend; uses `users`, `preferences` tables (Section 4) |
+| Order Management module       | Order lifecycle, status, QR codes                                 | Part of Django backend; depends on User Management, Catalog, Payment |
+| Payment module                | Payment processing, refunds                                       | Part of Django backend; integrates with Stripe                     |
+| Catalog module                | Products, drinks, customization                                   | Part of Django backend; uses catalog and inventory data           |
+| Inventory module              | Stock levels, alerts, restock                                     | Part of Django backend                                             |
+| AI Recommendation module      | Personalized recommendations, chatbot                             | Part of Django backend; uses preferences; calls external AI API    |
+| PostgreSQL                    | Persistent storage                                                | Accessed via Django ORM / repositories                             |
+| Stripe                        | Payment processing                                                | HTTPS API; webhooks for async events                               |
+| Email / notification service  | Verification, password reset, order/alert notifications           | HTTPS or SMTP from backend                                         |
+| AI provider (e.g., Claude API)| Recommendation and complaint chatbot                             | HTTPS API from backend                                             |
+| Maps / geolocation provider   | Store locator, delivery/pickup                                    | HTTPS API from frontend or backend                                 |
+
+![1.1 Component Diagram](misc/1.1_Component_Diagram.png)
+
+**Request/response flow — User login and authenticated request**
+
+1. User submits login credentials from the React login form.
+2. Frontend sends `POST /api/auth/login` with credentials (e.g., email + password) over HTTPS.
+3. Django API receives the request; middleware may attach CORS and security headers.
+4. `AuthenticationService.login(credentials)` is invoked: credentials are validated (e.g., against hashed password in `users` table via `UserRepository`); on success, a session or token is created and stored (e.g., Django session in DB or signed cookie).
+5. Backend returns success response with session cookie or token (and optionally user profile summary).
+6. For a subsequent authenticated request (e.g., "Get my profile"): frontend sends `GET /api/users/me` with session cookie or `Authorization` token.
+7. `AuthenticationService.validateToken(sessionOrToken)` (or Django auth middleware) resolves the current user; `UserService` or a profile endpoint returns the user's profile from `UserRepository.findById(userId)`.
+8. Response is returned as JSON to the frontend.
+
+**Request/response flow — User signup**
+
+1. User submits registration form (email, username, password, optional profile fields).
+2. Frontend sends `POST /api/auth/register` (or `/api/users/`) with payload.
+3. Backend invokes `UserService.createUser(dto)`: validates input, checks uniqueness (e.g., `UserRepository.findByEmail`, `findByUsername`), hashes password, persists user via `UserRepository.save()`; optionally triggers `emailService` for verification email.
+4. Backend automatically logs in the user: calls `AuthenticationService.login(credentials)` (or issues a session/token for the new user), then returns the same kind of auth payload as login (session/token + user summary) so the client can stay in an authenticated state without a separate login request.
+
+![1.1 Login Flow Diagram](misc/1.1_Login_Flow_Diagram.png)
+
+**Architecture justification**
+
+- **Client–server and three-tier** — Fits project scope and team size: clear separation of UI, business logic, and data; single backend simplifies deployment, security, and consistency. Aligns with typical course/assignment expectations for a full-stack application.
+- **Monolithic backend (Django) rather than microservices** — Reduces operational and networking complexity; shared database and in-process calls simplify transactions and debugging. Microservices would add deployment and coordination overhead without clear benefit at current scale.
+- **No serverless for core logic** — Keeps control flow and state in one place; serverless is reserved for optional/event-driven use cases if needed. Detailed technology comparisons are in **Section 6**.
+
+**Technology stack summary**
+
+- **Frontend:** React, with HTTP client for REST API calls.
+- **Backend:** Django (Python), REST API (Django REST framework or equivalent), PostgreSQL driver/ORM.
+- **Database:** PostgreSQL (see Section 4 for schema).
+- **External:** Stripe (payments), AI provider (e.g., Claude API), email service, maps/geolocation (e.g., Mapbox).
+
+Detailed justifications for framework and service choices are in **Section 6**.
+
+---
 
 #### 1.2 User Management Subsystem
-- **Subsystem Overview**
-  - Purpose and responsibilities
-  - Dependencies on other subsystems
-  - Key interfaces
-  
-- **Detailed Class Breakdown** (Single Responsibility Principle)
-  - `UserService` class
-    - Fields: userRepository, authService, emailService
-    - Methods: createUser(), authenticateUser(), updateUserProfile(), deleteUser()
-    - Responsibilities: User CRUD operations, profile management
-  - `AuthenticationService` class
-    - Fields: tokenGenerator, sessionManager
-    - Methods: login(), logout(), refreshToken(), validateToken()
-    - Responsibilities: Authentication and session management
-  - `UserRepository` class
-    - Fields: dbConnection
-    - Methods: findById(), findByEmail(), findByUsername(), save(), delete()
-    - Responsibilities: Data access for User entities
-  - `PreferenceService` class
-    - Fields: preferenceRepository, userRepository
-    - Methods: addPreference(), removePreference(), getUserPreferences()
-    - Responsibilities: Managing user drink preferences
-  - `GuestService` class
-    - Fields: sessionStorage
-    - Methods: createGuestSession(), getGuestSession()
-    - Responsibilities: Managing guest user sessions
 
-- **UML Class Diagram** for User Management Subsystem
-  - All classes with fields and methods
-  - Relationships: inheritance, composition, aggregation
-  - Dependencies on external services (email, notifications)
+**Subsystem overview**
 
-- **Design Decisions & Alternatives**
-  - Why Django's built-in User model vs custom User model
-  - Token-based auth vs session-based auth
-  - Guest user handling approach
+The User Management subsystem is responsible for identity, authentication, profile management, drink preferences, and guest sessions. It ensures that only authorized users (or designated guest sessions) can perform actions that require identity (e.g., placing orders, viewing history, managing preferences).
+
+- **Purpose and responsibilities**
+  - User registration and account lifecycle (create, update, delete).
+  - Authentication: login, logout, session or token issuance and validation.
+  - Profile management: read/update of user attributes (name, contact, role, etc.).
+  - Drink preference CRUD and retrieval for use by the Catalog and AI Recommendation subsystems.
+  - Guest session creation and lookup so unauthenticated users can browse and build orders before optionally converting to a registered account.
+
+- **Dependencies**
+  - **Database:** `users` (and any extended/auth tables), `preferences`; see **Section 4.2** for table definitions.
+  - **External:** Email service (verification, password reset); optionally notification service for account-related alerts.
+  - **Internal:** Order Management (orders tied to `user_id`); AI Recommendation (consumes preferences via `PreferenceService` or shared interfaces).
+
+- **Key interfaces (API surface)**
+  - `POST /api/auth/register` — Create new user (calls `UserService.createUser`); on success, auto-login and return session/token + user (same shape as login).
+  - `POST /api/auth/login` — Login (calls `AuthenticationService.login`).
+  - `POST /api/auth/logout` — Logout (calls `AuthenticationService.logout`).
+  - `GET /api/users/me`, `PATCH /api/users/me` — Current user profile (calls `UserService` / `UserRepository`).
+  - `GET /api/preferences/`, `POST /api/preferences/`, `DELETE /api/preferences/:id` — Preferences (calls `PreferenceService`).
+  - Guest endpoints (e.g., `POST /api/guest/session`, `GET /api/guest/session`) — `GuestService.createGuestSession`, `getGuestSession`.
+
+Security hardening (password hashing, RBAC, rate limiting, session configuration) is detailed in **Section 5**.
+
+**Detailed class breakdown**
+
+**UserService**
+
+- **Responsibility:** Orchestrates user CRUD and profile operations; delegates persistence to `UserRepository`, auth to `AuthenticationService`, and outbound email to `EmailService`. Does not perform password hashing directly—relies on auth layer or Django's user model.
+- **Fields:**
+  - `userRepository` (UserRepository) — Data access for user entities.
+  - `authService` (AuthenticationService) — For token/session creation after registration or login.
+  - `emailService` (interface to email provider) — Sends verification or password-reset emails.
+- **Methods:**
+  - `createUser(dto: CreateUserDto): User` — Validates dto (email format, username uniqueness, password policy); checks uniqueness via `userRepository.findByEmail`, `findByUsername`; creates user entity (password hashed by auth/django); `userRepository.save(user)`; optionally sends verification email via `emailService`; returns created user (or throws on validation/duplicate); The register API handler calls `AuthenticationService.login(credentials)` after a successful `createUser()` and returns the resulting AuthResult to the client.”.
+  - `authenticateUser(credentials: LoginCredentials): AuthResult` — Delegates to `authService.login(credentials)`; returns session/token and user summary.
+  - `updateUserProfile(userId: Id, profileDto: UpdateProfileDto): User` — Ensures caller is authorized for `userId`; updates allowed profile fields; `userRepository.save(user)`; returns updated user.
+  - `deleteUser(userId: Id): void` — Ensures authorization; performs soft delete or hard delete per policy; clears or anonymizes related data as defined (e.g., preferences, orders reference); `userRepository.delete(userId)`.
+- **Error handling:** Validation errors and duplicate email/username return client-friendly errors; not-found and unauthorized return appropriate HTTP status codes.
+
+**AuthenticationService**
+
+- **Responsibility:** Verifies credentials, issues and invalidates sessions or tokens, and validates incoming requests. Encapsulates whether the system uses Django sessions, JWT, or both.
+- **Fields:**
+  - `tokenGenerator` (or session backend) — Creates and signs tokens or session identifiers.
+  - `sessionManager` — Stores and retrieves session data (e.g., DB-backed sessions, or token blocklist for logout).
+- **Methods:**
+  - `login(credentials: LoginCredentials): AuthResult` — Looks up user (e.g., via `UserRepository.findByEmail`); verifies password (Django/auth library); creates session or token via `tokenGenerator`; stores session via `sessionManager`; returns `AuthResult` (token/session id + user summary).
+  - `logout(userContext: UserContext): void` — Invalidates session or token (e.g., remove from store or add to blocklist).
+  - `refreshToken(refreshToken: string): AuthResult` — If refresh tokens are used: validates refresh token, issues new access token/session; returns new `AuthResult`.
+  - `validateToken(tokenOrSessionId: string): UserContext | null` — Verifies signature and expiry; resolves user id; returns `UserContext` for downstream use or `null` if invalid/expired.
+- **Integration:** Used by Django middleware or view layer to set `request.user` for protected endpoints.
+
+**UserRepository**
+
+- **Responsibility:** Single place for all persistence operations on the `users` table (and any Django auth tables). Abstracts Django ORM or raw SQL; returns domain entities or ORM models as agreed.
+- **Fields:**
+  - `dbConnection` or ORM handle — Django model layer / database connection.
+- **Methods:**
+  - `findById(id: Id): User | null` — Returns user by primary key; null if not found.
+  - `findByEmail(email: string): User | null` — Returns user by email (unique).
+  - `findByUsername(username: string): User | null` — Returns user by username (unique).
+  - `save(user: User): User` — Inserts or updates user; returns saved entity (e.g., with generated id).
+  - `delete(userId: Id): void` — Deletes or soft-deletes user by id.
+- **Conventions:** Methods raise an exception or return null for "not found" consistently; constraint violations (e.g., duplicate email) surface as specific errors for the service layer to map to HTTP responses.
+
+**PreferenceService**
+
+- **Responsibility:** Manages per-user drink preferences (e.g., favorite base sodas, syrups, or saved customizations). Used by the AI Recommendation subsystem to personalize suggestions; by Catalog/UI to prefill or highlight options.
+- **Fields:**
+  - `preferenceRepository` — Data access for `preferences` table (Section 4.2).
+  - `userRepository` — To validate that the user exists and to enforce ownership.
+- **Methods:**
+  - `addPreference(userId: Id, preferenceDto: PreferenceDto): Preference` — Validates user exists; validates preference payload; persists via `preferenceRepository.save`; returns created preference.
+  - `removePreference(userId: Id, preferenceId: Id): void` — Ensures preference belongs to `userId`; deletes or soft-deletes.
+  - `getUserPreferences(userId: Id): List<Preference>` — Returns all active preferences for the user (e.g., for profile page or recommendation engine).
+- **Dependencies:** AI Recommendation (Section 3) may call `getUserPreferences` or consume preference data via a shared interface or API.
+
+**GuestService**
+
+- **Responsibility:** Creates and retrieves guest sessions so unauthenticated users can have a temporary identity (e.g., for cart or preferences stored server-side). Supports upgrade path: when a guest registers or logs in, their session data can be merged into the new or existing user.
+- **Fields:**
+  - `sessionStorage` — Backing store for guest session data (e.g., Django session keyed by guest id, or Redis/DB keyed by `guest_session_id`). Stores minimal data: guest id, created_at, optional cart/preference snapshot.
+- **Methods:**
+  - `createGuestSession(): GuestSession` — Generates a unique guest session id; stores a new record in `sessionStorage`; returns `GuestSession` (id, optional expiry).
+  - `getGuestSession(sessionId: string): GuestSession | null` — Looks up session by id; returns session or null if expired/invalid.
+- **Upgrade path:** When guest converts to user (register/login), the application layer merges guest cart/preferences into the user and then invalidates or disassociates the guest session. Order history is attached to the user from that point forward.
+
+**UML class diagram — User Management Subsystem**
+
+![1.2 Class Diagram](misc/1.2_Class_Diagram.png)
+
+*Note:* `EmailService` and `PreferenceRepository` are interfaces or external modules; their implementations may live in other packages. Section 4 describes the `users` and `preferences` table schemas.
+
+
+
+**Design decisions**
+
+- **Django built-in User model vs custom User model**
+  - **Choice:** Use Django's built-in `User` model (and `AbstractUser` extension if extra fields are needed, e.g., `role`, `phone_number`).
+  - **Rationale:** Built-in model provides battle-tested password hashing, group/permission hooks, and admin integration; reduces custom security code. Extending with a one-to-one or subclass satisfies CodePop's need for roles and contact info without maintaining a full custom auth stack.
+
+- **Token-based vs session-based auth**
+  - **Choice:** Session-based auth (Django sessions stored in DB or cache) for the primary web app; optional JWT or signed tokens for mobile or third-party API access if required later.
+  - **Rationale:** Sessions simplify logout (invalidate server-side), CSRF handling with cookies, and integration with Django middleware. Tokens are stateless but require explicit refresh/revocation and storage considerations.
+
+- **Guest user handling**
+  - **Choice:** Server-side guest sessions: backend issues a guest session id (e.g., in a cookie or returned to client); cart and temporary preferences stored keyed by that id. On register/login, merge guest data into the authenticated user and retire the guest session.
+  - **Rationale:** Allows "continue as guest" without polluting the `users` table; clear upgrade path and single source of truth for active cart/state. Limits abuse by tying sessions to a short-lived or single-device identity.
 
 ---
 
