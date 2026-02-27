@@ -1,164 +1,349 @@
 # CodePop Requirements Document
 
-## Introduction
+## 1. Introduction
 
-### Overview of CodePop
+**1.1 Overview of CodePop**
+CodePop is an innovative beverage application that leverages AI, automation, and distributed systems to redefine soda customization and ordering. The platform supports mobile and desktop usage and is designed for minimal human intervention, relying on AI-driven inventory management, ordering, logistics coordination, and maintenance tracking.
 
-CodePop is an innovative beverage application that leverages advanced technology, including AI and automation, to redefine the customer experience in soda customization and ordering. Designed to function seamlessly across multiple platforms, including handheld devices and desktops, CodePop aims to provide users with a unique and efficient way to create, customize, and order their favorite drinks. The application is geared towards minimal human intervention, utilizing AI and automated systems to manage inventory, process orders, and provide customer support.
+**1.2 Purpose of This Document**
+This document defines the complete functional, non-functional, business, and system requirements for CodePop. It aligns developers, stakeholders, and system architects on scope, priorities, and responsibilities, including newly introduced multi-store, logistics, and maintenance capabilities.
 
-### Purpose of Requirements Document
+**1.3 MoSCoW Analysis**
+Requirements are categorized as:
 
-The purpose of this requirements document is to provide a comprehensive outline for the functionality of the CodePop software. This document serves to keep developers and stakeholders on the same page in regards to basic requirements of CodePop going forward. 
+- **M** – Must Have  
+- **S** – Should Have  
+- **C** – Could Have  
+- **W** – Won’t Have  
 
-### Introduction to MoSCoW Analysis
+---
 
-To effectively prioritize the requirements for this application, we will use MoSCoW analysis. This method categorizes requirements into four groups:
+## 2. Functional Requirements
 
-- **Must Have *(M)*:** Essential features needed for the application to function correctly.
-- **Should Have *(S)*:** Important but not critical features that enhance user experience.
-- **Could Have *(C)*S:** Desirable features that are not essential but could add value to the application.
-- **Won’t Have *(W)*:** Features that are not relevant or feasible at this stage.
+### 2.1 System Scope Expansion
 
-In this document, these categories will be indicated with the following abbreviations added to each requirement for clarity:
-- **M** for Must Have
-- **S** for Should Have
-- **C** for Could Have
-- **W** for Won’t Have
+**2.1.1 Multi-Store, Nationwide Support (M)**
 
-These abbreviations will facilitate a clear and efficient understanding of the priority and scope of each requirement.
+The CodePop platform must support deployment across multiple stores distributed throughout the United States. Each store operates as an independent unit while still participating in regional coordination for supply, logistics, and data synchronization. Stores must be able to function autonomously in day-to-day operations, even if other stores or regional systems are unavailable.
 
-## Requirements
+The system must allow for:
+- Independent store configuration (inventory, machines, staff roles)
+- Regional grouping of stores for supply and logistics coordination
+- Expansion to new stores without requiring downtime or reconfiguration of existing locations
+- Store-specific operational parameters and customization
 
-### Functional Requirements
+**2.1.2 Decentralized Architecture (M)**
 
-**Device Accessibility:**
-*(M)* Prioritize functionality for handheld devices, specifically phones. CodePop should function as both an app and a site, and work on both iphone and android. The site will work on the most up to date versions of more popular search browsers, like Google Chrome, Safari, Mozilla Firefox, and Microsoft Edge.
+The system must operate using a decentralized architecture. There is no single central server that controls all stores nationwide. Instead:
+- Each store maintains its own local operational data
+- Stores communicate directly with other stores in the same region as needed
+- Stores communicate directly with regional supply hubs
+- Regional data synchronization must tolerate intermittent or unstable connectivity
 
-**Ability to Sign Up and Sign In:**
-*(M)* A variety of users can sign into the app/website, including Admins, Users, and Managers. Users with an account can save preferences and favorites, managers can see inventory, complaints, and revenue/payments, and admins can have access to user data and accounts (ex. remove problematic accounts or add a manager account). Users can use CodePop without an account, but their information (favorites and preferences) will not get saved.
+In the event of connectivity loss:
+- Local store operations (ordering, inventory tracking, machine operation) must continue uninterrupted
+- Synchronization of data (inventory usage, maintenance logs, demand metrics) must resume automatically once connectivity is restored
+- Conflicts during synchronization must be resolved using timestamp-based or priority-based reconciliation rules
 
-*(S)* New users signing up will be given a brief tutorial to get them familiar with the CodePop interface and how to use it.
+### 2.2 Supply & Logistics System
 
-**Ordering and AI Integration:**
-There are three different ways to order sodas on CodePop:
+**2.2.1 Supply Hubs (M)**
 
-- **Manual Creation and Customization:** *(M)* The user will be given a layered interface to choose their soda flavor, how much ice they want (ex. light, medium, heavy), syrup flavor and how many pumps they want in their drink, and the flavor of cream and how much (ex. light, medium, heavy). Items can be excluded, such as if the user does not want any cream in their soda.
+The system must support seven (7) regional supply hubs, each assigned to a specific geographic region:
+
+- **Region A:** Chicago, IL
+- **Region B:** New Jersey / New York
+- **Region C:** Logan, UT
+- **Region D:** Dallas, TX
+- **Region E:** Atlanta, GA
+- **Region F:** Phoenix, AZ
+- **Region G:** Boise, ID
+
+Each supply hub is responsible for managing and distributing ingredients, machine parts, and other consumables required for store operations.
+
+Supply hubs must be capable of delivering to:
+- Stores located within their assigned region
+- Stores located in other regions, provided the destination store is within a 1000-mile delivery radius
+
+The system must allow hubs to manage:
+- Current stock levels
+- Outgoing and incoming shipments
+- Estimated delivery times
+- Cross-region fulfillment when a closer hub lacks sufficient inventory
+
+**2.2.2 Supply Coordination (M)**
+
+Managers and logistics administrators must be able to coordinate supplies through multiple channels:
+- Local store inventory tracking
+- Shared local suppliers (e.g., regional syrup or CO₂ vendors)
+- At least one assigned regional supply hub
+
+The platform must provide a unified interface for viewing:
+- Current store inventory
+- In-transit shipments
+- Hub availability and fulfillment capacity
+- Supplier lead times
+
+AI-assisted demand prediction must be used to forecast future supply needs. This prediction system must:
+- Use historical usage data from individual stores and regions
+- Support CSV-based data ingestion for historical records and external forecasting inputs
+- Continuously update forecasts based on real-time usage trends
+
+The system must generate actionable recommendations, such as:
+- Suggested reorder quantities
+- Optimal sourcing location (local supplier vs. supply hub)
+- Recommended reorder timing to prevent shortages
+
+### 2.3 Machine Maintenance Tracking
+
+**2.3.1 Maintenance System Overview (M)**
+
+Each store must track all operational machines used in drink preparation and fulfillment. For every machine, the system must store:
+- Machine type and model
+- Operational start date
+- Current maintenance status
+- Complete maintenance and repair history
+
+This information must be available to:
+- Store managers
+- Regional maintenance coordinators
+- Authorized logistics or technical administrators
+
+**2.3.2 Maintenance Status Types (M)**
+
+The system must support the following machine states:
+
+- **normal:** Machine is operating within expected parameters
+- **warning:** Machine is operational but exhibiting early indicators of potential failure
+- **repair-start:** Machine has entered an active repair state
+- **repair-end:** Repair has been completed and machine is ready for operation
+- **error:** Machine has encountered a fault requiring attention
+- **out-of-order:** Machine is not operational and cannot be used
+- **schedule-service:** Machine is due for routine or preventive maintenance
+
+Transitions between states must be logged automatically with timestamps and responsible personnel (when applicable).
+
+**2.3.3 Repair Optimization (S)**
+
+The system should optimize repair and maintenance schedules using AI-assisted planning. Optimization objectives include:
+- Minimizing total technician travel time across stores
+- Respecting maximum allowable time between service visits for each machine type
+- Preventing machines in a **warning** state from exceeding safe operational thresholds
+
+The optimization system should consider:
+- Geographic location of stores
+- Technician availability
+- Severity and priority of machine issues
+- Historical failure patterns
+
+### 2.4 Test Data Requirements
+
+**2.4.1 Supply Hubs (M)**
+
+Create 7 supply hubs, one per region (A–G).
+
+**2.4.2 Stores (M)**
+
+- Region C: 20 stores
+- Neighboring regions (within 200 miles): minimum 5 stores per region
+
+**2.4.3 Roles & Supplies (M)**
+
+Assign:
+- One logistics_manager per hub (Regions A–G)
+- One repair_staff for Region C
+
+Populate:
+- Supply inventories
+- Maintenance schedules
+- Machine status histories
+
+---
+
+## 3. Non-Functional Requirements
+
+**Decentralized (M)**
+
+There is no central server to manage stores; each store must communicate directly with other stores within their region.
+
+**Data Consistency (M)**
+
+With no central server, we must define how stores agree on the state of supplies.
+
+**Fault Tolerance (S)**
+
+Each store must be able to operate autonomously if its connection to other stores or hubs is severed. Local maintenance tracking and sales must be cached locally and synchronized once the connection is restored.
+
+**Auditability & Logging (S)**
+
+The system must maintain an immutable transaction log at each node. Every action taken by a `logistics_manager` or `repair_staff` must be timestamped and cryptographically signed to prevent tampering.
+
+**Responsive (M)**
+
+The application must be responsive, providing an optimal user experience across a variety of devices, including desktops, tablets, and mobile devices, with seamless adaptation to different screen sizes and orientations.
+
+**Error Messages (M)**
+
+The application must provide clear, informative error messages for user interactions, invalid inputs, and system errors. Error messages should be concise, easy to understand, and where applicable, include suggestions for resolution.
+
+**Scalability (M)**
+
+The application must be designed to scale efficiently, handling an increasing number of user transactions and data volume without performance degradation, ensuring a consistent user experience. It must not be limited to one store; it must be able to support many stores across the USA.
+
+**Service Discovery (M)**
+
+When a new store opens in a region, the application must include a Service Discovery mechanism. New store nodes must be able to broadcast their presence and "handshake" with existing regional peers automatically upon deployment.
+
+**Cross-Browser Capability (S)**
+
+The application must be compatible with the latest versions of major browsers, including Chrome, Firefox, Safari, and Edge, ensuring consistent functionality and user experience across all platforms.
+
+**Security (M)**
+
+All sensitive data, including user credentials, payment information, and location data, must be encrypted using industry-standard encryption protocols, such as TLS (Transport Layer Security). Additionally, the application should adhere to best practices for secure coding and data handling to ensure the protection of all user information. All inter-store communications must be digitally signed. Every node must verify the sender's identity using a Public Key Infrastructure (PKI) before processing supply or maintenance updates.
+
+**Accessibility (S)**
+
+The application must comply with Web Content Accessibility Guidelines (WCAG) 2.1 to ensure that users with disabilities can navigate and use the application effectively. This includes avoiding problematic color combinations, such as red and green, and providing alternative text labels for color-based indicators.
+
+**Reporting (S)**
+
+The system should include features for inventory management. It must automatically notify the manager when items are out of stock and generate detailed reports. Additionally, the system should provide the manager with financial reports, offering insights into revenue. This will ensure timely restocking, help in identifying inventory trends or potential issues, and provide a clear understanding of the store's financial performance.
+
+---
+
+## 4. Business Requirements
+
+### 4.1 Operational Philosophy & Store Model
+
+**Minimal Human Intervention (M)**
+
+The CodePop business model prioritizes automation to reduce operational costs and increase efficiency:
+- Stores operate primarily through robotic drink preparation with no on-site staff required at most locations.
+- A single manager must be able to effectively oversee multiple store locations remotely.
+- AI systems handle inventory management, order processing, supply coordination, and customer support to minimize manual intervention.
+
+---
+
+### 4.2 Revenue & Payment Systems
+
+**Payment Processing (M)**
+
+The application must support complete financial transaction capabilities:
+- Process payments securely at the time an order is placed through the app or website.
+- Support refund processing when orders are canceled before drink arrives.
+- Track revenue independently for each store location to enable financial reporting and performance analysis.
+
+**Revenue Tracking & Reporting (M)**
+
+Each store location must have comprehensive revenue visibility:
+- Real-time revenue tracking accessible to managers and administrators.
+- Historical revenue data for trend analysis and business planning.
+- Per-location financial performance metrics for multi-store comparison.
+
+**Saved Payment Methods (C)**
+
+To streamline repeat purchases and improve customer experience:
+- Users may optionally save credit/debit card information for future transactions.
+- Saved payment data must be encrypted and stored according to PCI-DSS compliance standards.
+
+---
+
+### 4.3 Supply Chain & Logistics Management
+
+**Inventory Tracking System (M)**
+
+A comprehensive system to monitor and manage ingredient levels at each location:
+- Remote visibility into flavor syrup, soda base, cream, and add-in levels at all store locations.
+- Automated warnings when ingredient levels fall below configurable thresholds.
+- Manager notifications with recommended order quantities based on current usage rates.
+- AI analytics that learn usage patterns per location and provide estimated supply requirements for monthly ordering cycles.
+
+**Order Pickup Tracking (S)**
+
+To prevent cooler capacity issues and maintain drink quality:
+- Track elapsed time for each completed order waiting in pickup coolers.
+- Automated alerts when orders exceed configurable wait time thresholds.
+- Systematic disposal of stale orders to maintain cooler availability for new orders.
+
+---
+
+### 4.4 Customer Engagement & Loyalty
+
+**AI Customer Support (S)**
+
+To reduce customer service costs while maintaining satisfaction:
+- AI-powered chatbot to guide customers through common issues and questions.
+- Automated complaint intake and initial triage to reduce human intervention.
+- Continuous learning from customer interactions to improve response quality.
+
+**Member Loyalty Program (C)**
+
+To encourage repeat business and increase customer lifetime value:
+- Points accumulation system tied to purchase amounts.
+- Redeemable rewards for free items or discounts once point thresholds are reached.
+- Loyalty status visible within user accounts.
+
+**Social Media Integration (C)**
+
+To generate organic marketing and brand awareness:
+- In-app sharing functionality to post favorite drinks to social platforms (X, Instagram, Facebook).
+- User-generated content to promote CodePop through personal networks.
+
+---
+
+### 4.5 Business Requirements MoSCoW Summary
+
+**Must Have (M):**
+- Minimal human intervention operational model with robotic drink preparation
+- Complete payment processing with refund capabilities
+- Per-location revenue tracking and reporting
+- Comprehensive inventory tracking with low-stock warnings
+
+**Should Have (S):**
+- Order pickup tracking with automated stale order disposal
+- Repair schedule optimization for travel efficiency and preventive maintenance compliance
+- AI customer support chatbot for issue resolution
+
+**Could Have (C):**
+- Saved payment methods for streamlined checkout
+- Member loyalty program with points and rewards
+- Social media sharing integration for organic marketing
+
+**Won't Have (W):**
+- Global trend-based inventory forecasting (unreliable external data)
+- Shared user accounts across multiple individuals
+- Stored-value wallets or gift card systems
+- Cash payment processing at locations
 
 
-- **AI Randomized Soda:** *(M)* An AI will create a soda for the user using a random combination of soda flavor, ice amount, syrup flavor and pumps, and cream. The user can review the drink and, if it does not sound good, they can re-randomize and the AI will create a new drink.
+## 5. User Requirements
 
-  If the user has an account with CodePop, the user can choose to have the AI randomize based on their preferences: leaving out flavors they do not like and including flavors they do. Users without an account will not get this option, but they will get text in place of the “personalized-randomize” button that says they can get more personalized creations via account creation. General Users can get randomized drinks based on popular flavors as a placeholder.
+### 5.1 User Account Management
 
+**Account Creation (M)**
 
-- **Preset Menu and Seasonal Drinks:** *(C)* If the user wants to order a non-randomized, preset drink, there will be a menu with a variety of drinks the user can pick from. This menu will also include a seasonal section, with different sodas swapping out throughout the year (flavors of in-season fruits and drinks for special events).
-
-- For all options, the user can order multiple sodas, remove, review, and edit sodas in the cart, or cancel before they make a payment.
-
-**Payment:** *(M)*
-The user will pay for their soda(s) as soon as they submit their order either on the app or the website. If the cart is empty no transactions will take place. If the user decides to cancel the order, they will get immediately reimbursed. The user should not be able to cancel their order once the drinks have been picked up. To prevent theft, the user is given an order code after payment that they can input into their cooler at the location.  *(C)* There will also be an option to save credit/debit card or payment methods for future use.
-
-**Geolocation and AI:**
-*(M)* After submitting and paying for an order, the app will ask for the user’s location. Different options will be available depending on the user’s answer:
-  - **Yes:** An AI will track how fast the user is approaching and how much time the order will take to assemble. Using both of these, the AI will determine how close the user needs to be to the CodePop location before the robots begin making the order. If user location is for some reason unavailable, the user will be notified and will only be given the “start” button (see below). If the user does not want the drinks to start creation based on distance, they will have a “start” button to press when they are ready to head to the location. The user will get to know how long their order will take so they can press the “start” option at the right time.
-
-  - **No:** The user will be able to start the order by pushing a button. The user will get to see how long their order should take, that way they can start the order at the right time.
-
-  - Scheduling the drinks to be ready at a certain time is also an option.
-
-**Inventory Tracking and AI:**
-*(M)* To prevent a CodePop location from running out of ingredients, an AI will keep track of how popular certain ingredients are (in the CodePop store) and the rate at which they are being used. When an ingredient is estimated to start running low based on current usage trends (in store only), the AI will notify the manager to order more of it.
-
-**AI Usage:**
-*(M)* AI is an integral part of the app/website’s functionality and is used in a variety of places:
-  - **Randomly Generated Drinks:** When prompted, the AI will create a randomized drink for the user. This can either use the user’s preferences to create the drink or do something completely random. If the user does not like what the AI creates, they can have the AI re-randomize a new drink.
-
-  - **Geolocation and EST:** The AI will use geolocation to keep track of the user. Using a combination of the user’s rate of speed and an estimation of how long the soda order will take to create, the AI determines how close the user needs to be to the CodePop location before the robots start creating their order.
-
-  - **Inventory Tracking:** The AI will keep track of ingredient popularity and the rate at which ingredients are being used (in store). When it predicts an ingredient to start running low, it will notify the manager what ingredients should be ordered and restocked.
-
-### Non-functional Requirements
-
-**Responsive:**
-*(M)* Responsive: The application must be responsive, providing an optimal user experience across a variety of devices, including desktops, tablets, and mobile devices, with seamless adaptation to different screen sizes and orientations.
-
-**Error Messages:**
-*(M)* The application must provide clear, informative error messages for user interactions, invalid inputs, and system errors. Error messages should be concise, easy to understand, and where applicable, include suggestions for resolution.
-
-**Cross Browser Capability:**
-*(S)* The application must be compatible with the latest versions of major browsers, including Chrome, Firefox, Safari, and Edge, ensuring consistent functionality and user experience across all platforms.
-
-**Security:**
-*(M)* All sensitive data, including user credentials and payment information, and location data, must be encrypted using industry-standard encryption protocols, such as TLS (Transport Layer Security). Additionally, the application should adhere to best practices for secure coding and data handling to ensure the protection of all user information.
-
-**Scalability:**
-*(S)* The application must be designed to scale efficiently, handling an increasing number of user transactions and data volume without performance degradation, ensuring a consistent user experience.
-
-**Availability:**
-*(C)* Orders can only be placed when the store is open, but scheduled ordering is supported. The application must maintain an uptime of at least 99.9%, ensuring reliable access for users. While the store is closed, users can schedule orders to be processed once the store reopens.
-
-**Maintainability:**
-*(M)* The codebase must be modular, well-documented, and adhere to established coding standards to facilitate ease of maintenance, updates, and troubleshooting. This includes clear comments, structured code, and comprehensive documentation. Additionally, all dependencies, libraries, and frameworks used in the application should be kept up-to-date to ensure security, compatibility, and optimal performance.
-
-**Accessible:**
-*(S)* The application must comply with Web Content Accessibility Guidelines (WCAG) 2.1 to ensure that users with disabilities can navigate and use the application effectively. This includes avoiding problematic color combinations, such as red and green, and providing alternative text labels for color-based indicators.
-
-**Reporting:**
-*(S)* The system should include features for inventory management. It must automatically notify the manager when items are out of stock and generate detailed reports that can be sent to the developer for further analysis. Additionally, the system should provide the manager with financial reports, offering insights into revenue. This will ensure timely restocking, help in identifying inventory trends or potential issues, and provide a clear understanding of the store's financial performance
-
-### Business Requirements
-
-**As Little Human Input as Possible:**
-- The stores and the app should be mostly machine run.
-- We want one manager to effectively be able to run many stores.
-- Ideally there won’t be a human at most locations, just the robots that make the drinks.
-
-**Payment System:** *(M)*
-- The app needs to be able to process payments when an order is placed. 
-- Refunds must be able to be processed if the order is canceled before it’s made.
-- There should be a system to track revenue for each location.
-
-**Flavor Syrup Tracking System:** *(M)*
-- There should be a system to remotely check the levels of the flavor syrups at the location.
-- There should be warnings when the syrups get low.
-- The manager of the store should get warnings of when to order new syrups.
-- There should be analytics where the app learns the use of syrups per location and can give you an estimated amount of syrup you should order for a given month.
-
-**Order pickup tracking system:** *(S)*
-- In order to ensure that pickup coolers don’t get full with orders sitting for a long time there needs to be some way to track how long an order has been sitting waiting for pickup.
-- After a certain amount of time the old order should be thrown out to make room for new orders.
-
-**Manager Dashboard:** *(M)*
-- There should be a simple easy way for the store managers to access information about the store.
-- The managers should be able to look at syrup levels at a store.
-- The managers should be able to check on the status of the store and ensure that everything is still working from the app.
-- The dashboard should display a grid of all the available flavors and their levels with the ability to sort by how much is left in a flavor.
-- The dashboard should display a grid of the coolers and their status(full/empty). If the cooler is full it should display a time of how long the order has been sitting in the cooler.
-- The dashboard should display a list of orders processed at the store with the focus being on the in progress and future orders but the manager should be able to view past orders as well.
-- The dashboard should display overall revenue information for the location.
-- The dashboard should display stats of average time between the order being made and picked up and also display stats of how long people are waiting to receive their order.
-
-**AI Help Bot:** *(C)*
-- If customers run into issues there should be an AI chatbot to help guide them through their problems.
-- This help bot should serve most of our customer service needs. 
-
-**Member Loyalty Program:** *(C)*
-- There should be a program where the user builds up points as they purchase drinks. These points can be redeemed for free items once the user has built up enough points.
-
-**Social Media:** *(C)*
-- There will be a link to post to social media (i.e. X, Instagram, Facebook) that will allow users to post about their favorite drinks in order to generate free marketing.
-
-### User requirements
-**Account creation:** *(M)* 
 Users must be able to create an account or log in to the application using a combination of a username, password, and email address. This process includes setting up security measures such as email verification and password strength checks to protect user accounts from unauthorized access.
 
-**Profile management:** *(M)* 
+**Profile Management (M)**
+
 Users should be able to view and edit their profile information after initial sign-up. The profile management system should ensure that updates are reflected in real-time and maintain consistency across all parts of the application, including personalized recommendations and saved preferences.
 
-**Favorite drinks:** *(M)* 
+**Multi-Store Syncing (M)**
+
+Users should be able to access their information from any store. The software should suggest which location to buy from based on saved preferences and current location.
+
+---
+
+### 5.2 Drink Customization & Ordering
+
+**Favorite Drinks (M)**
+
 Users should be able to mark and view their favorite drinks. The application should provide an intuitive interface for users to manage their favorites, and ensure that this list is easily accessible for quick reordering and personalized recommendations.
 
-**Edit preferences:** *(S)* 
-Users should be able to customize their drink preferences. This feature will allow users to refine their experience based on individual tastes, ensuring that drink suggestions and potential promotional offers are tailored to their specific likes and dislikes.
+**Edit Preferences (M)**
+
+Users should be able to customize their drink preferences, including saving their preferred location and getting suggested new drinks based on existing user preferences and previous orders. Users should also be able to dislike ingredients so they aren't recommended.
 
 **First-time user tutorial:** *(S)* 
 New users should be guided through a tutorial when they first use the application. The tutorial should not only introduce the basic functionalities but also highlight unique features of the app, ensuring a smooth onboarding experience and helping users get the most out of the application from the start. 
@@ -172,95 +357,136 @@ Users should be able to rate the drinks they purchase. The rating system should 
 **Chat functionality with AI support staff:** *(C)* 
 Users should be able to chat with an AI-powered support staff for assistance. The AI support staff should be capable of handling a wide range of queries and issues, providing instant help and guidance while learning from reactions to improve its responses over time.
 
-**Loyalty program:** *(C)* 
-A loyalty program should be available to reward repeat customers.This program should offer various incentives such as points, discounts, or exclusive offers, fostering customer retention and encouraging continued patronage by recognizing and rewarding frequent visits.
+---
 
-**Social media functionality:** *(C)* 
-The application should integrate with social media platforms to enhance user engagement and sharing. Users should be able to seamlessly share their experiences and favorite drinks, as well as interact with the soda shop’s social media presence, creating a sense of community and boosting brand visibility.
+### 5.3 Support & Engagement
 
-### User requirements
-**Manager:**
+**Chat Functionality with AI Support Staff (C)**
+
+Users should be able to chat with an AI-powered support staff for assistance. The AI support staff should be capable of handling a wide range of queries and issues, providing instant help and guidance while learning from reactions to improve its responses over time.
+
+**Loyalty Program (C)**
+
+A loyalty program should be available to reward repeat customers. This program should offer various incentives such as points, discounts, or exclusive offers, fostering customer retention and encouraging continued patronage by recognizing and rewarding frequent visits.
+
+**Social Media Functionality (C)**
+
+The application should integrate with social media platforms to enhance user engagement and sharing. Users should be able to seamlessly share their experiences and favorite drinks, as well as interact with the soda shop's social media presence, creating a sense of community and boosting brand visibility.
+
+---
+
+## 6. User Roles & Permissions
+
+### 6.1 New Roles
+
+**logistics_manager**
+- Manage supply distribution within a region
+- Coordinate deliveries between hubs and stores
+- Analyze supply usage via AI using CSV imports
+
+**repair_staff**
+- Manage repair schedules for machines they are in charge of at store locations they manage
+- Import repair schedules from CSV file containing:
+  - store location: address field
+  - machine type: enumerated code of machine types
+  - machine status: one of:
+    - `normal`: machine operating normally
+    - `repair-start`: servicing started; machine is off-line
+    - `repair-end`: servicing finished
+    - `warning`: non-critical issue; operational but needs repair soon
+    - `error`: critical issue; requires repair within a week
+    - `out-of-order`: not operational
+    - `schedule-service`: operational but needs scheduled maintenance within one month
+  - status date: date when the status was recorded
+- Optimize repair schedule to minimize travel time, with constraints including:
+  - maximum time allowed between service visits
+  - maximum time a machine with a warning can remain operational before shutting down without service
+
+**super_admin**
+- Can access data for any store locations
+- Can view any page that anyone else has access to
+
+---
+
+### 6.2 Updated Existing Roles
+
+**admin**
+- Can access their own store information only
+- Has access to manage user account data
+- Has ability to update/remove/unlock user accounts
+- Has the ability to add manager accounts/grant permissions
+
+**manager**
+- Can access their own store information only
 - Has access to data such as stock inventory
 - Has access to user payments
 - Has access to revenue reports
 
-**Account User:**
-- This user has an account they can sign into
-- Account keeps track of user data and suggests new drinks based on preferences as well as remembers previous orders
-- Essentially has all app functionality
+**account_user**
+- Can access their own information from any store
+- Software will suggest which location to buy from based on:
+  - the user's current location and preferred pickup time, or
+  - the user's preferred location
+- Software remembers previous orders and suggests new drinks based on preferences
 
-**General User:**
-- User can use the app to order drinks on a single time basis without creating an account 
-- This user’s data and preferences aren’t saved
+**general_user**
+- User can use the app to order drinks on a single time basis without creating an account
+- This user's data and preferences aren't saved in the system
 
-**Admin (us):**
-- Has access to manage user account data
-- Has ability to update account
-  - remove/unlock user accounts
-- Has the ability to add manager accounts/grant permissions
+---
 
-### MosCow analysis
-**Must haves:**
-- App that works on a phone
-- Geolocation or similar
-- Ordering
-- Payments (when they order. If they cancel reimburse)
-- System orders when ingredients are low
-- AI integration for generating drinks
-- Log in/signup screen
-- Database that keeps track of inventory and updated when inventory is used up – Can see this from the managers side
-- Ability to cancel orders (reimbursement)
-- Option to favorite drinks
+## 7. Use Case Stories
 
-**Should haves:**
-- User can add preferences (likes and dislikes)
-  - Ai can also add these depending on user drinks – uses them for random generated drinks
-- Accessibility
-- Login tutorial for first timers
-- Seasonal menu
-- Ability to choose what time the drink is ready as opposed to making it automatically based on geolocation
-- System to throw out old orders if they have sat in a cooler for too long
+**Logistics Manager**
+- *(M)* As a Logistics Manager, I want to view real-time inventory levels across all stores in my assigned region so that I can make informed supply distribution decisions.
+- *(M)* As a Logistics Manager, I want to assign deliveries from my regional supply hub to stores within and outside my region (up to 1000 miles) so that supply shortages are prevented.
+- *(M)* As a Logistics Manager, I want to coordinate supply transfers between local stores and shared regional suppliers so that demand spikes can be handled without over-reliance on a single hub.
+- *(M)* As a Logistics Manager, I want to import historical supply usage data from CSV files so that AI-assisted demand prediction can generate accurate forecasts.
+- *(M)* As a Logistics Manager, I want to generate and update supply schedules for stores in my region so that deliveries align with predicted demand and inventory thresholds.
+- *(S)* As a Logistics Manager, I want to receive AI-generated alerts when projected demand exceeds available regional supply so that I can proactively adjust delivery plans.”
+- *(S)* As a Logistics Manager, I want to visualize hub-to-store routing on a regional dashboard so that I can optimize delivery efficiency and reduce travel distance.
+- *(C)* As a Logistics Manager, I want to compare historical demand forecasts against actual supply usage so that I can evaluate the accuracy of AI predictions.
+- *(C)* As a Logistics Manager, I want to export supply schedules and demand reports to CSV so that I can share them with external logistics partners if needed.
+- *(S)* As a Logistics Manager, I want to recieve notifications when inventory is low so that I can stay on top of re-ordering supplies
 
-**Could haves:**
-- AI that talks to the customer
-- Ai that receives complaints
-- Customer could rate a drink and the rating gets stored, AI can use this
-- Ability to enable push notifications to notify customers when drinks are ready
-  - Also maybe the ability to subscribe to a text list to promote the shop and keep user informed about deals
-- Loyalty program
-- Social media posts
-- SSO - google, etc
+**Repair Staff**
+- *(M)* As a repair staff member, I want to view all machines assigned to the store locations I manage so that I can monitor their operational status.
+- *(M)* As a repair staff member, I want to import machine repair schedules from a CSV file so that maintenance data can be populated efficiently and consistently.
+- *(M)* As a repair staff member, I want to see the current maintenance status of each machine so that I can prioritize repairs appropriately.
+- *(M)* As a repair staff member, I want to update machine statuses (e.g., warning, error, out-of-order) so that the system reflects real-world conditions.
+- *(M)* As a repair staff member, I want the system to generate an optimized repair schedule that minimizes travel time so that maintenance can be completed efficiently.
+- *(S)* As a repair staff member, I want the system to alert me when a machine in a warning state is approaching its maximum allowed operational time so that I can service it before shutdown.
+- *(S)* As a repair staff member, I want repair schedules to respect maximum time limits between service visits so that machines remain compliant with maintenance requirements.
+- *(C)* As a repair staff member, I want to view historical maintenance records for machines so that I can identify recurring issues.
+- *(W)* As a repair staff member, I want to export repair schedules to a CSV file so that I can share them externally if needed.
 
-**Will not haves:**
-- Use of global trends to determine when the manager should restock: AI may not be able to get good/reliable data, and world trends may not affect CodePop stores. Tracking what is happening in-store should provide similar data anyway.
-- The ability for multiple users to use the same account to keep better track of individual preferences. 
-- Multiple store locations: will keep our focus on 1 location for version 1.
-- The ability to get a refund after a drink is made. 
-- The ability to upload money into the account: payments only made through an outer source. 
-- A gift card system. 
-- A cash processing system. 
+**Super Admin**
+- *(M)* As a super admin, I want to access data for any store location so that I can oversee system-wide operations.
+- *(M)* As a super admin, I want to view performance metrics across all stores so that I can evaluate regional and national trends.
+- *(M)* As a super admin, I want to manage user roles and permissions across all store locations so that access control is enforced consistently.
+- *(C)* As a super admin, I want to generate system-wide reports so that I can review overall inventory, revenue, and maintenance performance.
+- *(S)* As a super admin, I want to monitor supply hub activity across all regions so that distribution issues can be identified early.
+- *(S)* As a super admin, I want to view any page that anyone else has access to so that I can check up on everything.
 
-### Use case stories 
 **Account user stories:**
-- *(M)* As an account user I want to be able to easily and securely sign in to my account to access my drink history and order drinks 
-- *(M)* As an account user, I want to know that my private data such as payment information and geolocation is being protected if I choose to share it. 
+- *(M)* As an account user, I want to be able to easily and securely sign in to my account to access my drink history and order drinks
+- *(M)* As an account user, I want to know that my private data such as payment information and geolocation is being protected if I choose to share it.
 - *(S)* As an account user, I want to have drinks recommended to me based on my preferences.
-- *(M)* As an account user, I want the app to be visually pleasing.
-- *(M)* As an account user I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink. 
+- *(M)* As an account user, I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
 - *(M)* As an account user, I want to be able to save my favorite drinks so I can order them easily in the future
-- *(M)* As an account user, I want to be able to have my drink fresh and ready for me right as I arrive to pick it up. 
-- *(S)* As an account user, I want the option to deny access to my geolocation and instead choose a time for my drink to be ready. 
-- *(M)* As an account user, I want to receive a notification when my soda is ready to pick up. 
+- *(M)* As an account user, I want to be able to have my drink fresh and ready for me right as I arrive to pick it up.
+- *(S)* As an account user, I want the option to deny access to my geolocation and instead choose a time for my drink to be ready.
+- *(M)* As an account user, I want to receive a notification when my soda is ready to pick up.
 - *(M)* As an account user, I want to be able to add payment options to my account so I can pay through the app when I order my drinks.
-- *(M)* As an account user, I want to be refunded if I cancel my drink order. 
+- *(M)* As an account user, I want to be refunded if I cancel my drink order.
 - *(C)* As an account user, I want to be able to rate the sodas I have tried out of 5.
-- *(C)* As an account user, I want AI to use my drink ratings to recommend  future soda combinations.
+- *(C)* As an account user, I want AI to use my drink ratings to recommend future soda combinations.
 - *(M)* As an account user, I want to be able to pay for my drink on the application when I order it.
-- *(C)* As an account user, I want to be able to lodge complaints. 
+- *(C)* As an account user, I want to be able to lodge complaints.
 - *(M)* As an account user, I want to be able to add and remove preferences
-- *(M)* As an account user, I want to be able to dislike ingredients so they aren’t recommended to me. 
-- *(C)* As an account user, I want to be able to share my drinks on social media. 
-- *(S)* As an account user, I want access to a seasonal drink menu for inspiration when making my own drinks. 
+- *(M)* As an account user, I want to be able to dislike ingredients so they aren’t recommended to me.
+- *(C)* As an account user, I want to be able to share my drinks on social media.
+- *(C)* As an account user, I want access to a seasonal drink menu for inspiration when making my own drinks.
 
 **General user stories:**
 - *(M)* As a general user, I want to be able to order drinks from the soda shop without having an account
@@ -269,7 +495,6 @@ The application should integrate with social media platforms to enhance user eng
 - *(M)* As a general user I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
 - *(S)* As a general user, I want to receive a notification when my soda is ready to pick up.
 - *(M)* As a general user, I want to be able to receive a refund if I cancel my order. 
-- *(S)* As an account user, I want access to a seasonal drink menu for inspiration when making my own drinks. 
 
 **Admin User stories**
 - *(M)* As an admin, I want to be able to keep track of inventory.
@@ -292,11 +517,40 @@ The application should integrate with social media platforms to enhance user eng
 - *(M)* As a user, I want simple and user-friendly options for making soda combinations, rating my sodas, and ordering sodas.
 - *(M)* As a user, I want a safe and secure platform that ensures my data, especially my geolocation and email, is protected. 
 - *(S)* As a user, I want the platform to be accessible according to WCAG standards of at least an “A”. 
-- *(S)* As a user, I want a place I can lodge complaints and get helpful feedback.
+- *(C)* As a user, I want a place I can lodge complaints and get helpful feedback.
 
-**Use Case Diagrams**
+---
 
-![User](misc/UserUseCaseDiagram.png)
-![Non Account User](misc/NonAccountUserUseCaseDiagram.png)
-![Manager](misc/ManagerUseCaseDiagram.png)
-![Admin](misc/AdminUseCaseDiagram.png)
+## 8. Out of Scope
+
+- Global trend-based inventory forecasting
+- Shared user accounts
+- Refunds after drink creation
+- Stored-value wallets
+- Gift cards
+- Cash payments
+
+---
+
+## 9. Use Case Diagrams
+
+### 9.1 Admin Use Case Diagram
+![Admin Use Case Diagram](new_user_diagrams/Admin.png)
+
+### 9.2 Logistics Manager Use Case Diagram
+![Logistics Manager Use Case Diagram](new_user_diagrams/LogisticsManager.png)
+
+### 9.3 Manager Use Case Diagram
+![Manager Use Case Diagram](new_user_diagrams/Manager.png)
+
+### 9.4 Repair Staff Use Case Diagram
+![Repair Staff Use Case Diagram](new_user_diagrams/RepairStaff.png)
+
+### 9.5 Super Admin Use Case Diagram
+![Super Admin Use Case Diagram](new_user_diagrams/SuperAdmin.png)
+
+### 9.6 User With Account Use Case Diagram
+![User With Account Use Case Diagram](new_user_diagrams/UserWithAccount.png)
+
+### 9.7 User Without Account Use Case Diagram
+![User Without Account Use Case Diagram](new_user_diagrams/UserWithoutAccount.png)

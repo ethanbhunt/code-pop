@@ -35,3 +35,6 @@ yarn-error.*
 *.tsbuildinfo
 
 **/__pychache__/*
+
+# IP configuration
+ip_address.js

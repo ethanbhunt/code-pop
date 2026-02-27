@@ -10,3 +10,12 @@ codepop_virtual_enviroment
 
 .idea
 node_modules
+
+# Python virtual environments (local only)
+codepop_backend/backend/venv/
+codepop_virtual_environment/
+
+# Catch-all safety for any venv folders
+venv/
+**/venv/
+
