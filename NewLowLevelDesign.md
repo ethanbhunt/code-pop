@@ -6206,88 +6206,19 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
 - [PostgreSQL Security](https://www.postgresql.org/docs/current/sql-syntax.html)
 ---
 
-### **Section 6: User Interfaces, Technology Stack, Deployment & Integrations**
-**Assigned to: Team Member 6**
+![Customer UI Flow Diagram](new_user_diagrams/CustomersPrototype.png)
+![Manager UI Flow Diagram](new_user_diagrams/ManagerPrototype.png)
+![Admin UI Flow Diagram](new_user_diagrams/AdminPrototype.png)
+![Super Admin UI Flow Diagram](new_user_diagrams/SuperAdminPrototype.png)
+![Logistics Manager UI Flow Diagram](new_user_diagrams/LogisticsManagerPrototype.png)
+![Repair Staff UI Flow Diagram](new_user_diagrams/RepairStaffPrototype.png)
 
-#### 6.1 User Interface Prototypes
-**For each user type, provide:**
-- **Screenshots/Mockups** of key interfaces
-- **UI Component Specifications**
-- **Usability Features**
-- **Accessibility Features**
+#### Usability and Accessibility Features
+* Most applicable user interfaces are present in the "home" screen
+* Navbar presents easy and consistent access to other common functionalities
+* Accessibility options are available within settings, but the default theme will be colorblind friendly
 
-**User Types:**
-1. **Customer (Account User)**
-   - Home page
-   - Drink creation page
-   - Cart page
-   - Payment/checkout page
-   - Order confirmation page
-   - Account preferences page
-   - Order history page
-   
-2. **Customer (Guest User)**
-   - Home page (simplified)
-   - Drink creation page
-   - Cart page
-   - Payment/checkout page
-   
-3. **Manager**
-   - Manager dashboard
-   - Revenue reports
-   - Inventory management
-   
-4. **Admin**
-   - Admin dashboard
-   - User management interface
-   - Account creation/editing
-   
-5. **Super Admin**
-   - System-wide dashboard
-   - Multi-store analytics
-   
-6. **Logistics Manager**
-   - Supply hub dashboard
-   - Inventory distribution interface
-   - CSV import/export interface
-   
-7. **Repair Staff**
-   - Maintenance dashboard
-   - Machine status interface
-   - Repair scheduling interface
-
-#### 6.2 Usability & Accessibility
-- **Usability Principles**
-  - Consistency: Design language across all pages
-  - Simplicity: Minimal clicks to complete tasks
-  - Feedback: Clear status indicators
-  - Error prevention: Input validation, confirmation dialogs
-  
-- **Accessibility Implementation**
-  - **WCAG 2.1 Compliance**: Level AA target
-  - **Screen Reader Support**: ARIA labels, semantic HTML
-  - **Keyboard Navigation**: Tab order, focus indicators
-  - **Color Contrast**: WCAG contrast ratios (4.5:1 for text)
-  - **Color Blindness**: Color palette tested for common types
-  - **Text Alternatives**: Alt text for images, icons
-  - **Responsive Design**: Mobile-first approach, flexible layouts
-
-#### 6.3 User Flow Diagrams
-**Key User Interactions:**
-1. **Order Placement Flow**
-   - Start → Browse/Design Drink → Add to Cart → Checkout → Payment → Confirmation
-   - Decision points: Account vs Guest, Payment method, Pickup option
-   
-2. **Account Creation Flow**
-   - Sign up → Email verification → Set preferences → Home
-   
-3. **Order Pickup Flow**
-   - Order ready → QR code generation → User arrives → QR scan → Pickup
-   
-4. **Manager Dashboard Flow**
-   - Login → Dashboard → Select report → View data → Export (optional)
-
-#### 6.4 Technology Stack & Justifications
+#### Technology Stack & Justifications
 **Programming Languages:**
 - **Python**: Backend development
   - Justification: Django framework, AI/ML libraries (Scikit-Learn), extensive ecosystem
@@ -6317,7 +6248,7 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
 
 **Justification for each**: Cost, performance, maintainability, team expertise, community support
 
-#### 6.5 Third-Party Integrations
+#### Third-Party Integrations
 **Detailed integration specifications for each:**
 
 1. **Stripe Payment Processing**
@@ -6363,7 +6294,7 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
    - Features: Account verification, password reset
    - Alternatives considered: Twilio SendGrid API, Mailgun
 
-#### 6.6 Deployment Plan
+#### Deployment Plan
 **Deployment Strategy:**
 - **Containerization**: Docker containers for Django app
 - **Orchestration**: Docker Compose for local, Kubernetes for production (optional)
