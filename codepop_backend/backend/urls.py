@@ -12,6 +12,12 @@ from .views import GenerateAIDrink
 from .views import RevenueViewSet
 from .views import UserOperations
 from .views import emailAPI
+from .views import (
+    RegionListAPIView, StoreListAPIView, SupplyHubListAPIView,
+    MachineListAPIView, MachineDetailAPIView, MaintenanceLogListAPIView,
+    ShipmentListCreateAPIView, ShipmentDetailAPIView,
+    GuestSessionCreateAPIView, GuestSessionGetAPIView,
+)
 
 #this ensures that the url calls the right function from the views for each type of request
 preferences_list = PreferencesOperations.as_view({
@@ -211,5 +217,17 @@ urlpatterns = [
     path('users/delete/<int:user_id>/', user_operations, name='delete_user'),
     path('users/edit/<int:user_id>/', user_operations, name='edit_user'),
 
-    path('email/<int:orderId>/', emailAPI.as_view(), name='Create Email')
+    path('email/<int:orderId>/', emailAPI.as_view(), name='Create Email'),
+
+    # Multi-store, supply, maintenance, guest (RequirementsDoc / HLD)
+    path('regions/', RegionListAPIView.as_view(), name='region_list'),
+    path('stores/', StoreListAPIView.as_view(), name='store_list'),
+    path('supply-hubs/', SupplyHubListAPIView.as_view(), name='supply_hub_list'),
+    path('machines/', MachineListAPIView.as_view(), name='machine_list'),
+    path('machines/<int:pk>/', MachineDetailAPIView.as_view(), name='machine_status'),
+    path('maintenance-logs/', MaintenanceLogListAPIView.as_view(), name='maintenance_log_list'),
+    path('shipments/', ShipmentListCreateAPIView.as_view(), name='shipment_list_create'),
+    path('shipments/<int:pk>/', ShipmentDetailAPIView.as_view(), name='shipment_detail'),
+    path('guest/session/', GuestSessionCreateAPIView.as_view(), name='guest_session_create'),
+    path('guest/session/<str:session_id>/', GuestSessionGetAPIView.as_view(), name='guest_session_get'),
 ]

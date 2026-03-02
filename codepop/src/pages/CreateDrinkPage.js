@@ -338,8 +338,7 @@ const CreateDrinkPage = () => {
 const styles = StyleSheet.create({
   wholePage: {
     flex: 1,
-    backgroundColor: '#FFA686',
-    // padding: 10,
+    backgroundColor: '#020617',
   },
   padding: {
     padding: 10,
@@ -377,10 +376,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#D30C7B',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    backgroundColor: '#22c55e',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
@@ -388,50 +387,53 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    marginVertical: 5,
+    marginVertical: 8,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#022c22',
+    fontSize: 15,
+    fontWeight: '600',
   },
   circularButton: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#D30C7B',
+    borderWidth: 1,
+    borderColor: '#4b5563',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F92758',
+    backgroundColor: 'rgba(15,23,42,0.95)',
     margin: 5,
   },
   circularButtonSelected: {
-    borderColor: '#8DF1D3',
-    backgroundColor: '#E8F5E9',
+    borderColor: '#22c55e',
+    backgroundColor: 'rgba(34,197,94,0.15)',
   },
   selectedButtonText: {
     color: '#000', // Black color for selected text
   },
   searchInput: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 3,
-    paddingHorizontal: 10,
-    width: '80%',
-    marginVertical: 15,
-    borderRadius: 5,
-    alignSelf: 'center', // Center the search input
+    height: 44,
+    borderColor: '#1f2937',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    width: '90%',
+    marginVertical: 16,
+    borderRadius: 999,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,23,42,0.95)',
+    color: '#e5e7eb',
   },
   straw: {
     position: 'absolute',
-    top: 10, // Position the straw above the cup
+    top: 10,
     left: '50%',
     width: 10,
     height: 240,
-    backgroundColor: 'F92758',  // Straw color
+    backgroundColor: '#f97316',
     borderRadius: 5,
-    transform: [{ translateX: -5 }],  // Center the straw horizontally
-    zIndex: 1, // Ensure straw appears on top of the drink container
+    transform: [{ translateX: -5 }],
+    zIndex: 1,
   },
 });
 

@@ -14,10 +14,12 @@ import CompletePage from './src/pages/CompletePage';
 import CreateAccountPage from './src/pages/CreateAccountPage';
 import CreateDrinkPage from './src/pages/CreateDrinkPage';
 import GeneralHomePage from './src/pages/GeneralHomePage';
+import MaintenancePage from './src/pages/MaintenancePage';
 import ManagerDash from './src/pages/ManagerDash';
 import PaymentPage from './src/pages/PaymentPage';
 import PostCheckout from './src/pages/PostCheckout';
 import PreferencesPage from './src/pages/PreferencesPage';
+import StoresPage from './src/pages/StoresPage';
 import UpdateDrink from './src/pages/UpdateDrink';
 import { BASE_URL } from './ip_address';
 
@@ -106,6 +108,7 @@ const App = () => {
               // fontFamily: 'CherryBombOne',
             },}}        
         />
+        <Stack.Screen name="Stores" component={StoresPage} options={{ title: 'Stores' }} />
         <Stack.Screen
           name="GeneralHome"
           component={GeneralHomePage}
@@ -133,6 +136,7 @@ const App = () => {
           component={ManagerDash}
           options={{ title: 'ManagerDash', headerRight: () => (<LogoutButton />) }}
         />
+        <Stack.Screen name="Maintenance" component={MaintenancePage} options={{ title: 'Machines & Maintenance' }} />
         <Stack.Screen
           name="AdminDash"
           component={AdminDash}

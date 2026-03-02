@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Preference, Drink, Inventory, Order, Notification, Revenue
+from .models import (
+    Preference, Drink, Inventory, Order, Notification, Revenue,
+    Region, Store, SupplyHub, Machine, MaintenanceLog, Shipment, UserProfile, GuestSession,
+)
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
@@ -10,9 +13,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ('username', 'password', 'first_name', 'last_name')
-        write_only_fields = ('password')
-        read_only_fields = ('is_staff', 'is_superuser', 'is_active',)
+        fields = ('id', 'username', 'password', 'email', 'first_name', 'last_name', 'is_staff', 'is_superuser')
+        write_only_fields = ('password',)
+        read_only_fields = ('id', 'is_staff', 'is_superuser', 'is_active',)
 
     def create(self, validated_data):
         user = super(CreateUserSerializer, self).create(validated_data)
@@ -54,7 +57,7 @@ class PreferenceSerializer(serializers.ModelSerializer):
             "salted caramel", "chocolate milano", "cinnamon", "choc chip cookie dough", 
             "brown sugar cinnamon", "hazelnut", "white chocolate", "butterscotch", "blue raspberry", 
             "sour", "blue curacao", "bubble gum", "cotton candy", "mojito", "cucumber", "lavender",
-            "pumpkin spice", "peppermint", "irish cream", "gingerbread", "butterbrew mix", "cream", 
+            "pumpkin spice", "pumpkin_spice", "peppermint", "irish cream", "gingerbread", "butterbrew mix", "cream", 
             "coconut cream", "whip", "lemon wedge", "lime wedge", "french vanilla creamer", "candy",
             "sprinkles", "strawberry puree", "peach puree", "mango puree", "raspberry puree", "candy sprinkles", "chocolate"
         ]
@@ -94,11 +97,61 @@ class DrinkSerializer(serializers.ModelSerializer):
 
         return value
 
+class RegionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Region
+        fields = ['RegionID', 'Code', 'Name', 'HubCity']
+
+
+class StoreSerializer(serializers.ModelSerializer):
+    RegionCode = serializers.CharField(source='Region.Code', read_only=True)
+    class Meta:
+        model = Store
+        fields = ['StoreID', 'Name', 'Region', 'RegionCode', 'Address', 'Latitude', 'Longitude', 'IsActive']
+
+
+class SupplyHubSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupplyHub
+        fields = ['HubID', 'Region', 'Name', 'Location', 'IsActive']
+
+
+class MachineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Machine
+        fields = ['MachineID', 'Store', 'MachineType', 'Model', 'OperationalStartDate', 'CurrentStatus']
+
+
+class MaintenanceLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaintenanceLog
+        fields = ['LogID', 'Machine', 'Status', 'Timestamp', 'ResponsibleUser', 'Notes']
+
+
+class ShipmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shipment
+        fields = ['ShipmentID', 'Hub', 'Store', 'Status', 'EstimatedDelivery', 'CreatedAt', 'Notes']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['ProfileID', 'User', 'Role', 'AssignedRegion', 'AssignedHub']
+
+
+class GuestSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GuestSession
+        fields = ['SessionID', 'CreatedAt', 'CartSnapshot']
+        read_only_fields = ['SessionID', 'CreatedAt']
+
+
 class InventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inventory
         fields = [
-            'InventoryID', 'ItemName', 'ItemType', 
+            'InventoryID', 'Store', 'ItemName', 'ItemType',
             'Quantity', 'ThresholdLevel', 'LastUpdated'
         ]
 
@@ -113,9 +166,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'OrderID', 'UserID', 'Drinks', 
-            'OrderStatus', 'PaymentStatus', 
-            'PickupTime', 'CreationTime','LockerCombo',
+            'OrderID', 'UserID', 'Store', 'Drinks',
+            'OrderStatus', 'PaymentStatus',
+            'PickupTime', 'CreationTime', 'LockerCombo',
             'StripeID'
         ]
 
@@ -133,7 +186,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class RevenueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Revenue
-        fields = ['RevenueID', 'OrderID', 'TotalAmount', 'SaleDate', 'Refunded']
+        fields = ['RevenueID', 'OrderID', 'Store', 'TotalAmount', 'SaleDate', 'Refunded']
 
     def create(self, validated_data):
         """Override the create method to ensure total amount calculation when a revenue instance is created."""

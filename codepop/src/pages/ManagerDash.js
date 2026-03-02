@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { BASE_URL } from '../../ip_address';
 
 const ManagerDash = () => {
+  const navigation = useNavigation();
   const [revenue, setRevenue] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [ordersCount, setOrdersCount] = useState(0);
@@ -128,6 +130,15 @@ const ManagerDash = () => {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Orders</Text>
         <Text style={styles.cardContent}>{ordersCount} orders</Text>
+      </View>
+
+      {/* Machines & Maintenance (multi-store feature) */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Machines & Maintenance</Text>
+        <Text style={styles.cardContent}>View machine status by store</Text>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Maintenance')}>
+          <Text style={styles.buttonText}>View Machines</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Inventory Modal */}

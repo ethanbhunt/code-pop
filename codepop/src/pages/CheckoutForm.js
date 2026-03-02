@@ -51,18 +51,19 @@ export default function CheckoutForm(totalPrice) {
       
       console.log(currentList);
 
+      const storeId = await AsyncStorage.getItem('selectedStoreId');
+      const payload = {
+        UserID: userId,
+        Drinks: currentList,
+        OrderStatus: 'processing',
+        PaymentStatus: 'paid',
+        StripeID: stripeNum,
+      };
+      if (storeId) payload.Store = parseInt(storeId, 10);
       const response = await fetch(`${BASE_URL}/backend/orders/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          UserID: userId,
-          Drinks: currentList,
-          OrderStatus: 'processing',
-          PaymentStatus: 'paid',
-          StripeID: stripeNum,
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
       // Check if the request was successful

@@ -196,44 +196,48 @@ const CartPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFA686',
+    backgroundColor: '#020617',
   },
   padding: {
     padding: 16,
   },
   headerText: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 10,
+    fontWeight: '700',
+    color: '#f9fafb',
+    marginBottom: 4,
     textAlign: 'center',
     padding: 16,
   },
   drinkContainer: {
-    backgroundColor: '#C8E6C9',
+    backgroundColor: 'rgba(15,23,42,0.96)',
     padding: 16,
     marginVertical: 8,
-    borderRadius: 8,
-    elevation: 2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(31,41,55,0.9)',
   },
   drinkText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e5e7eb',
   },
   ingredientsText: {
-    fontSize: 16,
-    marginTop: 5,
+    fontSize: 13,
+    marginTop: 6,
+    color: '#9ca3af',
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 5,
+    fontSize: 15,
+    fontWeight: '600',
+    marginTop: 8,
+    color: '#f9fafb',
   },
   emptyCartText: {
     fontSize: 18,
     textAlign: 'center',
-    color: '#000',
-    marginTop: 20,
+    color: '#9ca3af',
+    marginTop: 24,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -245,30 +249,30 @@ const styles = StyleSheet.create({
   },
   totalText: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
     marginVertical: 20,
-    padding: 10,                // Adds space inside the border
-    borderWidth: 2,             // Thickness of the border
-    borderColor: '#F92758',     // Color of the border
-    borderRadius: 10,           // Rounds the corners
-    backgroundColor: '#F92758', // Optional: background color to make it stand out
-    color: '#fff',            // Text color to match or contrast with border
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: '#22c55e',
+    color: '#022c22',
   },
   payButton: {
-    backgroundColor: '#D30C7B',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    backgroundColor: '#22c55e',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     marginBottom: 80,
-    borderRadius: 8,
+    borderRadius: 999,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   payButtonText: {
-    color: '#fff',
+    color: '#022c22',
     fontSize: 16,
     marginLeft: 8,
+    fontWeight: '600',
   },
   listContainer: {
     paddingBottom: 20,

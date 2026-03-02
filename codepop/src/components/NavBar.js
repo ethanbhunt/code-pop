@@ -30,7 +30,10 @@ const NavBar = () => {
 
       <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
         <Icon name="cart-outline" size={24} color="#000" />
-        {/* <Text style={styles.navItem}>Cart</Text> */}
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.navigate('Stores')}>
+        <Icon name="location-outline" size={24} color="#000" />
       </TouchableOpacity>
       
       <TouchableOpacity onPress={() => navigation.navigate('ComplaintsPage')}>

@@ -11,8 +11,16 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
-from .models import Preference, Drink, Inventory, Notification, Order, Revenue
-from .serializers import CreateUserSerializer, GetUserSerializer, PreferenceSerializer, DrinkSerializer, InventorySerializer, NotificationSerializer, OrderSerializer, RevenueSerializer
+from .models import (
+    Preference, Drink, Inventory, Notification, Order, Revenue,
+    Region, Store, SupplyHub, Machine, MaintenanceLog, Shipment, UserProfile, GuestSession,
+)
+from .serializers import (
+    CreateUserSerializer, GetUserSerializer, PreferenceSerializer, DrinkSerializer, InventorySerializer,
+    NotificationSerializer, OrderSerializer, RevenueSerializer,
+    RegionSerializer, StoreSerializer, SupplyHubSerializer, MachineSerializer, MaintenanceLogSerializer,
+    ShipmentSerializer, GuestSessionSerializer,
+)
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
 from django.conf import settings
@@ -44,13 +52,19 @@ class CustomAuthToken(ObtainAuthToken):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
+        role = 'user'
+        try:
+            profile = UserProfile.objects.get(User=user)
+            role = profile.Role
+        except UserProfile.DoesNotExist:
+            pass
         return Response({
             'token': token.key,
             'user_id': user.pk,
             'first_name': user.first_name,
-            'is_admin' : user.is_superuser,
-            'is_manager' : user.is_staff,
-            
+            'is_admin': user.is_superuser,
+            'is_manager': user.is_staff,
+            'role': role,
         })
 
 #Code to create a user in the database
@@ -62,9 +76,11 @@ class CreateUserAPIView(CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        user = serializer.instance
+        # Create UserProfile with role=user for new registrations
+        UserProfile.objects.get_or_create(User=user, defaults={'Role': 'user'})
         headers = self.get_success_headers(serializer.data)
-        # We create a token than will be used for future auth
-        token = Token.objects.create(user=serializer.instance)
+        token = Token.objects.create(user=user)
         token_data = {"token": token.key}
         return Response(
             {**serializer.data, **token_data},
@@ -188,9 +204,15 @@ class UserDrinksLookup(ListAPIView):
 
 
 class InventoryListAPIView(ListAPIView):
-    """List all items that are not out of stock."""
-    queryset = Inventory.objects.filter(Quantity__gt=0)
+    """List inventory; optional ?store_id= filters by store."""
     serializer_class = InventorySerializer
+
+    def get_queryset(self):
+        qs = Inventory.objects.filter(Quantity__gt=0)
+        store_id = self.request.query_params.get('store_id')
+        if store_id:
+            qs = qs.filter(Store_id=store_id)
+        return qs
 
 class InventoryReportAPIView(APIView):
     """Generate an inventory report."""
@@ -377,38 +399,29 @@ class OrderOperations(viewsets.ModelViewSet):
     #     return super().get_permissions()
 
     def create(self, request, *args, **kwargs):
-        # Extract data from the request
         user_id = request.data.get("UserID", None)
         drinks = request.data.get("Drinks", [])
         order_status = request.data.get("OrderStatus", "processing")
         payment_status = request.data.get("PaymentStatus", "pending")
         stripe_id = request.data.get("StripeID", None)
+        store_id = request.data.get("Store", None) or request.data.get("store_id", None)
 
-         # Log extracted values
-        print(f"UserID: {user_id}, Drinks: {drinks}, OrderStatus: {order_status}, PaymentStatus: {payment_status}, StripeID: {stripe_id}")
-
-        # Create a new order
         order_data = {
             "UserID": user_id,
-            "order_status": order_status,
+            "OrderStatus": order_status,
             "Drinks": drinks,
             "PaymentStatus": payment_status,
-            "StripeID": stripe_id,
+            "StripeID": stripe_id or "",
         }
+        if store_id is not None:
+            order_data["Store"] = store_id
 
         serializer = self.get_serializer(data=order_data)
         if serializer.is_valid():
             order = serializer.save()
-
-            # Add drinks to the order if provided
             if drinks:
                 order.add_drinks(drinks)
-
-            # Return the created order's data
             return Response(self.get_serializer(order).data, status=status.HTTP_201_CREATED)
-
-        print("Serializer errors:", serializer.errors)
-        # Handle validation errors
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
@@ -608,18 +621,25 @@ class GenerateAIDrink(APIView):
 
 
 class RevenueViewSet(viewsets.ModelViewSet):
-    """
-    A viewset for listing, retrieving, creating, and filtering revenue records.
-    """
     queryset = Revenue.objects.all()
     serializer_class = RevenueSerializer
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        """
-        Custom create method to ensure the total amount is calculated if not provided.
-        """
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order_id = serializer.validated_data.get('OrderID')
+        store = None
+        if order_id:
+            try:
+                order = Order.objects.get(OrderID=order_id)
+                store = order.Store
+            except Order.DoesNotExist:
+                pass
+        if store is not None:
+            serializer.validated_data['Store'] = store
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         """
@@ -698,4 +718,141 @@ class UserOperations(viewsets.ModelViewSet):
             return JsonResponse({"message":"User edited successfully"}, status=status.HTTP_200_OK)
         except Exception as e:
             return JsonResponse({'Error': str(e)}, status=400)
-        
+
+
+# --- Multi-store, supply hubs, machines, maintenance, guest (RequirementsDoc / HLD) ---
+
+class RegionListAPIView(ListAPIView):
+    permission_classes = [AllowAny]
+    queryset = Region.objects.all()
+    serializer_class = RegionSerializer
+
+
+class StoreListAPIView(ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = StoreSerializer
+
+    def get_queryset(self):
+        qs = Store.objects.filter(IsActive=True).select_related('Region')
+        region_id = self.request.query_params.get('region_id')
+        if region_id:
+            qs = qs.filter(Region_id=region_id)
+        return qs
+
+
+class SupplyHubListAPIView(ListAPIView):
+    permission_classes = [AllowAny]
+    queryset = SupplyHub.objects.filter(IsActive=True).select_related('Region')
+    serializer_class = SupplyHubSerializer
+
+
+class MachineListAPIView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MachineSerializer
+
+    def get_queryset(self):
+        qs = Machine.objects.select_related('Store')
+        store_id = self.request.query_params.get('store_id')
+        if store_id:
+            qs = qs.filter(Store_id=store_id)
+        return qs
+
+
+class MachineDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        """Update machine status and create a MaintenanceLog entry."""
+        machine = get_object_or_404(Machine, pk=pk)
+        new_status = request.data.get('CurrentStatus') or request.data.get('current_status')
+        if not new_status or new_status not in dict(Machine.MAINTENANCE_STATUS_CHOICES):
+            return Response({'error': 'Valid CurrentStatus required'}, status=status.HTTP_400_BAD_REQUEST)
+        old_status = machine.CurrentStatus
+        machine.CurrentStatus = new_status
+        machine.save()
+        MaintenanceLog.objects.create(
+            Machine=machine,
+            Status=new_status,
+            ResponsibleUser=request.user if request.user.is_authenticated else None,
+            Notes=request.data.get('notes', ''),
+        )
+        return Response(MachineSerializer(machine).data, status=status.HTTP_200_OK)
+
+
+class MaintenanceLogListAPIView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MaintenanceLogSerializer
+
+    def get_queryset(self):
+        qs = MaintenanceLog.objects.select_related('Machine', 'ResponsibleUser')
+        machine_id = self.request.query_params.get('machine_id')
+        store_id = self.request.query_params.get('store_id')
+        if machine_id:
+            qs = qs.filter(Machine_id=machine_id)
+        if store_id:
+            qs = qs.filter(Machine__Store_id=store_id)
+        return qs.order_by('-Timestamp')
+
+
+class ShipmentListCreateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = Shipment.objects.select_related('Hub', 'Store')
+        hub_id = request.query_params.get('hub_id')
+        store_id = request.query_params.get('store_id')
+        if hub_id:
+            qs = qs.filter(Hub_id=hub_id)
+        if store_id:
+            qs = qs.filter(Store_id=store_id)
+        return Response(ShipmentSerializer(qs.order_by('-CreatedAt'), many=True).data)
+
+    def post(self, request):
+        serializer = ShipmentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ShipmentDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        shipment = get_object_or_404(Shipment, pk=pk)
+        new_status = request.data.get('Status') or request.data.get('status')
+        if new_status and new_status in dict(Shipment.STATUS_CHOICES):
+            shipment.Status = new_status
+            shipment.save()
+        return Response(ShipmentSerializer(shipment).data, status=status.HTTP_200_OK)
+
+
+class GuestSessionCreateAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        import secrets
+        session_id = secrets.token_urlsafe(32)
+        cart = request.data.get('CartSnapshot') if isinstance(request.data, dict) else None
+        guest = GuestSession.objects.create(SessionID=session_id, CartSnapshot=cart)
+        return Response(
+            {'SessionID': guest.SessionID, 'CreatedAt': guest.CreatedAt},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class GuestSessionGetAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, session_id):
+        guest = get_object_or_404(GuestSession, SessionID=session_id)
+        return Response(GuestSessionSerializer(guest).data)
+
+    def patch(self, request, session_id):
+        guest = get_object_or_404(GuestSession, SessionID=session_id)
+        cart = request.data.get('CartSnapshot')
+        if cart is not None:
+            guest.CartSnapshot = cart
+            guest.save()
+        return Response(GuestSessionSerializer(guest).data)
+

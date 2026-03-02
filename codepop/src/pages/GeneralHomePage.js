@@ -125,59 +125,58 @@ const GeneralHomePage = () => {
 
   return (
     <View style={styles.container}>
-      <Image 
-                source={require('../../assets/PinkBubbles.png')}
-                style={styles.image}
-                resizeMode="cover"
-            />
+      <Image
+        source={require('../../assets/PinkBubbles.png')}
+        style={styles.image}
+        resizeMode="cover"
+      />
+      <View style={styles.overlay} />
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* If logged in, display the username and Logout button, otherwise display Login button */}
-        {isLoggedIn ? (
-          <>
-            {/* Conditionally render the "Hello <username>" if username exists */}
-            {name ? <Text style={styles.greeting}>Hello {name}!</Text> : null}
+        <View style={styles.hero}>
+          <Text style={styles.logoText}>CodePop</Text>
+          {name ? (
+            <Text style={styles.greeting}>Welcome back, {name}</Text>
+          ) : (
+            <Text style={styles.greeting}>Craft your perfect drink.</Text>
+          )}
+          <Text style={styles.subtitle}>
+            Smart recommendations, custom creations, and a smoother soda run.
+          </Text>
+        </View>
 
-            {/* The main title */}
-            <Text style={styles.title}>Welcome to the CodePop App!</Text>
-            <SeasonalCarousel style={styles.carousel}/>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={generateDrinks} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Generate Drinks</Text>
+        <SeasonalCarousel style={styles.carousel} />
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity onPress={generateDrinks} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Generate drink with AI</Text>
+          </TouchableOpacity>
+
+          {isLoggedIn ? (
+            <TouchableOpacity onPress={handleLogout} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Logout</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={goToLoginPage} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Sign in</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isLoggedIn && (isAdmin || isManager) && (
+          <View style={styles.adminRow}>
+            {isAdmin && (
+              <TouchableOpacity onPress={goToAdminDash} style={styles.chipButton}>
+                <Text style={styles.chipText}>Admin dashboard</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleLogout} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Logout</Text>
+            )}
+            {isManager && (
+              <TouchableOpacity onPress={goToManDash} style={styles.chipButton}>
+                <Text style={styles.chipText}>Manager dashboard</Text>
               </TouchableOpacity>
-              {/*If the user is an admin display a button for navigation to the admin dash*/}
-              {isAdmin ? (
-                <>
-                <TouchableOpacity onPress={goToAdminDash} style={styles.mediumButton}>
-                  <Text style={styles.buttonText}>Admin Dash</Text>
-                </TouchableOpacity>
-                </>
-              ): (<></>)}
-              {/*If the user is an admin display a button for navigation to the admin dash*/}
-              {isManager ? (
-                <>
-                <TouchableOpacity onPress={goToManDash} style={styles.mediumButton}>
-                  <Text style={styles.buttonText}>Manager Dash</Text>
-                </TouchableOpacity>
-                </>
-              ): (<></>)}  
-            </View>
-          </>
-        ) : (
-          <>
-            <SeasonalCarousel style={styles.carousel}/>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={generateDrinks} style={styles.mediumButton}>
-              <Text style={styles.buttonText}>Generate Drinks</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={goToLoginPage} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Login</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+            )}
+          </View>
         )}
+
         <NavBar />
       </ScrollView>
     </View>
@@ -185,51 +184,106 @@ const GeneralHomePage = () => {
 };
 
 const styles = StyleSheet.create({
-  image: {
-    width: '100%',
-    height: '150%',
-    ...StyleSheet.absoluteFillObject,
-  },
   container: {
     flex: 1,
-    padding: 0,
-    backgroundColor: '#D30C7B',
-    zIndex: 2, // Ensure it's above the image
-
+    backgroundColor: '#020617',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    ...StyleSheet.absoluteFillObject,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.8)',
   },
   contentContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 90,
   },
-  mediumButton: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#8DF1D3',
-    borderRadius: 10,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+  hero: {
+    width: '100%',
+    marginBottom: 24,
   },
-  buttonText: {
-    fontSize: 16,
-    color: '#000',
+  logoText: {
+    fontSize: 36,
+    color: '#f9fafb',
+    fontFamily: 'CherryBombOne',
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   greeting: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 20,
+    color: '#e5e7eb',
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    lineHeight: 20,
   },
   carousel: {
-    margin: 0,
-    padding: 0,
+    width: '100%',
+    marginBottom: 24,
   },
-  title: {
-    fontSize: 25,
-  }
+  buttonRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  primaryButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#22c55e',
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+  },
+  primaryButtonText: {
+    color: '#022c22',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#4b5563',
+    backgroundColor: 'rgba(15,23,42,0.9)',
+  },
+  secondaryButtonText: {
+    color: '#e5e7eb',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  adminRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  chipButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: 'rgba(37,99,235,0.9)',
+  },
+  chipText: {
+    color: '#e5e7eb',
+    fontSize: 13,
+    fontWeight: '500',
+  },
 });
 
 export default GeneralHomePage;
