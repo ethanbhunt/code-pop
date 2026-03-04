@@ -438,86 +438,86 @@ The application should integrate with social media platforms to enhance user eng
 ## 7. Use Case Stories
 
 **Logistics Manager**
-- *(M)* As a Logistics Manager, I want to view real-time inventory levels across all stores in my assigned region so that I can make informed supply distribution decisions.
-- *(M)* As a Logistics Manager, I want to assign deliveries from my regional supply hub to stores within and outside my region (up to 1000 miles) so that supply shortages are prevented.
-- *(M)* As a Logistics Manager, I want to coordinate supply transfers between local stores and shared regional suppliers so that demand spikes can be handled without over-reliance on a single hub.
-- *(M)* As a Logistics Manager, I want to import historical supply usage data from CSV files so that AI-assisted demand prediction can generate accurate forecasts.
-- *(M)* As a Logistics Manager, I want to generate and update supply schedules for stores in my region so that deliveries align with predicted demand and inventory thresholds.
-- *(S)* As a Logistics Manager, I want to receive AI-generated alerts when projected demand exceeds available regional supply so that I can proactively adjust delivery plans.”
-- *(S)* As a Logistics Manager, I want to visualize hub-to-store routing on a regional dashboard so that I can optimize delivery efficiency and reduce travel distance.
-- *(C)* As a Logistics Manager, I want to compare historical demand forecasts against actual supply usage so that I can evaluate the accuracy of AI predictions.
-- *(C)* As a Logistics Manager, I want to export supply schedules and demand reports to CSV so that I can share them with external logistics partners if needed.
-- *(S)* As a Logistics Manager, I want to recieve notifications when inventory is low so that I can stay on top of re-ordering supplies
+1. *(M)* As a Logistics Manager, I want to view real-time inventory levels across all stores in my assigned region so that I can make informed supply distribution decisions.
+2. *(M)* As a Logistics Manager, I want to assign deliveries from my regional supply hub to stores within and outside my region (up to 1000 miles) so that supply shortages are prevented.
+3. *(M)* As a Logistics Manager, I want to coordinate supply transfers between local stores and shared regional suppliers so that demand spikes can be handled without over-reliance on a single hub.
+4. *(M)* As a Logistics Manager, I want to import historical supply usage data from CSV files so that AI-assisted demand prediction can generate accurate forecasts.
+5. *(M)* As a Logistics Manager, I want to generate and update supply schedules for stores in my region so that deliveries align with predicted demand and inventory thresholds.
+6. *(S)* As a Logistics Manager, I want to receive AI-generated alerts when projected demand exceeds available regional supply so that I can proactively adjust delivery plans.”
+7. *(S)* As a Logistics Manager, I want to visualize hub-to-store routing on a regional dashboard so that I can optimize delivery efficiency and reduce travel distance.
+8. *(C)* As a Logistics Manager, I want to compare historical demand forecasts against actual supply usage so that I can evaluate the accuracy of AI predictions.
+9. *(C)* As a Logistics Manager, I want to export supply schedules and demand reports to CSV so that I can share them with external logistics partners if needed.
+1. *(S)* As a Logistics Manager, I want to recieve notifications when inventory is low so that I can stay on top of re-ordering supplies.
 
 **Repair Staff**
-- *(M)* As a repair staff member, I want to view all machines assigned to the store locations I manage so that I can monitor their operational status.
-- *(M)* As a repair staff member, I want to import machine repair schedules from a CSV file so that maintenance data can be populated efficiently and consistently.
-- *(M)* As a repair staff member, I want to see the current maintenance status of each machine so that I can prioritize repairs appropriately.
-- *(M)* As a repair staff member, I want to update machine statuses (e.g., warning, error, out-of-order) so that the system reflects real-world conditions.
-- *(M)* As a repair staff member, I want the system to generate an optimized repair schedule that minimizes travel time so that maintenance can be completed efficiently.
-- *(S)* As a repair staff member, I want the system to alert me when a machine in a warning state is approaching its maximum allowed operational time so that I can service it before shutdown.
-- *(S)* As a repair staff member, I want repair schedules to respect maximum time limits between service visits so that machines remain compliant with maintenance requirements.
-- *(C)* As a repair staff member, I want to view historical maintenance records for machines so that I can identify recurring issues.
-- *(W)* As a repair staff member, I want to export repair schedules to a CSV file so that I can share them externally if needed.
+11 *(M)* As a repair staff member, I want to view all machines assigned to the store locations I manage so that I can monitor their operational status.
+1. *(M)* As a repair staff member, I want to import machine repair schedules from a CSV file so that maintenance data can be populated efficiently and consistently.
+1. *(M)* As a repair staff member, I want to see the current maintenance status of each machine so that I can prioritize repairs appropriately.
+1. *(M)* As a repair staff member, I want to update machine statuses (e.g., warning, error, out-of-order) so that the system reflects real-world conditions.
+1. *(M)* As a repair staff member, I want the system to generate an optimized repair schedule that minimizes travel time so that maintenance can be completed efficiently.
+1. *(S)* As a repair staff member, I want the system to alert me when a machine in a warning state is approaching its maximum allowed operational time so that I can service it before shutdown.
+1. *(S)* As a repair staff member, I want repair schedules to respect maximum time limits between service visits so that machines remain compliant with maintenance requirements.
+1. *(C)* As a repair staff member, I want to view historical maintenance records for machines so that I can identify recurring issues.
+1. *(W)* As a repair staff member, I want to export repair schedules to a CSV file so that I can share them externally if needed.
 
 **Super Admin**
-- *(M)* As a super admin, I want to access data for any store location so that I can oversee system-wide operations.
-- *(M)* As a super admin, I want to view performance metrics across all stores so that I can evaluate regional and national trends.
-- *(M)* As a super admin, I want to manage user roles and permissions across all store locations so that access control is enforced consistently.
-- *(C)* As a super admin, I want to generate system-wide reports so that I can review overall inventory, revenue, and maintenance performance.
-- *(S)* As a super admin, I want to monitor supply hub activity across all regions so that distribution issues can be identified early.
-- *(S)* As a super admin, I want to view any page that anyone else has access to so that I can check up on everything.
+20. *(M)* As a super admin, I want to access data for any store location so that I can oversee system-wide operations.
+21. *(M)* As a super admin, I want to view performance metrics across all stores so that I can evaluate regional and national trends.
+22. *(M)* As a super admin, I want to manage user roles and permissions across all store locations so that access control is enforced consistently.
+23. *(C)* As a super admin, I want to generate system-wide reports so that I can review overall inventory, revenue, and maintenance performance.
+24. *(S)* As a super admin, I want to monitor supply hub activity across all regions so that distribution issues can be identified early.
+25. *(S)* As a super admin, I want to view any page that anyone else has access to so that I can check up on everything.
 
 **Account user stories:**
-- *(M)* As an account user, I want to be able to easily and securely sign in to my account to access my drink history and order drinks
-- *(M)* As an account user, I want to know that my private data such as payment information and geolocation is being protected if I choose to share it.
-- *(S)* As an account user, I want to have drinks recommended to me based on my preferences.
-- *(M)* As an account user, I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
-- *(M)* As an account user, I want to be able to save my favorite drinks so I can order them easily in the future
-- *(M)* As an account user, I want to be able to have my drink fresh and ready for me right as I arrive to pick it up.
-- *(S)* As an account user, I want the option to deny access to my geolocation and instead choose a time for my drink to be ready.
-- *(M)* As an account user, I want to receive a notification when my soda is ready to pick up.
-- *(M)* As an account user, I want to be able to add payment options to my account so I can pay through the app when I order my drinks.
-- *(M)* As an account user, I want to be refunded if I cancel my drink order.
-- *(C)* As an account user, I want to be able to rate the sodas I have tried out of 5.
-- *(C)* As an account user, I want AI to use my drink ratings to recommend future soda combinations.
-- *(M)* As an account user, I want to be able to pay for my drink on the application when I order it.
-- *(C)* As an account user, I want to be able to lodge complaints.
-- *(M)* As an account user, I want to be able to add and remove preferences
-- *(M)* As an account user, I want to be able to dislike ingredients so they aren’t recommended to me.
-- *(C)* As an account user, I want to be able to share my drinks on social media.
-- *(C)* As an account user, I want access to a seasonal drink menu for inspiration when making my own drinks.
+26. *(M)* As an account user, I want to be able to easily and securely sign in to my account to access my drink history and order drinks
+27. *(M)* As an account user, I want to know that my private data such as payment information and geolocation is being protected if I choose to share it.
+28. *(S)* As an account user, I want to have drinks recommended to me based on my preferences.
+29. *(M)* As an account user, I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
+30. *(M)* As an account user, I want to be able to save my favorite drinks so I can order them easily in the future
+31. *(M)* As an account user, I want to be able to have my drink fresh and ready for me right as I arrive to pick it up.
+32. *(S)* As an account user, I want the option to deny access to my geolocation and instead choose a time for my drink to be ready.
+33. *(M)* As an account user, I want to receive a notification when my soda is ready to pick up.
+34. *(M)* As an account user, I want to be able to add payment options to my account so I can pay through the app when I order my drinks.
+35. *(M)* As an account user, I want to be refunded if I cancel my drink order.
+36. *(C)* As an account user, I want to be able to rate the sodas I have tried out of 5.
+37. *(C)* As an account user, I want AI to use my drink ratings to recommend future soda combinations.
+38. *(M)* As an account user, I want to be able to pay for my drink on the application when I order it.
+39. *(C)* As an account user, I want to be able to lodge complaints.
+40. *(M)* As an account user, I want to be able to add and remove preferences
+41. *(M)* As an account user, I want to be able to dislike ingredients so they aren’t recommended to me.
+42. *(C)* As an account user, I want to be able to share my drinks on social media.
+43. *(C)* As an account user, I want access to a seasonal drink menu for inspiration when making my own drinks.
 
 **General user stories:**
-- *(M)* As a general user, I want to be able to order drinks from the soda shop without having an account
-- *(M)* As a general user I want to be able to create personalized drinks to order
-- *(S)* As a general user, I want to be able to see drink suggestions based on popular drinks so I have ideas to order
-- *(M)* As a general user I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
-- *(S)* As a general user, I want to receive a notification when my soda is ready to pick up.
-- *(M)* As a general user, I want to be able to receive a refund if I cancel my order. 
+44. *(M)* As a general user, I want to be able to order drinks from the soda shop without having an account
+45. *(M)* As a general user I want to be able to create personalized drinks to order
+46. *(S)* As a general user, I want to be able to see drink suggestions based on popular drinks so I have ideas to order
+47. *(M)* As a general user I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
+48. *(S)* As a general user, I want to receive a notification when my soda is ready to pick up.
+49. *(M)* As a general user, I want to be able to receive a refund if I cancel my order. 
 
 **Admin User stories**
-- *(M)* As an admin, I want to be able to keep track of inventory.
-- *(M)* As an admin, I want to be able to access certain user data such as the number of user accounts.
-- *(M)* As an admin, I want to be able to see and keep track of the cost of inventory and maintenance of the shop.
-- *(M)* As an admin, I want to be able to see how much money the shop is bringing in.
-- *(M)* As an admin, I want to be able to see general and account user complaints.
-- *(S)* As an admin, I want to receive all available data in the form of easily understandable and regular reports.
-- *(M)* As an admin, I want the ability to manage user accounts. This includes overriding locked accounts, disabling accounts, and deleting user accounts.
-- *(M)* As an admin, I want to be able to add permissions to manager accounts.
+50. *(M)* As an admin, I want to be able to keep track of inventory.
+51. *(M)* As an admin, I want to be able to access certain user data such as the number of user accounts.
+52. *(M)* As an admin, I want to be able to see and keep track of the cost of inventory and maintenance of the shop.
+53. *(M)* As an admin, I want to be able to see how much money the shop is bringing in.
+54. *(M)* As an admin, I want to be able to see general and account user complaints.
+55. *(S)* As an admin, I want to receive all available data in the form of easily understandable and regular reports.
+56. *(M)* As an admin, I want the ability to manage user accounts. This includes overriding locked accounts, disabling accounts, and deleting user accounts.
+57. *(M)* As an admin, I want to be able to add permissions to manager accounts.
 
 **Manager User stories**
-- *(S)* As a manager, I want to be able to see store revenue reports from the database.
-- *(M)* As a manager, I want to be notified when inventory is low. 
-- *(S)* As a manager, I want to be able to order more inventory when it is low.
-- *(M)* As a manager, I want to be able to see inventory and usage data pertinent to running the store in the form of regular reports.
+58. *(S)* As a manager, I want to be able to see store revenue reports from the database.
+59. *(M)* As a manager, I want to be notified when inventory is low. 
+60. *(S)* As a manager, I want to be able to order more inventory when it is low.
+61. *(M)* As a manager, I want to be able to see inventory and usage data pertinent to running the store in the form of regular reports.
 
 **General system stories**
-- *(M)* As a user, I want all my options to be easily accessible and useful. 
-- *(M)* As a user, I want simple and user-friendly options for making soda combinations, rating my sodas, and ordering sodas.
-- *(M)* As a user, I want a safe and secure platform that ensures my data, especially my geolocation and email, is protected. 
-- *(S)* As a user, I want the platform to be accessible according to WCAG standards of at least an “A”. 
-- *(C)* As a user, I want a place I can lodge complaints and get helpful feedback.
+62. *(M)* As a user, I want all my options to be easily accessible and useful. 
+63. *(M)* As a user, I want simple and user-friendly options for making soda combinations, rating my sodas, and ordering sodas.
+64. *(M)* As a user, I want a safe and secure platform that ensures my data, especially my geolocation and email, is protected. 
+65. *(S)* As a user, I want the platform to be accessible according to WCAG standards of at least an “A”. 
+66. *(C)* As a user, I want a place I can lodge complaints and get helpful feedback.
 
 ---
 
