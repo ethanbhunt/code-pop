@@ -9,10 +9,6 @@ This document explains how to set up the planned distributed database environmen
 
 Both frontends are clients of backend services. Neither frontend connects directly to any database.
 
-This guide covers the target multi-node deployment described in [RequirementsDoc.md](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\RequirementsDoc.md), [DevelopmentTasks.md](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\DevelopmentTasks.md), [HighLevelDesign.md](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\HighLevelDesign.md), and [LowLevelDesign.md](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\LowLevelDesign.md).
-
-This guide does not describe the current single-node local development setup in [README.md](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\README.md), [docker-compose.yml](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\docker-compose.yml), or [codepop_backend/codepop_backend/settings.py](c:\Users\Matth\Box\Homework\Year 4\Semester 2\Introduction to Software Engineering\code-pop\codepop_backend\codepop_backend\settings.py).
-
 ## 2. Target Topology
 
 ### 2.1 Node Types
