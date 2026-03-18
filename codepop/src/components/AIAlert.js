@@ -7,7 +7,7 @@ import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
 import Modal from 'react-native-modal';
 
-const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
+const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
   const navigation = useNavigation();
 
   const createObj = async () => {
@@ -156,6 +156,12 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
                 <Text style={styles.buttonText}>Add to Cart</Text>
               </TouchableOpacity>
 
+              {onRegenerate && (
+                <TouchableOpacity style={styles.newOptionButton} onPress={onRegenerate}>
+                  <Text style={styles.buttonText}>New Option</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity style={styles.buttons} onPress={toggleModal}>
                 <Text style={styles.buttonText}>Dismiss</Text>
               </TouchableOpacity>
@@ -229,6 +235,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     marginBottom: 10, // Adds space between buttons
+  },
+  newOptionButton: {
+    backgroundColor: '#8DF1D3',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    marginBottom: 10,
   },
   buttonText: {
     color: '#000',
