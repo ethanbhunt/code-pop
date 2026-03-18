@@ -1,16 +1,28 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
+import { Role } from "@/lib/roles";
+
 /**
  * Auth.js config: validates users against codepop_backend (Django).
  *
- * Backend: POST { baseUrl }/backend/auth/login/
+ * Backend: POST { baseUrl }/auth/login/
  *   Body: username & password (form-urlencoded or JSON)
  *   Success (200): { token, user_id, first_name, is_admin, is_manager }
+ *
+ * NOTE: Your backend does not yet model fine-grained roles.
+ * For now we infer a temporary role set from `is_admin` and `is_manager`.
  */
 const djangoLoginUrl = process.env.DJANGO_API_URL
   ? `${process.env.DJANGO_API_URL.replace(/\/$/, "")}/auth/login/`
   : "";
+
+function inferRoles(data: { is_admin?: boolean; is_manager?: boolean }): Role[] {
+  // Temporary mapping until backend roles exist.
+  if (data.is_admin) return [Role.SuperAdmin, Role.Admin];
+  if (data.is_manager) return [Role.Manager, Role.LogisticsManager];
+  return [Role.RepairStaff];
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -46,10 +58,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
         if (!data?.token || data.user_id == null) return null;
 
+        const roles = inferRoles({ is_admin: data.is_admin, is_manager: data.is_manager });
+
         return {
           id: String(data.user_id),
           email: credentials.username as string,
           name: (data.first_name ?? credentials.username) as string,
+          roles,
         };
       },
     }),
@@ -64,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.roles = (user as unknown as { roles?: Role[] }).roles ?? [];
       }
       return token;
     },
@@ -72,6 +88,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        (session.user as unknown as { roles?: Role[] }).roles =
+          (token.roles ?? []) as Role[];
       }
       return session;
     },
