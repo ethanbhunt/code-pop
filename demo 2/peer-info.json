@@ -1,9 +1,0 @@
-{
-  "dbAddress": "/orbitdb/zdpuAxCARmsFvBarsE2TZWfN79HRcDk6KiubDhpYhUqCwxU3o",
-  "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWS2bdPdT9mn9N8YX8Wyuvn4T6qJE9GSwNS3neFWyir2Kt",
-    "/ip4/144.39.241.110/tcp/4000/p2p/12D3KooWS2bdPdT9mn9N8YX8Wyuvn4T6qJE9GSwNS3neFWyir2Kt",
-    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWS2bdPdT9mn9N8YX8Wyuvn4T6qJE9GSwNS3neFWyir2Kt"
-  ],
-  "peerId": "12D3KooWS2bdPdT9mn9N8YX8Wyuvn4T6qJE9GSwNS3neFWyir2Kt"
-}
