@@ -17,11 +17,24 @@ const djangoLoginUrl = process.env.DJANGO_API_URL
   ? `${process.env.DJANGO_API_URL.replace(/\/$/, "")}/auth/login/`
   : "";
 
+const devBypassEnabled =
+  process.env.NODE_ENV !== "production" &&
+  (process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true" ||
+    process.env.DEV_AUTH_BYPASS === "true");
+
+const devUsername = process.env.DEV_AUTH_BYPASS_USERNAME ?? "dev";
+
 function inferRoles(data: { is_admin?: boolean; is_manager?: boolean }): Role[] {
   // Temporary mapping until backend roles exist.
   if (data.is_admin) return [Role.SuperAdmin, Role.Admin];
   if (data.is_manager) return [Role.Manager, Role.LogisticsManager];
   return [Role.RepairStaff];
+}
+
+function coerceRole(value: unknown): Role | null {
+  if (typeof value !== "string") return null;
+  const values = Object.values(Role);
+  return values.includes(value as Role) ? (value as Role) : null;
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -30,8 +43,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        role: { label: "Role", type: "text" },
       },
       async authorize(credentials) {
+        // Dev-mode bypass: when enabled, do not call Django at all.
+        if (devBypassEnabled) {
+          const usernameValue =
+            typeof credentials?.username === "string"
+              ? credentials.username
+              : devUsername;
+          const selected = coerceRole((credentials as { role?: unknown }).role);
+          return {
+            id: "dev",
+            email: usernameValue,
+            name: "Dev",
+            roles: [selected ?? Role.RepairStaff],
+          };
+        }
+
         if (!credentials?.username || !credentials?.password || !djangoLoginUrl) {
           return null;
         }
