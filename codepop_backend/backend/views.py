@@ -21,6 +21,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views import View #maybe delete these three?
 from django.utils.decorators import method_decorator
 import json
+from datetime import timedelta
 from rest_framework.decorators import action
 from django.utils.dateparse import parse_datetime
 from .drinkAI import generate_soda
@@ -352,10 +353,36 @@ class OrderOperations(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [AllowAny]
 
+    STATUS_TRANSITIONS = {
+        'pending': ['processing', 'cancelled'],
+        'processing': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': [],
+    }
+
+    def _estimate_ready_time(self, drink_count):
+        active_orders = Order.objects.filter(OrderStatus__in=['pending', 'processing']).count()
+        minutes = 3 + max(1, int(drink_count)) * 2 + max(0, active_orders - 1)
+        return timezone.now() + timedelta(minutes=minutes)
+
+    def _is_transition_valid(self, current_status, next_status):
+        if not next_status or next_status == current_status:
+            return True
+        return next_status in self.STATUS_TRANSITIONS.get(current_status, [])
+
     def patch(self, request, *args, **kwargs):
         order = self.get_object()
         drinks_to_add = request.data.get("AddDrinks", [])
         drinks_to_remove = request.data.get("RemoveDrinks", [])
+        requested_status = request.data.get("OrderStatus")
+
+        if not self._is_transition_valid(order.OrderStatus, requested_status):
+            return Response(
+                {
+                    "error": f"Invalid status transition from '{order.OrderStatus}' to '{requested_status}'."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         
         # Adding drinks
         if drinks_to_add:
@@ -364,11 +391,22 @@ class OrderOperations(viewsets.ModelViewSet):
         # Removing drinks
         if drinks_to_remove:
             order.remove_drinks(drinks_to_remove)
+
+        # If status changes to processing and PickupTime is missing, initialize ETA.
+        if requested_status == 'processing' and not order.PickupTime:
+            order.PickupTime = self._estimate_ready_time(order.Drinks.count())
+            order.save(update_fields=['PickupTime'])
+
+        # If status changes to completed, set pickup time to now for better tracking fidelity.
+        if requested_status == 'completed':
+            order.PickupTime = timezone.now()
+            order.save(update_fields=['PickupTime'])
         
         serializer = self.get_serializer(order, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     # def get_permissions(self):
     #     """Only authenticated users can create, update, or delete orders."""
@@ -380,20 +418,28 @@ class OrderOperations(viewsets.ModelViewSet):
         # Extract data from the request
         user_id = request.data.get("UserID", None)
         drinks = request.data.get("Drinks", [])
-        order_status = request.data.get("OrderStatus", "processing")
+        order_status = request.data.get("OrderStatus", "pending")
         payment_status = request.data.get("PaymentStatus", "pending")
         stripe_id = request.data.get("StripeID", None)
+        pickup_time = request.data.get("PickupTime", None)
 
          # Log extracted values
         print(f"UserID: {user_id}, Drinks: {drinks}, OrderStatus: {order_status}, PaymentStatus: {payment_status}, StripeID: {stripe_id}")
 
+        if order_status not in self.STATUS_TRANSITIONS:
+            return Response({"error": f"Invalid initial OrderStatus '{order_status}'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pickup_time is None and order_status in ['pending', 'processing']:
+            pickup_time = self._estimate_ready_time(len(drinks))
+
         # Create a new order
         order_data = {
             "UserID": user_id,
-            "order_status": order_status,
+            "OrderStatus": order_status,
             "Drinks": drinks,
             "PaymentStatus": payment_status,
             "StripeID": stripe_id,
+            "PickupTime": pickup_time,
         }
 
         serializer = self.get_serializer(data=order_data)
@@ -416,6 +462,34 @@ class OrderOperations(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def live_status(self, request, pk=None):
+        order = self.get_object()
+        requested_status = request.data.get('status')
+        delay_minutes = int(request.data.get('delay_minutes', 0))
+
+        if requested_status and not self._is_transition_valid(order.OrderStatus, requested_status):
+            return Response(
+                {
+                    "error": f"Invalid status transition from '{order.OrderStatus}' to '{requested_status}'."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if requested_status:
+            order.OrderStatus = requested_status
+
+        # Delay is demo-friendly: adjust ETA up/down without changing lifecycle.
+        if delay_minutes != 0:
+            base_eta = order.PickupTime or self._estimate_ready_time(order.Drinks.count())
+            order.PickupTime = base_eta + timedelta(minutes=delay_minutes)
+
+        if requested_status == 'completed':
+            order.PickupTime = timezone.now()
+
+        order.save()
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
 class UserOrdersLookup(ListCreateAPIView):
     serializer_class = OrderSerializer

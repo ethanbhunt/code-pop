@@ -45,7 +45,6 @@ export default function CheckoutForm(totalPrice) {
     try {
       const cartList = await AsyncStorage.getItem('checkoutList');
       const currentList = cartList ? JSON.parse(cartList) : [];
-      const token = await AsyncStorage.getItem('userToken');
       
       const userId = await AsyncStorage.getItem('userId');
       
@@ -59,7 +58,7 @@ export default function CheckoutForm(totalPrice) {
         body: JSON.stringify({
           UserID: userId,
           Drinks: currentList,
-          OrderStatus: 'processing',
+          OrderStatus: 'pending',
           PaymentStatus: 'paid',
           StripeID: stripeNum,
         })
@@ -68,11 +67,12 @@ export default function CheckoutForm(totalPrice) {
       // Check if the request was successful
       if (response.ok) {
         const data = await response.json(); // Parse JSON if returned
-        orderNum = data.OrderID;
-        console.log('Order Num:', orderNum);
-        await AsyncStorage.setItem("orderNum", orderNum.toString());
+        const createdOrderNum = data.OrderID;
+        console.log('Order Num:', createdOrderNum);
+        await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
       } else {
         console.error('Failed to create order:', response.status, await response.text());
+        return null;
       }
 
  
@@ -84,9 +84,11 @@ export default function CheckoutForm(totalPrice) {
       
 
       console.log("cart cleared sucessfully");
+      return true;
       
     } catch (error) {
       console.error('Error removing drinks from cart:', error);
+      return null;
     }
   };
 
@@ -127,14 +129,21 @@ export default function CheckoutForm(totalPrice) {
         {
           text: 'OK',
           onPress: async () => {
-            await removeAllDrinks();
+            const orderCreated = await removeAllDrinks();
+            if (!orderCreated) {
+              Alert.alert('Order issue', 'Payment succeeded, but order creation failed. Please contact support.');
+              return;
+            }
             await addRevenue();
-            const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
+            const savedOrderNum = await AsyncStorage.getItem("orderNum");
+            if (savedOrderNum) {
+              await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+            }
             navigation.navigate('PostCheckout');
           },
         },

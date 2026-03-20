@@ -1,4 +1,606 @@
-# CodePop Distributed Database Setup Guide
+# CodePop Distributed Database Setup Guide (OrbitDB)
+
+## 1. Purpose and Scope
+
+This document explains how to set up the distributed database environment for CodePop using OrbitDB on top of IPFS after the frontend split into:
+
+- a mobile ordering app for customer ordering
+- a web app for manager, logistics, admin, and repair dashboards
+
+Both frontends are clients of backend services. Neither frontend connects directly to OrbitDB or IPFS.
+
+## 2. Target Topology
+
+### 2.1 Node Types
+
+The distributed rollout uses separate backend nodes and separate OrbitDB database sets for each operational site.
+
+- Each store has its own backend service and its own local OrbitDB data set.
+- Each regional supply hub has its own backend service and its own hub OrbitDB data set.
+- Dashboard users access web services exposed by store nodes, hub nodes, or regional API gateways if one is introduced later.
+- Mobile ordering users interact with the backend for their selected store.
+
+### 2.2 Regional Layout
+
+The required supply hubs are:
+
+- Region A: Chicago, IL
+- Region B: New Jersey / New York
+- Region C: Logan, UT
+- Region D: Dallas, TX
+- Region E: Atlanta, GA
+- Region F: Phoenix, AZ
+- Region G: Boise, ID
+
+The initial data model must support:
+
+- 7 supply hubs total
+- 20 stores in Region C
+- at least 5 stores in neighboring regions
+- cross-region hub fulfillment up to 1000 miles
+
+### 2.3 Database Responsibility Model
+
+Each node stores local operational truth first, then replicates selected records to peers and hubs through OrbitDB replication.
+
+- Store data sets own local orders, local inventory position, local machine status, local staff actions, and local audit logs.
+- Hub data sets own regional stock availability, inbound and outbound transfers, logistics planning records, and hub audit logs.
+- Shared cross-node state is propagated through signed OrbitDB entries and validated backend rules, not by direct SQL joins across sites.
+
+## 3. Planning Assumptions
+
+The current repository does not yet implement the full distributed OrbitDB design. This guide records the required setup steps and future-state assumptions.
+
+Assumptions used in this guide:
+
+- OrbitDB is the distributed operational data layer for store and hub nodes.
+- IPFS is the replication transport layer used by OrbitDB peers.
+- Backend services remain the only API boundary for mobile and web frontends.
+- Synchronization is event-driven, append-first, and resilient to intermittent connectivity.
+- Inter-node writes are authenticated by cryptographic identities and constrained by access controllers.
+
+If the team changes the database engine, transport protocol, or trust model later, this guide must be updated before deployment.
+
+## 4. Prerequisites
+
+Before creating distributed databases, prepare the following for every store node and every hub node.
+
+### 4.1 Infrastructure Prerequisites
+
+- A host or VM for each store node
+- A host or VM for each regional hub node
+- Stable hostnames or static IP addresses for every node
+- TLS certificates for all backend endpoints
+- Firewall rules that allow only approved store-to-store and store-to-hub traffic
+- Secure time synchronization on every node for deterministic projection and audit processing
+- Persistent storage for IPFS repository and OrbitDB local cache
+
+### 4.2 Software Prerequisites
+
+- Node.js LTS installed on each node for OrbitDB runtime components
+- IPFS daemon (Kubo) installed and pinned to a team-approved version
+- OrbitDB libraries and service wrappers installed on each node
+- Python, Django, and required backend dependencies installed where API services still run in Django
+- Key management process for generating, distributing, rotating, and revoking node identities
+- Backup tooling for IPFS repository snapshots and OrbitDB export/import
+
+### 4.3 Environment Variables Per Node
+
+Each node must have a local environment file or secret bundle containing at least:
+
+- `NODE_ID`: unique node identifier
+- `NODE_TYPE`: `store` or `hub`
+- `REGION_ID`: one of `A` through `G`
+- `STORE_ID` for store nodes only
+- `HUB_ID` for hub nodes only
+- `API_BASE_URL`
+- `IPFS_PATH`: local IPFS repository path
+- `IPFS_API_URL`: local or remote IPFS API endpoint
+- `IPFS_SWARM_KEY` where private swarm mode is used
+- `ORBITDB_DIRECTORY`: local OrbitDB cache directory
+- `ORBITDB_IDENTITY_KEY_PATH`
+- `ORBITDB_ACCESS_CONTROLLER_TYPE`
+- `PEER_BOOTSTRAP_MULTIADDRS` (comma-separated list)
+- `TRUSTED_NODE_ALLOWLIST` (for service-layer write checks)
+
+## 5. Bootstrap Order
+
+Provision a new node in the following order.
+
+1. Assign node identity, region, and network address.
+2. Create cryptographic identity keys for OrbitDB signing.
+3. Configure and initialize IPFS repository and bootstrap peers.
+4. Start IPFS daemon and verify swarm connectivity.
+5. Create OrbitDB instance bound to node identity.
+6. Create or open required OrbitDB databases for the node role.
+7. Configure access controllers (write ACLs) for each database.
+8. Seed required hub, store, and role metadata.
+9. Register peer and hub directory records.
+10. Start replication watchers and projection workers.
+11. Validate signed handshake and authorization paths.
+12. Run a synchronization test with a staged outage and replay.
+
+## 6. OrbitDB Naming and Node Provisioning
+
+### 6.1 Logical Naming Convention
+
+Use separate OrbitDB databases by domain and node role.
+
+- Store database name pattern: `codepop.store.<region>.<store_id>.<domain>`
+- Hub database name pattern: `codepop.hub.<region>.<hub_id>.<domain>`
+
+Examples:
+
+- `codepop.store.C.001.orders`
+- `codepop.store.C.020.inventory`
+- `codepop.hub.C.001.transfers`
+
+Persist each database address after creation so other nodes can replicate from the canonical address.
+
+### 6.2 Identity and Access Convention
+
+Each node must use a dedicated OrbitDB identity and least-privilege write ACLs.
+
+- Store identity pattern: `store-<region>-<store_id>-svc`
+- Hub identity pattern: `hub-<region>-<hub_id>-svc`
+
+Do not allow wildcard writes from unknown peers. Restrict `write` permissions per database to approved identities.
+
+### 6.3 Required Database Groups
+
+Every node must host the following logical groups.
+
+- Core application data stores
+- Ownership and routing metadata stores
+- Synchronization and replay event logs
+- Audit and signature verification records
+- Peer directory and heartbeat records
+
+## 7. Data Contract Requirements
+
+OrbitDB is schema-flexible, so the system must enforce contracts at the service layer.
+
+### 7.1 Store Node Data Sets
+
+Store nodes must maintain data sets for:
+
+- users and roles needed for local operations
+- preferences
+- drinks and drink ingredients
+- inventory
+- orders and order items
+- notifications
+- machine maintenance and repair history
+- local audit logs
+
+### 7.2 Hub Node Data Sets
+
+Hub nodes must maintain data sets for:
+
+- hub inventory
+- stock transfers
+- supply requests
+- logistics planning and recommendations
+- regional maintenance coordination references if required later
+- hub audit logs
+
+### 7.3 Shared Distributed Entities
+
+Model and validate records for:
+
+- `stores`
+- `supply_hubs`
+- `stock_transfers`
+- `peer_registry`
+- `peer_heartbeats`
+- `sync_events`
+- `sync_event_attempts`
+- `conflict_resolutions`
+- `audit_log`
+- `trusted_peers`
+- `key_rotation_history`
+
+### 7.4 Required Record Fields
+
+All records that can replicate across nodes must include:
+
+- `store_id` where data belongs to one store
+- `hub_id` where data belongs to one hub
+- `region_id` for routing and reporting
+- `created_at`
+- `updated_at`
+- `origin_node_id`
+- `event_id` or equivalent idempotency identifier
+- `orbitdb_entry_hash` when available from append context
+
+Add deterministic query indexes in projection/read models for:
+
+- `store_id`
+- `hub_id`
+- `region_id`
+- `event_id`
+- `created_at`
+- `updated_at`
+
+## 8. Store Node Setup
+
+Perform these steps for every store node.
+
+### 8.1 Create Store Databases
+
+1. Start local IPFS daemon.
+2. Create/open required OrbitDB stores for local domains.
+3. Persist database addresses in node configuration.
+4. Configure write ACLs for local service identity and approved replication peers.
+
+Recommended store databases:
+
+- `orders` as event log
+- `inventory` as key-value or document store
+- `machines` as document store
+- `preferences` as document store
+- `audit` as append-only event log
+- `peer` as key-value directory cache
+
+### 8.2 Apply Data Contracts
+
+1. Register JSON schema validators in the backend write pipeline.
+2. Enforce required ownership and routing fields.
+3. Reject records that fail contract checks.
+4. Verify projection jobs can materialize read models for API queries.
+
+### 8.3 Seed Store Metadata
+
+Insert or seed:
+
+- store record
+- region assignment
+- assigned regional hub reference
+- store status and onboarding state
+- local manager and admin roles
+- machine inventory baseline if known
+
+### 8.4 Enable Local-Only Operational Persistence
+
+The store node must persist the following locally even while disconnected:
+
+- order intake and completion state
+- inventory deductions and adjustments
+- local machine status transitions
+- customer preferences when relevant to that store
+- local audit trail
+- offline outbound sync events
+
+### 8.5 Register Peers
+
+Each store must register:
+
+- its assigned hub endpoint
+- trusted in-region peer endpoints
+- approved peer identity IDs
+- heartbeat interval and retry policy
+
+## 9. Hub Node Setup
+
+Perform these steps for every regional hub node.
+
+### 9.1 Create Hub Databases
+
+1. Start local IPFS daemon.
+2. Create/open hub OrbitDB databases by logistics domain.
+3. Persist canonical addresses for store nodes and regional services.
+4. Configure least-privilege write ACLs for hub workflows.
+
+Recommended hub databases:
+
+- `hub_inventory` as key-value or document store
+- `transfers` as event log
+- `supply_requests` as event log
+- `routing` as document store
+- `audit` as append-only event log
+- `peer_registry` as key-value store
+
+### 9.2 Apply Data Contracts
+
+1. Apply shared record contract validators.
+2. Enforce transfer state transition rules.
+3. Enforce signature and identity checks before accepting cross-node writes.
+4. Verify hub projections for routing and transfer status queries.
+
+### 9.3 Seed Hub Metadata
+
+Insert or seed:
+
+- hub record
+- region assignment
+- maximum delivery radius
+- logistics manager role
+- initial stock catalog
+- neighboring region reachability rules
+
+### 9.4 Register Regional Stores
+
+For each hub, create or import directory records for all stores in its region, including:
+
+- store ID
+- region ID
+- network endpoint
+- OrbitDB identity ID
+- operational status
+- last heartbeat timestamp
+
+## 10. Seed Data Requirements
+
+The initial production-like rollout must seed the database network with at least the following business entities.
+
+### 10.1 Supply Hubs
+
+Create seven hub records, one for each required region.
+
+### 10.2 Stores
+
+Create:
+
+- 20 stores in Region C
+- at least 5 stores in neighboring regions
+
+Each store record must include:
+
+- store ID
+- region ID
+- assigned hub ID
+- location metadata
+- operational status
+- API endpoint
+- OrbitDB identity ID
+
+### 10.3 Staff Roles
+
+Seed:
+
+- one `logistics_manager` per hub
+- one `repair_staff` for Region C
+- required `manager`, `admin`, and `super_admin` records according to the access model
+
+## 11. Replication and Event Flow Setup
+
+OrbitDB replication is the transport for distributed state. Business synchronization is handled by append-only events plus deterministic projection.
+
+### 11.1 Event Record Requirements
+
+Every synchronized event must include at least:
+
+- `event_id`
+- `origin_node_id`
+- `target_scope`
+- `aggregate_type`
+- `aggregate_id`
+- `event_type`
+- `payload`
+- `created_at`
+- `attempt_count`
+- `status`
+- `signature`
+
+Track delivery attempts in a dedicated event-attempt store with:
+
+- event delivery target
+- attempt timestamp
+- response code
+- failure reason
+- next retry time
+
+### 11.2 Business Domains That Must Sync
+
+Configure synchronization for:
+
+- inventory usage and adjustments
+- stock transfers
+- maintenance logs and machine status changes
+- demand metrics and demand-prediction inputs
+- peer heartbeat updates
+- security and audit events where policy requires cross-node visibility
+
+### 11.3 Retry and Reliability Policy
+
+Every node must implement:
+
+- exponential backoff for failed delivery acknowledgments
+- idempotent replay using `event_id`
+- dead-letter handling for events that exceed retry thresholds
+- alerting when queue depth or replay age exceeds operational thresholds
+
+## 12. Conflict Resolution Setup
+
+OrbitDB is eventually consistent. Application-level reconciliation rules are still required for conflicting business writes.
+
+### 12.1 Required Ordering Inputs
+
+Every synchronized change must carry:
+
+- `event_id`
+- `origin_node_id`
+- `origin_role`
+- `created_at`
+- `logical_priority`
+- `lamport_clock` or equivalent causal metadata when available
+
+### 12.2 Minimum Reconciliation Rules
+
+1. Reject duplicate events by `event_id`.
+2. Prefer the higher `logical_priority` when two valid updates conflict.
+3. If priorities match, prefer the later trusted timestamp.
+4. If timestamps also match, prefer the lexicographically lower `origin_node_id` as deterministic fallback.
+5. Record every resolved conflict in `conflict_resolutions` for auditability.
+
+### 12.3 Data Classes That Need Explicit Rules
+
+Create per-domain reconciliation rules for at least:
+
+- inventory quantity adjustments
+- stock transfer state transitions
+- machine status transitions
+- peer directory updates
+- demand metric aggregates
+
+## 13. Service Discovery and Peer Handshake Setup
+
+The requirements and backlog expect automatic peer discovery for new stores.
+
+### 13.1 Peer Directory Data
+
+Each node must store:
+
+- peer node ID
+- node type
+- region ID
+- endpoint URL
+- OrbitDB identity ID
+- last heartbeat time
+- node status
+
+### 13.2 New Store Bootstrap Sequence
+
+When a new store is opened:
+
+1. Provision infrastructure and start IPFS + OrbitDB runtime.
+2. Create required store databases and persist their addresses.
+3. Seed store metadata and assigned hub reference.
+4. Exchange and validate node identities with assigned hub and approved peers.
+5. Register store in regional peer directory.
+6. Begin heartbeat publication.
+7. Run a test sync event and verify acknowledgment.
+
+### 13.3 Handshake Validation Requirements
+
+A node must not accept operational updates from another node until it validates:
+
+- trusted identity mapping
+- node identifier
+- region and role permissions
+- request signature
+- freshness of timestamp or nonce
+
+## 14. Identity, Keys, and Trust Setup
+
+Because inter-node communications must be signed and authenticated, every node requires local trust configuration before joining the network.
+
+### 14.1 Required Trust Material
+
+Each node must have:
+
+- one private signing key
+- one public identity artifact
+- one trust store containing approved peer identities
+- one revocation source or deny-list
+
+### 14.2 Key Provisioning Steps
+
+1. Generate a private key on the target node or in approved secure provisioning infrastructure.
+2. Bind key material to the node identity.
+3. Store private key in a restricted path or managed secret store.
+4. Distribute public identity metadata to trusted hubs and peers.
+5. Record identity fingerprint in `trusted_peers`.
+
+### 14.3 Rotation and Revocation
+
+Document and automate the following where possible:
+
+- identity expiration policy
+- scheduled key rotation windows
+- emergency key revocation
+- removal of compromised peers from allowlists
+- replay rejection for messages signed by revoked identities
+
+## 15. Backup, Restore, and Recovery
+
+Every node is operationally independent, so backup and recovery must also be independent.
+
+### 15.1 Backup Policy
+
+For each store and hub node:
+
+- snapshot IPFS repository at regular intervals
+- export critical OrbitDB stores on a schedule
+- encrypt backup artifacts at rest
+- replicate backups to off-node storage
+- verify restore usability on a schedule
+
+### 15.2 Restore Policy
+
+When restoring a node:
+
+1. Restore IPFS repository snapshot.
+2. Restore OrbitDB data exports if required.
+3. Restore identity and trust-store material.
+4. Rejoin peer discovery in read-only or limited-sync mode first.
+5. Replay missed events.
+6. Verify conflict logs before allowing full write traffic.
+
+### 15.3 Rejoin After Extended Outage
+
+If a store has been offline long enough to accumulate stale data:
+
+1. Freeze outbound sync.
+2. Pull latest trusted directory and hub metadata.
+3. Compare local replay checkpoints and high-water marks.
+4. Replay missing inbound events.
+5. Resolve conflicts using configured reconciliation rules.
+6. Resume normal traffic only after queue depth returns to baseline.
+
+## 16. Verification Checklist
+
+Do not mark a region or store as ready until all checks pass.
+
+### 16.1 Database Readiness
+
+- Required OrbitDB databases exist for the node role.
+- Canonical OrbitDB addresses are persisted and discoverable.
+- Write ACLs are least-privilege.
+- Required record contracts are enforced.
+
+### 16.2 Seed Validation
+
+- Seven supply hubs exist network-wide.
+- Region C contains 20 stores.
+- Neighboring regions contain at least 5 stores each where required.
+- Required roles are present.
+
+### 16.3 Trust Validation
+
+- Node identities are installed.
+- Trust stores contain only approved peers.
+- Signed handshake validation succeeds.
+- Revoked or unknown peers are rejected.
+
+### 16.4 Sync Validation
+
+- Heartbeats are visible in peer directories.
+- A test inventory event can be appended and replicated.
+- The receiving node accepts the event exactly once at business layer.
+- A simulated outage followed by replay succeeds.
+- Conflict logging captures at least one forced conflict test.
+
+### 16.5 Frontend Boundary Validation
+
+- The mobile ordering app uses backend APIs for its selected store only.
+- The web dashboard app uses backend APIs for hub, store, or regional views.
+- No frontend credential bundle includes direct OrbitDB or IPFS write credentials.
+
+## 17. Implementation Gaps to Track
+
+The following items are required by the OrbitDB design but are not fully represented in the current repository implementation.
+
+- concrete backend adapters for OrbitDB read/write operations
+- final peer discovery protocol details
+- signed handshake payload schema
+- sync worker implementation and observability
+- dead-letter queue handling
+- final logical-priority definitions per domain
+- automated key rotation and revocation workflow
+- production pinning strategy and retention policy
+
+Treat this guide as the deployment target and implementation checklist for Task-001, Task-002, Task-007, Task-008, and Task-010.# CodePop Distributed Database Setup Guide
 
 ## 1. Purpose and Scope
 

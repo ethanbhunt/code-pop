@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Button, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import NavBar from '../components/NavBar';
 import RatingCarosel from '../components/RatingCarosel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
@@ -11,11 +10,19 @@ import MapView, { Marker } from 'react-native-maps';
 const PostCheckout = () => {
   const navigation = useNavigation();
   const [lockerCombo, setLockerCombo] = useState('');
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [orderNum, setOrderNum] = useState(null);
+  const [orderStatus, setOrderStatus] = useState('pending');
+  const [estimatedReadyTime, setEstimatedReadyTime] = useState(null);
+  const [lastUpdateText, setLastUpdateText] = useState('Waiting for first update...');
+  const [isDemoFallback, setIsDemoFallback] = useState(false);
+  const [failedPollCount, setFailedPollCount] = useState(0);
   const [purchasedDrinks, setPurchasedDrinks] = useState([]);
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
+
+  const statusTimeline = ['pending', 'processing', 'completed'];
 
   const storeLocation = {
       latitude: 41.7421007, //the emulator will likely user coordinates to google headquarters which is these coordinates. uncomment to test <500 yard option
@@ -37,8 +44,6 @@ const PostCheckout = () => {
               } catch (error) {
                 console.error("Error fetching location:", error);
               }
-
-        return () => clearInterval(locationInterval);
       })();
     }, []);
 
@@ -165,38 +170,73 @@ const PostCheckout = () => {
   }, []); // Empty dependency array ensures it runs only once
 
   useEffect(() => {
+    const loadOrderNum = async () => {
+      const storedOrderNum = await AsyncStorage.getItem('orderNum');
+      if (storedOrderNum) {
+        setOrderNum(storedOrderNum);
+      }
+    };
+
+    loadOrderNum();
+  }, []);
+
+  useEffect(() => {
     if(lockerCombo !== ''){
       updateLockerCombo();
     }
   }, [lockerCombo]);
 
   useEffect(() => {
-    // Start countdown timer
-    if (timeLeft > 0 && isNearby) {
-      const timerId = setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
-      }, 1000);
-  
-      // Clear the interval when the timer reaches 0
-      return () => clearInterval(timerId);
-    }else{
-      completeOrder();
-    }
-  }, [isNearby, timeLeft]);
-  
+    if (!estimatedReadyTime) return;
 
-  const completeOrder = async () => {
-    const orderNum = await AsyncStorage.getItem("orderNum");
-    await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        OrderStatus: 'completed',
-      }),
-    });
-  }
+    const timerId = setInterval(() => {
+      const secondsRemaining = Math.max(0, Math.floor((new Date(estimatedReadyTime).getTime() - Date.now()) / 1000));
+      setTimeLeft(secondsRemaining);
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [estimatedReadyTime]);
+
+  useEffect(() => {
+    if (!orderNum) return;
+
+    const pollOrder = async () => {
+      try {
+        const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Order poll failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setOrderStatus(data.OrderStatus || 'pending');
+        setEstimatedReadyTime(data.PickupTime || null);
+        setLastUpdateText(`Live update: ${new Date().toLocaleTimeString()}`);
+        setFailedPollCount(0);
+        setIsDemoFallback(false);
+      } catch (error) {
+        console.error('Polling order failed:', error);
+        setFailedPollCount((prev) => {
+          const next = prev + 1;
+          if (next >= 2) {
+            setIsDemoFallback(true);
+            setLastUpdateText('Presentation mode: network unstable, using local fallback.');
+          }
+          return next;
+        });
+      }
+    };
+
+    pollOrder();
+    const pollId = setInterval(pollOrder, 5000);
+
+    return () => clearInterval(pollId);
+  }, [orderNum]);
   
 
   const handleLockerCombo = () => {
@@ -239,6 +279,13 @@ const PostCheckout = () => {
     setIsNearby(true);
   }
 
+  const getStatusLabel = (status) => {
+    if (status === 'pending') return 'Queued';
+    if (status === 'processing') return 'Mixing';
+    if (status === 'completed') return 'Ready';
+    return status;
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
@@ -252,6 +299,28 @@ const PostCheckout = () => {
                         <Text style={styles.text}>Once you are within 500 yards from the store Bob will start making your drink.</Text>
                 )}
             </View>
+        </View>
+
+        <View style={[styles.section, styles.trackerSection]}>
+          <Text style={styles.trackerTitle}>Live Order Journey</Text>
+          <Text style={styles.trackerSubTitle}>Status: {getStatusLabel(orderStatus)}</Text>
+          <Text style={styles.trackerSubTitle}>ETA: {minutes}:{seconds}</Text>
+          <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
+          {isDemoFallback && (
+            <Text style={styles.fallbackBadge}>Presentation fallback active</Text>
+          )}
+
+          <View style={styles.timelineRow}>
+            {statusTimeline.map((status) => {
+              const isDone = statusTimeline.indexOf(status) <= statusTimeline.indexOf(orderStatus);
+              return (
+                <View key={status} style={styles.timelineItem}>
+                  <View style={[styles.timelineDot, isDone ? styles.timelineDotActive : null]} />
+                  <Text style={styles.timelineLabel}>{getStatusLabel(status)}</Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         {/* Map Image Box */}
@@ -309,14 +378,14 @@ const PostCheckout = () => {
             <Text style={styles.timer}>
               {minutes}:{seconds}
             </Text>
-            {timeLeft === 0 && <Text style={styles.successMessage}>Your drink is ready!</Text>}
+            {orderStatus === 'completed' && <Text style={styles.successMessage}>Your drink is ready!</Text>}
           </View>
 
           <View style={[styles.section, styles.lockerComboSection]}>
             <Text style={styles.lockerCombo}>Locker combo: {lockerCombo}</Text>
           </View>
         </View>
-        {timeLeft === 0 ? (
+        {orderStatus === 'completed' ? (
           <TouchableOpacity onPress={goHomePage} style={styles.mediumButton}>
             <Text style={styles.buttonText}>Back To Home Page</Text>
           </TouchableOpacity>
@@ -441,7 +510,62 @@ const styles = StyleSheet.create({
   nearbySection: {
     backgroundColor: '#F92758',
     justifyContent: 'center',
-    height: 40
+    height: 40,
+  },
+  trackerSection: {
+    backgroundColor: '#1f3c88',
+    padding: 14,
+    alignItems: 'flex-start',
+  },
+  trackerTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  trackerSubTitle: {
+    color: '#d8f3ff',
+    fontSize: 16,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  lastUpdate: {
+    color: '#c2f7d9',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  fallbackBadge: {
+    color: '#1f3c88',
+    backgroundColor: '#f9e76d',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  timelineRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  timelineItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  timelineDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#6c7cab',
+    marginBottom: 4,
+  },
+  timelineDotActive: {
+    backgroundColor: '#f9e76d',
+  },
+  timelineLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   nearbyText: {
     fontWeight: '900',

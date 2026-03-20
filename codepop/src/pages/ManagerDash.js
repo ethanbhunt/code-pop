@@ -1,18 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, Image, Alert } from 'react-native';
 import { BASE_URL } from '../../ip_address';
 
 const ManagerDash = () => {
   const [revenue, setRevenue] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [ordersCount, setOrdersCount] = useState(0);
+  const [orders, setOrders] = useState([]);
 
   const [inventoryModalVisible, setInventoryModalVisible] = useState(false);
   const [revenueModalVisible, setRevenueModalVisible] = useState(false);
+  const [liveOrdersModalVisible, setLiveOrdersModalVisible] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [loadingRevenue, setLoadingRevenue] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [error, setError] = useState(null);
+
+  const formatEta = (pickupTime) => {
+    if (!pickupTime) return 'No ETA';
+    const etaDate = new Date(pickupTime);
+    const seconds = Math.max(0, Math.floor((etaDate.getTime() - Date.now()) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const remSeconds = seconds % 60;
+    return `${minutes}m ${String(remSeconds).padStart(2, '0')}s`;
+  };
+
+  const getNextStatus = (status) => {
+    if (status === 'pending') return 'processing';
+    if (status === 'processing') return 'completed';
+    return null;
+  };
+
+  const fetchOrders = async () => {
+    const ordersResponse = await fetch(`${BASE_URL}/backend/orders/`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const ordersData = await ordersResponse.json();
+    setOrders(Array.isArray(ordersData) ? ordersData : []);
+    setOrdersCount(Array.isArray(ordersData) ? ordersData.length : 0);
+  };
+
+  const updateLiveStatus = async (orderId, status = null, delayMinutes = 0) => {
+    try {
+      setUpdatingOrderId(orderId);
+      const payload = {};
+      if (status) payload.status = status;
+      if (delayMinutes !== 0) payload.delay_minutes = delayMinutes;
+
+      const response = await fetch(`${BASE_URL}/backend/orders/${orderId}/live-status/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert('Update failed', data.error || 'Unable to update order status.');
+        return;
+      }
+
+      await fetchOrders();
+    } catch (err) {
+      console.error('Error updating live status:', err);
+      Alert.alert('Update failed', 'Network issue while updating order.');
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
 
   // Fetching revenue, inventory, and orders data
   useEffect(() => {
@@ -38,12 +94,7 @@ const ManagerDash = () => {
         setInventory(sortedInventory);
 
         // Fetch orders count
-        const ordersResponse = await fetch(`${BASE_URL}/backend/orders/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const ordersData = await ordersResponse.json();
-        setOrdersCount(ordersData.length);
+        await fetchOrders();
       } catch (error) {
         console.error('Error fetching metrics:', error);
         setError('Failed to load data');
@@ -128,6 +179,11 @@ const ManagerDash = () => {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Orders</Text>
         <Text style={styles.cardContent}>{ordersCount} orders</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setLiveOrdersModalVisible(true)}>
+          <Text style={styles.buttonText}>Live Order Controls</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Inventory Modal */}
@@ -205,6 +261,66 @@ const ManagerDash = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Live Orders Modal */}
+      <Modal
+        transparent={true}
+        visible={liveOrdersModalVisible}
+        onRequestClose={() => setLiveOrdersModalVisible(false)}>
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContentLarge}>
+            <Text style={styles.modalTitle}>Live Order Journey Controls</Text>
+
+            <TouchableOpacity style={styles.button} onPress={fetchOrders}>
+              <Text style={styles.buttonText}>Refresh Orders</Text>
+            </TouchableOpacity>
+
+            <ScrollView style={styles.scrollableList}>
+              {orders.length === 0 ? (
+                <Text>No orders available yet.</Text>
+              ) : (
+                orders.map((order) => {
+                  const nextStatus = getNextStatus(order.OrderStatus);
+                  return (
+                    <View key={order.OrderID} style={styles.orderCard}>
+                      <Text style={styles.itemName}>Order #{order.OrderID}</Text>
+                      <Text>Status: {order.OrderStatus}</Text>
+                      <Text>ETA: {formatEta(order.PickupTime)}</Text>
+                      <View style={styles.orderButtonRow}>
+                        <TouchableOpacity
+                          style={[styles.button, styles.orderButton]}
+                          onPress={() => updateLiveStatus(order.OrderID, null, 2)}>
+                          <Text style={styles.buttonText}>+2 min</Text>
+                        </TouchableOpacity>
+                        {nextStatus ? (
+                          <TouchableOpacity
+                            style={[styles.button, styles.orderButton]}
+                            onPress={() => updateLiveStatus(order.OrderID, nextStatus, 0)}>
+                            <Text style={styles.buttonText}>Next: {nextStatus}</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={[styles.button, styles.orderButton, styles.disabledButton]}>
+                            <Text style={styles.buttonText}>Done</Text>
+                          </View>
+                        )}
+                      </View>
+                      {updatingOrderId === order.OrderID && (
+                        <Text style={styles.updatingText}>Updating...</Text>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setLiveOrdersModalVisible(false)}>
+              <Text style={styles.buttonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </ScrollView>
     </View>
   );
@@ -275,6 +391,14 @@ const styles = StyleSheet.create({
     width: 300,
     alignItems: 'center',
   },
+  modalContentLarge: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    width: '90%',
+    maxHeight: '80%',
+    alignItems: 'center',
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -317,6 +441,30 @@ const styles = StyleSheet.create({
   },
   scrollableList: {
     maxHeight: 400,  // Limiting the height of the scrollable list
+    width: '100%',
+  },
+  orderCard: {
+    marginBottom: 12,
+    width: '100%',
+    backgroundColor: '#f1fbf5',
+    padding: 12,
+    borderRadius: 8,
+  },
+  orderButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  orderButton: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  disabledButton: {
+    opacity: 0.55,
+  },
+  updatingText: {
+    marginTop: 8,
+    fontWeight: 'bold',
   },
 });
 

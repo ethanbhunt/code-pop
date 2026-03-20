@@ -57,7 +57,12 @@ order_list = OrderOperations.as_view({
 order_detail = OrderOperations.as_view({
     'get': 'retrieve',
     'put': 'update',
+    'patch': 'patch',
     'delete': 'destroy'
+})
+
+order_live_status = OrderOperations.as_view({
+    'post': 'live_status'
 })
 
 revenue_list = RevenueViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -166,6 +171,10 @@ urlpatterns = [
     # - PATCH: Update the specific order (e.g., adding drinks).
     # - DELETE: Remove the specific order from the database.
     path('orders/<int:pk>/', order_detail, name='order_detail'),
+
+    # Demo/live-order control endpoint
+    # - POST: Advance status and/or shift ETA minutes for manager-led demos.
+    path('orders/<int:pk>/live-status/', order_live_status, name='order_live_status'),
 
     # Retrieve Orders by UserID
 
