@@ -12,23 +12,54 @@ export default function CheckoutForm(totalPrice) {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
   const [stripeNum, setStripeNum] = useState(null);
+  const [paymentSheetReady, setPaymentSheetReady] = useState(false);
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
 
   const fetchPaymentSheetParams = async () => {
-    const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: totalPrice }), // amount in cents
-    });
-    const { paymentIntent, ephemeralKey, customer } = await response.json();
-    setStripeNum(paymentIntent);
-    return { paymentIntent, ephemeralKey, customer };
+    try {
+      const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: totalPrice }), // amount in dollars
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        console.error('Failed to create payment intent:', payload);
+        return null;
+      }
+
+      const { paymentIntent, ephemeralKey, customer } = payload;
+      setStripeNum(paymentIntent);
+      return { paymentIntent, ephemeralKey, customer };
+    } catch (error) {
+      console.error('Payment intent request failed:', error);
+      return null;
+    }
   };
 
   const initializePaymentSheet = async () => {
-    const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
+    if (!totalPrice || totalPrice <= 0) {
+      setPaymentSheetReady(false);
+      return;
+    }
+
+    const paymentParams = await fetchPaymentSheetParams();
+    if (!paymentParams) {
+      setPaymentSheetReady(false);
+      setLoading(true);
+      return;
+    }
+
+    const { paymentIntent, ephemeralKey, customer } = paymentParams;
+    if (!paymentIntent || !ephemeralKey || !customer) {
+      setPaymentSheetReady(false);
+      setLoading(true);
+      return;
+    }
+
     const { error } = await initPaymentSheet({
       merchantDisplayName: "Example, Inc.",
       customerId: customer,
@@ -36,8 +67,14 @@ export default function CheckoutForm(totalPrice) {
       paymentIntentClientSecret: paymentIntent,
       allowsDelayedPaymentMethods: true,
     });
-    if (!error) setLoading(true);
-    else Alert.alert("Error", error.message);
+    if (!error) {
+      setLoading(true);
+      setPaymentSheetReady(true);
+    } else {
+      setPaymentSheetReady(false);
+      setLoading(true);
+      console.error('Payment sheet init failed:', error.message);
+    }
   };
 
   // function to remove all drinks from cart list after sucessful checkout
@@ -60,7 +97,7 @@ export default function CheckoutForm(totalPrice) {
           Drinks: currentList,
           OrderStatus: 'pending',
           PaymentStatus: 'paid',
-          StripeID: stripeNum,
+          StripeID: stripeNum || `demo_${Date.now()}`,
         })
       });
 
@@ -119,7 +156,44 @@ export default function CheckoutForm(totalPrice) {
     }
   }
 
+  const finalizeCheckout = async () => {
+    const orderCreated = await removeAllDrinks();
+    if (!orderCreated) {
+      Alert.alert('Order issue', 'Unable to create your order. Please try again.');
+      return;
+    }
+
+    await addRevenue();
+    const savedOrderNum = await AsyncStorage.getItem("orderNum");
+    if (savedOrderNum) {
+      await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    }
+    navigation.navigate('PostCheckout');
+  };
+
   const openPaymentSheet = async () => {
+    if (!paymentSheetReady) {
+      Alert.alert(
+        'Demo checkout mode',
+        'Payment gateway is unavailable. Continue with demo checkout? ',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            onPress: async () => {
+              await finalizeCheckout();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     const { error } = await presentPaymentSheet();
   
     if (error) {
@@ -129,22 +203,7 @@ export default function CheckoutForm(totalPrice) {
         {
           text: 'OK',
           onPress: async () => {
-            const orderCreated = await removeAllDrinks();
-            if (!orderCreated) {
-              Alert.alert('Order issue', 'Payment succeeded, but order creation failed. Please contact support.');
-              return;
-            }
-            await addRevenue();
-            const savedOrderNum = await AsyncStorage.getItem("orderNum");
-            if (savedOrderNum) {
-              await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              });
-            }
-            navigation.navigate('PostCheckout');
+            await finalizeCheckout();
           },
         },
       ]);

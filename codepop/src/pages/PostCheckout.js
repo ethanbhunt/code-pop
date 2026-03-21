@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
 import MapView, { Marker } from 'react-native-maps';
+import NavBar from '../components/NavBar';
 
 const PostCheckout = () => {
   const navigation = useNavigation();
@@ -398,6 +399,7 @@ const PostCheckout = () => {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <NavBar />
     </View>
   );
 };
@@ -410,7 +412,7 @@ const styles = StyleSheet.create({
   scrollViewContainer: {
     flexGrow: 1,
     padding: 10,
-    paddingBottom: 30,
+    paddingBottom: 100,
   },
   section: {
     width: '100%',
