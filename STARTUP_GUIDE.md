@@ -1,36 +1,56 @@
 # CodePop - OrbitDB Startup Guide
 
-## Problem Resolved ✅
+## Problems Resolved ✅
 
-**Error**: `Database is not open - Resource temporarily unavailable`
+### Error 1: Database is not open
+**Error**: `Database is not open - Resource temporarily unavailable`  
+**Cause**: Lock file from previous shutdown  
+**Solution**: Clean database directories and restart
 
-**Cause**: Lock file from previous shutdown. Databases were locked and couldn't be accessed.
-
-**Solution**: Clean database directories and restart with proper initialization.
+### Error 2: No valid address (ERR_NO_VALID_ADDRESSES)
+**Error**: `Transport (@libp2p/tcp) could not listen on any available address`  
+**Cause**: Previous bootstrap process still holding port 4000 (libp2p TCP port)  
+**Solution**: Force-kill all Node processes, clean directories, restart fresh
 
 ---
 
 ## Quick Start - 2 Minutes
 
-### Step 1: Clean and Start Backend
+### Step 1: Use the Automatic Startup Script (RECOMMENDED)
+
+```bash
+/tmp/start_nodes.sh
+```
+
+This script automatically:
+- Force-kills any orphaned processes
+- Cleans all repo directories and peer-info.json
+- Starts bootstrap node
+- Waits 8 seconds
+- Starts peer node
+- Verifies both nodes are healthy
+
+### Step 2: Manual Startup (Alternative)
+
+If you prefer manual startup:
 
 ```bash
 cd codepop_backend/orbitdb
 
+# Force kill any old processes
+pkill -9 -f "node.*-node.js"
+
 # Clean up old database files
-rm -rf repo-bootstrap repo-peer-3001
+rm -rf repo-bootstrap repo-peer-* peer-info.json
+
+# Wait a moment for ports to be released
+sleep 2
 
 # Start Bootstrap Node (Terminal 1)
-PORT=3000 node bootstrap-node.js
+node bootstrap-node.js
 
 # Wait 8 seconds, then start Peer Node (Terminal 2)
-PORT=3001 node peer-node.js
-```
-
-**Or use the automatic startup script:**
-
-```bash
-/tmp/run_orbitdb.sh
+node peer-node.js
 ```
 
 ### Step 2: Verify Backend is Running
@@ -68,20 +88,43 @@ Then choose:
 ### If you get "Database is not open" error:
 
 ```bash
-# 1. Kill any running processes
-pkill -f "node bootstrap-node.js"
-pkill -f "node peer-node.js"
+# 1. Force-kill any running processes (use -9 flag)
+pkill -9 -f "node bootstrap-node.js"
+pkill -9 -f "node peer-node.js"
 sleep 2
 
 # 2. Clean database directories
 rm -rf codepop_backend/orbitdb/repo-bootstrap
 rm -rf codepop_backend/orbitdb/repo-peer-*
+rm codepop_backend/orbitdb/peer-info.json
 
 # 3. Restart fresh
 cd codepop_backend/orbitdb
-PORT=3000 node bootstrap-node.js  # Terminal 1
+node bootstrap-node.js  # Terminal 1
 # Wait 8 seconds
-PORT=3001 node peer-node.js       # Terminal 2
+node peer-node.js       # Terminal 2
+```
+
+### If you get "No valid address" or "ERR_NO_VALID_ADDRESSES" error:
+
+This means ports 4000 or 4001 (libp2p ports) are locked by a previous process.
+
+```bash
+# 1. Check what's using the ports
+lsof -i :4000
+lsof -i :4001
+
+# 2. Force-kill all Node processes
+pkill -9 -f "node bootstrap-node.js"
+pkill -9 -f "node peer-node.js"
+sleep 3
+
+# 3. Clean everything
+rm -rf codepop_backend/orbitdb/repo-*
+rm codepop_backend/orbitdb/peer-info.json
+
+# 4. Restart (use the startup script or manual steps)
+/tmp/start_nodes.sh
 ```
 
 ### If port 3000 or 3001 is already in use:
