@@ -24,7 +24,7 @@ import json
 from datetime import timedelta
 from rest_framework.decorators import action
 from django.utils.dateparse import parse_datetime
-from .drinkAI import generate_soda
+from .drinkAI import generate_soda, parse_prompt
 from rest_framework.permissions import BasePermission
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -644,6 +644,26 @@ class GenerateAIDrink(APIView):
             else:
                 # Generate drink for general user
                 response_data = self.generate_general_user()
+            return Response(response_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
+
+    def post(self, request, user_id=None):
+        """Handle text prompt-based drink generation."""
+        try:
+            prompt = request.data.get("prompt", "")
+            if not prompt.strip():
+                return Response({'error': 'No prompt provided'}, status=400)
+
+            preferences = parse_prompt(prompt)
+
+            if user_id:
+                user = get_object_or_404(User, pk=user_id)
+                user_created = True
+            else:
+                user_created = False
+
+            response_data = self.generate_response_data(preferences, user_created)
             return Response(response_data)
         except Exception as e:
             return Response({'error': str(e)}, status=400)

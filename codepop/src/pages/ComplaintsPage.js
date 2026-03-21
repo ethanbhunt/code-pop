@@ -40,8 +40,11 @@ const ComplaintsPage = () => {
         ]);
         setLoading(true);
 
+
         try {
-            // Make a POST request to the chatbot endpoint
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
             const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
                 method: 'POST',
                 headers: {
@@ -50,12 +53,16 @@ const ComplaintsPage = () => {
                 body: JSON.stringify({
                     message: userRequest,
                     refund_phase: refund_phase,
-                    wrong_drink_phase: wrong_drink_phase,
+                    wront_drink_phase: wrong_drink_phase,
                     order_num: order_num,
                     drink_nums: drink_nums
-                })
+                }),
+                signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
     
+
             if (response.ok) {
                 const data = await response.json();
                 const botResponse = data.responses;
@@ -65,8 +72,8 @@ const ComplaintsPage = () => {
                 setDrinkNums(data.drink_nums);
 
                 if(response_refund_phase === "none" && response_wrong_drink_phase === "none"){
-                    setRefundPhase(null);
-                    setWrongDrinkPhase(null);
+                    setRefundPhase("none");
+                    setWrongDrinkPhase("none");
                     // Replace the "typing" message with the actual response
                     setMessages((prevMessages) =>
                         prevMessages.map((msg, index) =>
