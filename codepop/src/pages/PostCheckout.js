@@ -125,11 +125,15 @@ const PostCheckout = () => {
     });
 
     // Fetch revenue data
-    const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const inventoryData = await inventoryResponse.json();
+     const token = await AsyncStorage.getItem('userToken');
+     const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
+       method: 'GET',
+       headers: { 
+         'Content-Type': 'application/json',
+         'Authorization': `Token ${token}`,
+       },
+     });
+     const inventoryData = await inventoryResponse.json();
 
     // Extract matching InventoryIDs
     const matchingInventoryIDs = inventoryData.inventory_items.filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase())).map(item => item.InventoryID); // Extract the InventoryID
@@ -137,12 +141,15 @@ const PostCheckout = () => {
     for (const id of matchingInventoryIDs)
     {
       try{
-        const data = {'used_quantity': 1};
-        const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
+       const data = {'used_quantity': 1};
+         const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+           method: 'PATCH',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify(data),
+         });
 
         if (!response.ok) {
           throw new Error('Failed to update Inventory')
@@ -185,18 +192,20 @@ const PostCheckout = () => {
   }, [isNearby, timeLeft]);
   
 
-  const completeOrder = async () => {
-    const orderNum = await AsyncStorage.getItem("orderNum");
-    await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        OrderStatus: 'completed',
-      }),
-    });
-  }
+   const completeOrder = async () => {
+     const orderNum = await AsyncStorage.getItem("orderNum");
+     const token = await AsyncStorage.getItem('userToken');
+     await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+       method: 'PATCH',
+       headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Token ${token}`,
+       },
+       body: JSON.stringify({
+         OrderStatus: 'completed',
+       }),
+     });
+   }
   
 
   const handleLockerCombo = () => {
@@ -209,17 +218,19 @@ const PostCheckout = () => {
     setLockerCombo(combo);
   };
 
-  const updateLockerCombo = async () => {
-    const orderNum = await AsyncStorage.getItem("orderNum");
-    await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        LockerCombo: lockerCombo,
-      }),
-    });
+   const updateLockerCombo = async () => {
+     const orderNum = await AsyncStorage.getItem("orderNum");
+     const token = await AsyncStorage.getItem('userToken');
+     await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+       method: 'PATCH',
+       headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Token ${token}`,
+       },
+       body: JSON.stringify({
+         LockerCombo: lockerCombo,
+       }),
+     });
   };
 
   // Convert timeLeft to minutes and seconds format

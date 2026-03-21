@@ -125,18 +125,19 @@ const UpdateDrink = ({route, navigation}) => {
       }else{
         const token = await AsyncStorage.getItem('userToken');
     
-        const response = await fetch(`${BASE_URL}/backend/drinks/${drink.DrinkID}/`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            Name: "Updated Drink",
-            SodaUsed,
-            SyrupsUsed,
-            AddIns,
-            Price: 2.00, // Adjust price as needed
-            User_Created: true,
+         const response = await fetch(`${BASE_URL}/backend/drinks/${drink.DrinkID}/`, {
+           method: 'PUT',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify({
+             Name: "Updated Drink",
+             SodaUsed,
+             SyrupsUsed,
+             AddIns,
+             Price: 2.00, // Adjust price as needed
+             User_Created: true,
             Size: selectedSize,
             Ice: selectedIce,
           }),

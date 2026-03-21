@@ -38,22 +38,26 @@ const PreferencesPage = () => {
       }
     };
   
-    const fetchInventory = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/backend/inventory/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventory = await response.json();
-        const items = inventory.map(item => ({
-          value: item.ItemName,
-          ItemType: item.ItemType,
-        }));
-        setInventoryData(items);
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-      }
-    };
+     const fetchInventory = async () => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const response = await fetch(`${BASE_URL}/backend/inventory/`, {
+           method: 'GET',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         const inventory = await response.json();
+         const items = inventory.map(item => ({
+           value: item.ItemName,
+           ItemType: item.ItemType,
+         }));
+         setInventoryData(items);
+       } catch (error) {
+         console.error('Error fetching inventory:', error);
+       }
+     };
   
     const fetchUserPreferences = async (token, userId) => {
       try {

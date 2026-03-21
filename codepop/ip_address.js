@@ -1,3 +1,3 @@
-const BASE_URL = 'http://144.39.83.83:8000'; // Your backend URL
+const BASE_URL = 'http://localhost:3001'; // OrbitDB backend URL
 
 export { BASE_URL };

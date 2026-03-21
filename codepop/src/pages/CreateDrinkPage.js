@@ -57,22 +57,23 @@ const CreateDrinkPage = () => {
       }else{
         const token = await AsyncStorage.getItem('userToken');
     
-        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            Name: "Drink in User Cart",  // Example name for the drink
-            SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-            SyrupsUsed: SyrupsUsed,
-            AddIns: AddIns,
-            Price: 2.00,
-            User_Created: true,    // Assuming the user is creating the drink
-            Size: selectedSize,
-            Ice: selectedIce,
-          })
-        });
+         const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify({ 
+             Name: "Drink in User Cart",  // Example name for the drink
+             SodaUsed: SodaUsed,  // Default value if SodaUsed is null
+             SyrupsUsed: SyrupsUsed,
+             AddIns: AddIns,
+             Price: 2.00,
+             User_Created: true,    // Assuming the user is creating the drink
+             Size: selectedSize,
+             Ice: selectedIce,
+           })
+         });
     
         if (!response.ok) {
           throw new Error(`Failed to add drink. Status: ${response.status}`);

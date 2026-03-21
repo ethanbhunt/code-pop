@@ -17,15 +17,19 @@ export default function CheckoutForm(totalPrice) {
   const [loading, setLoading] = useState(false);
 
   const fetchPaymentSheetParams = async () => {
-    const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: totalPrice }), // amount in cents
-    });
-    const { paymentIntent, ephemeralKey, customer } = await response.json();
-    setStripeNum(paymentIntent);
-    return { paymentIntent, ephemeralKey, customer };
-  };
+     const token = await AsyncStorage.getItem('userToken');
+     const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
+       method: 'POST',
+       headers: { 
+         'Content-Type': 'application/json',
+         'Authorization': `Token ${token}`,
+       },
+       body: JSON.stringify({ amount: totalPrice }), // amount in cents
+     });
+     const { paymentIntent, ephemeralKey, customer } = await response.json();
+     setStripeNum(paymentIntent);
+     return { paymentIntent, ephemeralKey, customer };
+   };
 
   const initializePaymentSheet = async () => {
     const { paymentIntent, ephemeralKey, customer } = await fetchPaymentSheetParams();
@@ -51,19 +55,20 @@ export default function CheckoutForm(totalPrice) {
       
       console.log(currentList);
 
-      const response = await fetch(`${BASE_URL}/backend/orders/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          UserID: userId,
-          Drinks: currentList,
-          OrderStatus: 'processing',
-          PaymentStatus: 'paid',
-          StripeID: stripeNum,
-        })
-      });
+       const response = await fetch(`${BASE_URL}/backend/orders/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify({
+           UserID: userId,
+           Drinks: currentList,
+           OrderStatus: 'processing',
+           PaymentStatus: 'paid',
+           StripeID: stripeNum,
+         })
+       });
 
       // Check if the request was successful
       if (response.ok) {
@@ -94,16 +99,18 @@ export default function CheckoutForm(totalPrice) {
     try {
       const orderNum = await AsyncStorage.getItem("orderNum");
     
-      const response = await fetch(`${BASE_URL}/backend/revenues/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          OrderID: orderNum,
-          TotalAmount: totalPrice,
-        }),
-      });
+       const token = await AsyncStorage.getItem('userToken');
+       const response = await fetch(`${BASE_URL}/backend/revenues/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify({
+           OrderID: orderNum,
+           TotalAmount: totalPrice,
+         }),
+       });
     
       if (response.ok) {
         const data = await response.json(); // Parse the response if needed
@@ -127,15 +134,17 @@ export default function CheckoutForm(totalPrice) {
         {
           text: 'OK',
           onPress: async () => {
-            await removeAllDrinks();
-            await addRevenue();
-            const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-            navigation.navigate('PostCheckout');
+             await removeAllDrinks();
+             await addRevenue();
+             const token = await AsyncStorage.getItem('userToken');
+             const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
+               method: 'GET',
+               headers: {
+                 'Content-Type': 'application/json',
+                 'Authorization': `Token ${token}`,
+               },
+             });
+             navigation.navigate('PostCheckout');
           },
         },
       ]);

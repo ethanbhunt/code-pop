@@ -40,21 +40,23 @@ const ComplaintsPage = () => {
         ]);
         setLoading(true);
 
-        try {
-            // Make a POST request to the chatbot endpoint
-            const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: userRequest,
-                    refund_phase: refund_phase,
-                    wrong_drink_phase: wrong_drink_phase,
-                    order_num: order_num,
-                    drink_nums: drink_nums
-                })
-            });
+         try {
+             const token = await AsyncStorage.getItem('userToken');
+             // Make a POST request to the chatbot endpoint
+             const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Token ${token}`,
+                 },
+                 body: JSON.stringify({
+                     message: userRequest,
+                     refund_phase: refund_phase,
+                     wrong_drink_phase: wrong_drink_phase,
+                     order_num: order_num,
+                     drink_nums: drink_nums
+                 })
+             });
     
             if (response.ok) {
                 const data = await response.json();
@@ -83,12 +85,14 @@ const ComplaintsPage = () => {
                         )
                     );
 
-                    const orderResponse = await fetch(`${BASE_URL}/backend/orders/${order_num}/`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
+                     const token = await AsyncStorage.getItem('userToken');
+                     const orderResponse = await fetch(`${BASE_URL}/backend/orders/${order_num}/`, {
+                         method: 'GET',
+                         headers: {
+                             'Content-Type': 'application/json',
+                             'Authorization': `Token ${token}`,
+                         }
+                     });
 
                     if(orderResponse.ok){
                         const drinksForPost = [];
@@ -138,14 +142,16 @@ const ComplaintsPage = () => {
         }
     };
 
-    const getDrinkData = async (drinkID) => {
-        try {
-            const drinkData = await fetch(`${BASE_URL}/backend/drinks/${drinkID}/`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
+     const getDrinkData = async (drinkID) => {
+         try {
+             const token = await AsyncStorage.getItem('userToken');
+             const drinkData = await fetch(`${BASE_URL}/backend/drinks/${drinkID}/`, {
+                 method: 'GET',
+                 headers: {
+                     'Content-Type': 'application/json',
+                     'Authorization': `Token ${token}`,
+                 },
+             });
     
             if (!drinkData.ok) {
                 console.error(`Error fetching drink data: ${drinkData.status} ${drinkData.statusText}`);

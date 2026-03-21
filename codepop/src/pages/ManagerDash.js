@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 
 const ManagerDash = () => {
@@ -15,35 +16,46 @@ const ManagerDash = () => {
   const [error, setError] = useState(null);
 
   // Fetching revenue, inventory, and orders data
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        // Fetch revenue data
-        const revenueResponse = await fetch(`${BASE_URL}/backend/revenues/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const revenueData = await revenueResponse.json();
-        setRevenue(revenueData);
+   useEffect(() => {
+     const fetchMetrics = async () => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         
+         // Fetch revenue data
+         const revenueResponse = await fetch(`${BASE_URL}/backend/revenues/`, {
+           method: 'GET',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         const revenueData = await revenueResponse.json();
+         setRevenue(revenueData);
 
-        // Fetch inventory data (from /report endpoint)
-        const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventoryData = await inventoryResponse.json();
+         // Fetch inventory data (from /report endpoint)
+         const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
+           method: 'GET',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         const inventoryData = await inventoryResponse.json();
 
-        // Sort inventory by Threshold Level (ascending order)
-        const sortedInventory = inventoryData.inventory_items.sort((a, b) => a.ThresholdLevel - b.ThresholdLevel);
-        setInventory(sortedInventory);
+         // Sort inventory by Threshold Level (ascending order)
+         const sortedInventory = inventoryData.inventory_items.sort((a, b) => a.ThresholdLevel - b.ThresholdLevel);
+         setInventory(sortedInventory);
 
-        // Fetch orders count
-        const ordersResponse = await fetch(`${BASE_URL}/backend/orders/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const ordersData = await ordersResponse.json();
-        setOrdersCount(ordersData.length);
+         // Fetch orders count
+         const ordersResponse = await fetch(`${BASE_URL}/backend/orders/`, {
+           method: 'GET',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         const ordersData = await ordersResponse.json();
+         setOrdersCount(ordersData.length);
       } catch (error) {
         console.error('Error fetching metrics:', error);
         setError('Failed to load data');
@@ -61,16 +73,20 @@ const ManagerDash = () => {
     return date.toLocaleString();
   };
 
-  // Function to handle resetting the inventory to the threshold level
-  const resetInventory = async (itemId, thresholdLevel) => {
-    try {
-      // Send a PATCH request to the backend to reset the quantity to the threshold level
-      const data = { reset: true }; // Indicating that the inventory should be reset
-      const response = await fetch(`${BASE_URL}/backend/inventory/${itemId}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+   // Function to handle resetting the inventory to the threshold level
+   const resetInventory = async (itemId, thresholdLevel) => {
+     try {
+       const token = await AsyncStorage.getItem('userToken');
+       // Send a PATCH request to the backend to reset the quantity to the threshold level
+       const data = { reset: true }; // Indicating that the inventory should be reset
+       const response = await fetch(`${BASE_URL}/backend/inventory/${itemId}/`, {
+         method: 'PATCH',
+         headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify(data),
+       });
 
       if (response.ok) {
         // Update the local inventory state after successful reset

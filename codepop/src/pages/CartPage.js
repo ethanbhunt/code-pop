@@ -36,18 +36,19 @@ const CartPage = () => {
       // await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(currentList));
 
       const fetchedDrinks = [];
-      for (let i = 0; i < currentList.length; i++) {
-        const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        const data = await response.json();
-        if (data != null && data.Size && data.SodaUsed && data.Ice) {
-          fetchedDrinks.push(data); // Add each drink to the temporary array
-        }
-      }
+       for (let i = 0; i < currentList.length; i++) {
+         const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         const data = await response.json();
+         if (data != null && data.Size && data.SodaUsed && data.Ice) {
+           fetchedDrinks.push(data); // Add each drink to the temporary array
+         }
+       }
       
       setDrinks(fetchedDrinks); // Update state once after all drinks are collected
       calculateTotalPrice(fetchedDrinks); // Calculate total price after fetching drinks
