@@ -26,9 +26,10 @@ export default function CheckoutForm(totalPrice) {
        },
        body: JSON.stringify({ amount: totalPrice }), // amount in cents
      });
-     const { paymentIntent, ephemeralKey, customer } = await response.json();
-     setStripeNum(paymentIntent);
-     return { paymentIntent, ephemeralKey, customer };
+      const paymentResponse = await response.json();
+      const { paymentIntent, ephemeralKey, customer } = paymentResponse.data || paymentResponse;
+      setStripeNum(paymentIntent);
+      return { paymentIntent, ephemeralKey, customer };
    };
 
   const initializePaymentSheet = async () => {
@@ -62,23 +63,23 @@ export default function CheckoutForm(totalPrice) {
            'Authorization': `Token ${token}`,
          },
          body: JSON.stringify({
-           UserID: userId,
-           Drinks: currentList,
-           OrderStatus: 'processing',
-           PaymentStatus: 'paid',
-           StripeID: stripeNum,
+           userId: userId,
+           drinks: currentList,
+           orderStatus: 'processing',
+           paymentStatus: 'paid',
+           stripeId: stripeNum,
          })
        });
 
-      // Check if the request was successful
-      if (response.ok) {
-        const data = await response.json(); // Parse JSON if returned
-        orderNum = data.OrderID;
-        console.log('Order Num:', orderNum);
-        await AsyncStorage.setItem("orderNum", orderNum.toString());
-      } else {
-        console.error('Failed to create order:', response.status, await response.text());
-      }
+       // Check if the request was successful
+       if (response.ok) {
+         const responseData = await response.json(); // Parse JSON if returned
+         orderNum = responseData.data.orderId; // API returns nested data with camelCase
+         console.log('Order Num:', orderNum);
+         await AsyncStorage.setItem("orderNum", orderNum.toString());
+       } else {
+         console.error('Failed to create order:', response.status, await response.text());
+       }
 
  
       // Update the local state to remove the drink from the cart page
@@ -106,10 +107,10 @@ export default function CheckoutForm(totalPrice) {
            'Content-Type': 'application/json',
            'Authorization': `Token ${token}`,
          },
-         body: JSON.stringify({
-           OrderID: orderNum,
-           TotalAmount: totalPrice,
-         }),
+          body: JSON.stringify({
+            orderId: orderNum,
+            totalAmount: totalPrice,
+          }),
        });
     
       if (response.ok) {
@@ -129,26 +130,27 @@ export default function CheckoutForm(totalPrice) {
   
     if (error) {
       Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
-      Alert.alert('Success', 'Your order is confirmed!', [
-        {
-          text: 'OK',
-          onPress: async () => {
-             await removeAllDrinks();
-             await addRevenue();
-             const token = await AsyncStorage.getItem('userToken');
-             const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
-               method: 'GET',
-               headers: {
-                 'Content-Type': 'application/json',
-                 'Authorization': `Token ${token}`,
-               },
-             });
-             navigation.navigate('PostCheckout');
-          },
-        },
-      ]);
-    }
+     } else {
+       Alert.alert('Success', 'Your order is confirmed!', [
+         {
+           text: 'OK',
+           onPress: async () => {
+              await removeAllDrinks();
+              await addRevenue();
+              const token = await AsyncStorage.getItem('userToken');
+              const orderNum = await AsyncStorage.getItem('orderNum');
+              const response = await fetch(`${BASE_URL}/backend/email/${orderNum}/`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Token ${token}`,
+                },
+              });
+              navigation.navigate('PostCheckout');
+           },
+         },
+       ]);
+     }
   };
 
   return { initializePaymentSheet, openPaymentSheet, loading };

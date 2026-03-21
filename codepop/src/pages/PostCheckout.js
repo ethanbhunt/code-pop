@@ -108,19 +108,19 @@ const PostCheckout = () => {
 
         parsedDrinks.forEach((drink) => {
 
-          // Add SyrupsUsed to the list
-          if (drink.SyrupsUsed && drink.SyrupsUsed.length > 0) {
-            allUsedItems.push(...drink.SyrupsUsed); // Spread operator to merge arrays
+          // Add syrupsUsed to the list
+          if (drink.syrupsUsed && drink.syrupsUsed.length > 0) {
+            allUsedItems.push(...drink.syrupsUsed); // Spread operator to merge arrays
           }
 
-          // Add SodaUsed to the list
-          if (drink.SodaUsed && drink.SodaUsed.length > 0) {
-            allUsedItems.push(...drink.SodaUsed);
+          // Add sodaUsed to the list
+          if (drink.sodaUsed && drink.sodaUsed.length > 0) {
+            allUsedItems.push(...drink.sodaUsed);
           }
 
-        // Add AddIns to the list
-          if (drink.AddIns && drink.AddIns.length > 0) {
-            allUsedItems.push(...drink.AddIns);
+        // Add addIns to the list
+          if (drink.addIns && drink.addIns.length > 0) {
+            allUsedItems.push(...drink.addIns);
           }
     });
 
@@ -136,12 +136,12 @@ const PostCheckout = () => {
      const inventoryData = await inventoryResponse.json();
 
     // Extract matching InventoryIDs
-    const matchingInventoryIDs = inventoryData.inventory_items.filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase())).map(item => item.InventoryID); // Extract the InventoryID
+    const matchingInventoryIDs = inventoryData.data.inventory_items.filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.itemName.toLowerCase())).map(item => item.inventoryId); // Extract the inventoryId
 
     for (const id of matchingInventoryIDs)
     {
       try{
-       const data = {'used_quantity': 1};
+       const data = {'usedQuantity': 1};
          const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
            method: 'PATCH',
            headers: { 
@@ -193,19 +193,19 @@ const PostCheckout = () => {
   
 
    const completeOrder = async () => {
-     const orderNum = await AsyncStorage.getItem("orderNum");
-     const token = await AsyncStorage.getItem('userToken');
-     await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-       method: 'PATCH',
-       headers: {
-         'Content-Type': 'application/json',
-         'Authorization': `Token ${token}`,
-       },
-       body: JSON.stringify({
-         OrderStatus: 'completed',
-       }),
-     });
-   }
+      const orderNum = await AsyncStorage.getItem("orderNum");
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({
+          orderStatus: 'completed',
+        }),
+      });
+    }
   
 
   const handleLockerCombo = () => {
@@ -218,20 +218,20 @@ const PostCheckout = () => {
     setLockerCombo(combo);
   };
 
-   const updateLockerCombo = async () => {
-     const orderNum = await AsyncStorage.getItem("orderNum");
-     const token = await AsyncStorage.getItem('userToken');
-     await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-       method: 'PATCH',
-       headers: {
-         'Content-Type': 'application/json',
-         'Authorization': `Token ${token}`,
-       },
-       body: JSON.stringify({
-         LockerCombo: lockerCombo,
-       }),
-     });
-  };
+    const updateLockerCombo = async () => {
+      const orderNum = await AsyncStorage.getItem("orderNum");
+      const token = await AsyncStorage.getItem('userToken');
+      await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({
+          lockerCombo: lockerCombo,
+        }),
+      });
+    };
 
   // Convert timeLeft to minutes and seconds format
   const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');

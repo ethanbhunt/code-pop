@@ -10,9 +10,10 @@
     "revenues": "/orbitdb/zdpuAtvPgq28r2KWkpAHWDJdhFGnJbJgex9aSV9VLNURYjmGp"
   },
   "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWKqiWU1wokwC6D4zUTQt2mHeK9ryzZi3WivQsuF5N1k5a",
-    "/ip4/144.39.111.212/tcp/4000/p2p/12D3KooWKqiWU1wokwC6D4zUTQt2mHeK9ryzZi3WivQsuF5N1k5a"
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWLiWCjvKM6FvdVwHZNukHRFZtW8ZDjWkt9ePz8c9MRGij",
+    "/ip4/144.39.111.212/tcp/4000/p2p/12D3KooWLiWCjvKM6FvdVwHZNukHRFZtW8ZDjWkt9ePz8c9MRGij",
+    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWLiWCjvKM6FvdVwHZNukHRFZtW8ZDjWkt9ePz8c9MRGij"
   ],
-  "peerId": "12D3KooWKqiWU1wokwC6D4zUTQt2mHeK9ryzZi3WivQsuF5N1k5a",
-  "timestamp": "2026-03-21T18:34:15.106Z"
+  "peerId": "12D3KooWLiWCjvKM6FvdVwHZNukHRFZtW8ZDjWkt9ePz8c9MRGij",
+  "timestamp": "2026-03-21T20:04:36.727Z"
 }

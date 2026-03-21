@@ -11,63 +11,85 @@ const SeasonalCarousel = () => {
     const navigation = useNavigation();
     const [data, setData] = useState([]);
 
-    useEffect(() => {
-        const fetchData = async () => {
-             try {
-                const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-            const drinks = await response.json();
+     useEffect(() => {
+         const fetchData = async () => {
+              try {
+                 const token = await AsyncStorage.getItem('userToken');
+                 
+                 // Skip fetching drinks if user is not logged in
+                 if (!token) {
+                     console.log('No token found, skipping drinks fetch');
+                     setData([]);
+                     return;
+                 }
+                 
+                 const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+                     method: 'GET',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'Authorization': `Token ${token}`,
+                     },
+                 });
+             const drinksResponse = await response.json();
+             
+             // Check if response has error or data is missing
+             if (!drinksResponse.data || !Array.isArray(drinksResponse.data)) {
+                 console.warn('No drinks data available or invalid response:', drinksResponse);
+                 setData([]);
+                 return;
+             }
+             
+             const drinks = drinksResponse.data;
 
-            const parsedDrinks = drinks.map(drink => ({
-                drinkID: drink.DrinkID,
-                name: drink.Name,
-                price: drink.Price,
-                sodaUsed: drink.SodaUsed,  // Default value if SodaUsed is null
-                syrupsUsed: drink.SyrupsUsed,
-                addIns: drink.AddIns,
-                user_Created: drink.user_Created,    // Assuming the user is creating the drink
-                // size: drink.selectedSize,
-                // ice: drink.selectedIce,
-            }));
-            console.log('parsed')
-            console.log(parsedDrinks);
-            setData(parsedDrinks);
-            } catch (error) {
-                console.error(error);
-            } 
-        };
-        fetchData();
-    }, []);
+             const parsedDrinks = drinks.map(drink => ({
+                 drinkId: drink.drinkId,
+                 name: drink.name,
+                 price: drink.price,
+                 sodaUsed: drink.sodaUsed,  // Default value if sodaUsed is null
+                 syrupsUsed: drink.syrupsUsed,
+                 addIns: drink.addIns,
+                 userCreated: drink.userCreated,    // Assuming the user is creating the drink
+                 // size: drink.size,
+                 // ice: drink.ice,
+             }));
+             console.log('parsed')
+             console.log(parsedDrinks);
+             setData(parsedDrinks);
+             } catch (error) {
+                 console.error('Error fetching drinks:', error);
+                 setData([]);
+             } 
+         };
+         fetchData();
+     }, []);
     
-    const createDrink = async (item) => {
-        console.log('creating drinks...');
-        try {
-            // Get the list from AsyncStorage, or initialize as an empty array
-            cartList = await AsyncStorage.getItem("checkoutList");
-            const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
-            const cleanedList = currentList.filter(item => item !== null && item !== undefined);
+     const createDrink = async (item) => {
+         console.log('creating drinks...');
+         try {
+             const token = await AsyncStorage.getItem('userToken');
+             // Get the list from AsyncStorage, or initialize as an empty array
+             cartList = await AsyncStorage.getItem("checkoutList");
+             const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
+             const cleanedList = currentList.filter(item => item !== null && item !== undefined);
 
-            // Log the item to ensure it has the correct structure
-            console.log(item);
+             // Log the item to ensure it has the correct structure
+             console.log(item);
 
-            const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
+             const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+                 method: 'POST',
+                 headers: {
+                   'Content-Type': 'application/json',
+                   'Authorization': `Token ${token}`,
+                 },
                 body: JSON.stringify({ 
-                  Name: item.name,  // Example name for the drink
-                  SodaUsed: item.sodaUsed,  // Default value if SodaUsed is null
-                  SyrupsUsed: item.syrupsUsed,
-                  AddIns: item.addIns,
-                  Price: item.price,
-                  User_Created: true,    // Assuming the user is creating the drink
-                  Size: '24oz',
-                  Ice: 'Regular',
+                  name: item.name,  // Example name for the drink
+                  sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
+                  syrupsUsed: item.syrupsUsed,
+                  addIns: item.addIns,
+                  price: item.price,
+                  userCreated: true,    // Assuming the user is creating the drink
+                  size: '24oz',
+                  ice: 'normal',
                 })
               });
             
@@ -80,8 +102,8 @@ const SeasonalCarousel = () => {
                 cartList = await AsyncStorage.getItem("checkoutList");
                 const currentList = cartList ? JSON.parse(cartList) : [];
                 // takes the response (what we get after we create a drink) and extracts the drinkID
-                const data = await response.json();
-                const drinkID = data.DrinkID;
+                const responseData = await response.json();
+                const drinkID = responseData.data.drinkId;
                 // add the drinkID to the checkoutList
                 const updatedList = [...currentList, drinkID]
                 // Saves the checkoutlist back into the storage on the phone

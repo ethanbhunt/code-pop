@@ -55,44 +55,45 @@ const CreateDrinkPage = () => {
         Alert.alert("Dont forget to choose a Soda, Size and, Ice Ammount!")
 
       }else{
-        const token = await AsyncStorage.getItem('userToken');
-    
-         const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Token ${token}`,
-           },
-           body: JSON.stringify({ 
-             Name: "Drink in User Cart",  // Example name for the drink
-             SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-             SyrupsUsed: SyrupsUsed,
-             AddIns: AddIns,
-             Price: 2.00,
-             User_Created: true,    // Assuming the user is creating the drink
-             Size: selectedSize,
-             Ice: selectedIce,
-           })
-         });
+         const token = await AsyncStorage.getItem('userToken');
+         console.log('Token retrieved:', token ? 'Token exists' : 'NO TOKEN FOUND');
+     
+           const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Token ${token}`,
+             },
+             body: JSON.stringify({ 
+               name: "Drink in User Cart",  // Example name for the drink
+               sodaUsed: SodaUsed,  // Default value if sodaUsed is null
+               syrupsUsed: SyrupsUsed,
+               addIns: AddIns,
+               price: 2.00,
+               userCreated: true,    // Assuming the user is creating the drink
+               size: selectedSize,
+               ice: selectedIce.toLowerCase(),  // Convert to lowercase for backend
+             })
+           });
     
         if (!response.ok) {
           throw new Error(`Failed to add drink. Status: ${response.status}`);
         }
         // add drink item (the drinks ID) to the checkout list from App.js
-        try{
-          // gets list of out of storage on your phone
-          cartList = await AsyncStorage.getItem("checkoutList");
-          const currentList = cartList ? JSON.parse(cartList) : [];
-          // takes the response (what we get after we create a drink) and extracts the drinkID
-          const data = await response.json();
-          const drinkID = data.DrinkID;
-          // add the drinkID to the checkoutList
-          const updatedList = [...currentList, drinkID]
-          // Saves the checkoutlist back into the storage on the phone
-          await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-        }catch (error){
-          console.log(error)
-        }
+         try{
+           // gets list of out of storage on your phone
+           cartList = await AsyncStorage.getItem("checkoutList");
+           const currentList = cartList ? JSON.parse(cartList) : [];
+           // takes the response (what we get after we create a drink) and extracts the drinkID
+           const responseData = await response.json();
+           const drinkID = responseData.data.drinkId; // API returns nested data with camelCase
+           // add the drinkID to the checkoutList
+           const updatedList = [...currentList, drinkID]
+           // Saves the checkoutlist back into the storage on the phone
+           await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+         }catch (error){
+           console.log(error)
+         }
 
         navigation.navigate('Cart');
       }
@@ -165,35 +166,14 @@ const CreateDrinkPage = () => {
   
   // function for generate drink button which generates a drink with AI   
     
-  const GenerateAI = async () => {
-    try {
-      const user_id = await AsyncStorage.getItem('userId');
-      let url = `${BASE_URL}/backend/generate/`;
-
-      if (user_id) {
-        url = `${BASE_URL}/backend/generate/${user_id}/`;
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error when trying to generate AI drink. Status: ${response.status}`);
-      }
-
-      const drink = await response.json();
-      setDrinkDict(drink);
-      setModalVisible(true);
-      console.log(drink);
-    }
-    catch (error) {
-      console.error('Error when trying to generate AI drink:', error);
-    }
-  };
+   const GenerateAI = async () => {
+     // Show alert that AI generation is not yet available
+     Alert.alert(
+       'Feature Coming Soon',
+       'AI Drink Generation is not yet available. Please create drinks manually using the ingredients below.',
+       [{ text: 'OK' }]
+     );
+   };
 
   // reactive gif stuff
   const getLayers = (soda, syrups, addins) => {
@@ -275,7 +255,7 @@ const CreateDrinkPage = () => {
 
         {/* Ice buttons on the right */}
         <View style={styles.buttonContainerRight}>
-          {['No Ice', 'Light', 'Regular', 'Extra'].map((ice) => (
+          {['Light', 'Normal', 'Extra'].map((ice) => (
             <TouchableOpacity
               key={ice}
               onPress={() => handleIceSelection(ice)}

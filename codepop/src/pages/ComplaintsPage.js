@@ -49,22 +49,22 @@ const ComplaintsPage = () => {
                      'Content-Type': 'application/json',
                      'Authorization': `Token ${token}`,
                  },
-                 body: JSON.stringify({
-                     message: userRequest,
-                     refund_phase: refund_phase,
-                     wrong_drink_phase: wrong_drink_phase,
-                     order_num: order_num,
-                     drink_nums: drink_nums
-                 })
+              body: JSON.stringify({
+                  message: userRequest,
+                  refundPhase: refund_phase,
+                  wrongDrinkPhase: wrong_drink_phase,
+                  orderNum: order_num,
+                  drinkNums: drink_nums
+              })
              });
     
-            if (response.ok) {
-                const data = await response.json();
-                const botResponse = data.responses;
-                const response_refund_phase = data.refund_phase;
-                const response_wrong_drink_phase = data.wrong_drink_phase;
-                setOrderNum(data.order_num);
-                setDrinkNums(data.drink_nums);
+             if (response.ok) {
+                 const data = await response.json();
+                 const botResponse = data.data.responses;
+                 const response_refund_phase = data.data.refundPhase;
+                 const response_wrong_drink_phase = data.data.wrongDrinkPhase;
+                 setOrderNum(data.data.orderNum);
+                 setDrinkNums(data.data.drinkNums);
 
                 if(response_refund_phase === "none" && response_wrong_drink_phase === "none"){
                     setRefundPhase(null);
@@ -94,12 +94,12 @@ const ComplaintsPage = () => {
                          }
                      });
 
-                    if(orderResponse.ok){
-                        const drinksForPost = [];
-                        const orderData = await orderResponse.json();
-                         // Use Promise.all to wait for all drink data to resolve
-                        const drinkPromises = orderData.Drinks.map(drink => getDrinkData(drink));
-                        const resolvedDrinks = await Promise.all(drinkPromises); // Wait for all Promises to resolve
+                     if(orderResponse.ok){
+                         const drinksForPost = [];
+                         const orderData = await orderResponse.json();
+                          // Use Promise.all to wait for all drink data to resolve
+                         const drinkPromises = orderData.data.drinks.map(drink => getDrinkData(drink));
+                         const resolvedDrinks = await Promise.all(drinkPromises); // Wait for all Promises to resolve
 
                         // Add resolved drink data to drinksForPost
                         drinksForPost.push(...resolvedDrinks);
@@ -146,20 +146,20 @@ const ComplaintsPage = () => {
          try {
              const token = await AsyncStorage.getItem('userToken');
              const drinkData = await fetch(`${BASE_URL}/backend/drinks/${drinkID}/`, {
-                 method: 'GET',
+                  method: 'GET',
                  headers: {
                      'Content-Type': 'application/json',
                      'Authorization': `Token ${token}`,
                  },
              });
-    
-            if (!drinkData.ok) {
-                console.error(`Error fetching drink data: ${drinkData.status} ${drinkData.statusText}`);
-                return null;
-            }
-    
-            const jsonForm = await drinkData.json();
-            return jsonForm;
+     
+             if (!drinkData.ok) {
+                 console.error(`Error fetching drink data: ${drinkData.status} ${drinkData.statusText}`);
+                 return null;
+             }
+     
+             const jsonForm = await drinkData.json();
+             return jsonForm.data;
         } catch (error) {
             console.error("Error getting drink:", error);
             return null;
