@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,7 +26,7 @@ export default function CheckoutForm(totalPrice) {
 
       const payload = await response.json();
       if (!response.ok) {
-        console.error('Failed to create payment intent:', payload);
+        console.log('Demo mode: payment intent unavailable, using fallback checkout.', payload);
         return null;
       }
 
@@ -35,7 +34,7 @@ export default function CheckoutForm(totalPrice) {
       setStripeNum(paymentIntent);
       return { paymentIntent, ephemeralKey, customer };
     } catch (error) {
-      console.error('Payment intent request failed:', error);
+      console.log('Demo mode: payment intent request failed, using fallback checkout.', error);
       return null;
     }
   };
@@ -73,7 +72,7 @@ export default function CheckoutForm(totalPrice) {
     } else {
       setPaymentSheetReady(false);
       setLoading(true);
-      console.error('Payment sheet init failed:', error.message);
+      console.log('Demo mode: payment sheet init failed, using fallback checkout.', error.message);
     }
   };
 
@@ -159,7 +158,7 @@ export default function CheckoutForm(totalPrice) {
   const finalizeCheckout = async () => {
     const orderCreated = await removeAllDrinks();
     if (!orderCreated) {
-      Alert.alert('Order issue', 'Unable to create your order. Please try again.');
+      console.warn('Order issue: unable to create order during demo checkout.');
       return;
     }
 
@@ -178,35 +177,18 @@ export default function CheckoutForm(totalPrice) {
 
   const openPaymentSheet = async () => {
     if (!paymentSheetReady) {
-      Alert.alert(
-        'Demo checkout mode',
-        'Payment gateway is unavailable. Continue with demo checkout? ',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Continue',
-            onPress: async () => {
-              await finalizeCheckout();
-            },
-          },
-        ]
-      );
+      console.log('Demo checkout mode: payment gateway unavailable, continuing without popup.');
+      await finalizeCheckout();
       return;
     }
 
     const { error } = await presentPaymentSheet();
   
     if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
+      console.log('Demo mode: payment sheet error, using fallback checkout.', error.code, error.message);
+      await finalizeCheckout();
     } else {
-      Alert.alert('Success', 'Your order is confirmed!', [
-        {
-          text: 'OK',
-          onPress: async () => {
-            await finalizeCheckout();
-          },
-        },
-      ]);
+      await finalizeCheckout();
     }
   };
 

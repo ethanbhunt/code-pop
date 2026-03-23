@@ -54,7 +54,19 @@ const App = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="GeneralHome" screenOptions={{headerStyle: {backgroundColor: '#c8c8ee'}}}>
+      <Stack.Navigator
+        initialRouteName="GeneralHome"
+        screenOptions={{
+          headerStyle: { backgroundColor: '#fffaf5' },
+          headerTintColor: '#13293d',
+          headerTitleStyle: {
+            fontWeight: '800',
+            fontSize: 22,
+          },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: '#fffaf5' },
+        }}
+      >
         <Stack.Screen 
           name="Auth" 
           component={AuthPage} 
@@ -163,7 +175,7 @@ const ProfileButton = () => {
 
   return (
     <TouchableOpacity onPress={() => navigation.navigate('Preferences')}>
-      <Icon name="person-circle-outline" size={30} color="#000" />
+      <Icon name="person-circle-outline" size={30} color="#13293d" />
     </TouchableOpacity>
     
   );

@@ -32,19 +32,25 @@ const PostCheckout = () => {
 
   useEffect(() => {
       (async () => {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setErrorMsg('Permission to access location was denied.\n Please click the button when you have arrived so we can have your drink prepared.');
-          return;
-        }
+        try {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            setErrorMsg(null);
+            return;
+          }
 
           try {
                 // Fetch the user's current location
                 let currentLocation = await Location.getCurrentPositionAsync({});
                 setLocation(currentLocation);
               } catch (error) {
-                console.error("Error fetching location:", error);
+                // Silently ignore location fetch failures in demo mode
+                setErrorMsg(null);
               }
+        } catch (error) {
+          // Silently ignore permission request failures in demo mode
+          setErrorMsg(null);
+        }
       })();
     }, []);
 
@@ -287,115 +293,107 @@ const PostCheckout = () => {
     return status;
   };
 
+  const currentStatusIndex = Math.max(0, statusTimeline.indexOf(orderStatus));
+  const progressPercent = `${((currentStatusIndex + 1) / statusTimeline.length) * 100}%`;
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
-
-        {/*Distance from store*/}
-        <View style={[styles.section, styles.nearbySection]}>
-            <View style={styles.nearbyText}>
-                {isNearby ? (
-                        <Text style={styles.text}>Your drink is being made!</Text>
-                      ) : (
-                        <Text style={styles.text}>Once you are within 500 yards from the store Bob will start making your drink.</Text>
-                )}
-            </View>
-        </View>
-
-        <View style={[styles.section, styles.trackerSection]}>
-          <Text style={styles.trackerTitle}>Live Order Journey</Text>
-          <Text style={styles.trackerSubTitle}>Status: {getStatusLabel(orderStatus)}</Text>
-          <Text style={styles.trackerSubTitle}>ETA: {minutes}:{seconds}</Text>
+        <View style={styles.headerCard}>
+          <Text style={styles.headerEyebrow}>Live Tracking</Text>
+          <Text style={styles.headerTitle}>Order #{orderNum || '---'}</Text>
+          <Text style={styles.headerStatus}>Status: {getStatusLabel(orderStatus)}</Text>
+          <Text style={styles.headerEta}>ETA: {minutes}:{seconds}</Text>
           <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
           {isDemoFallback && (
             <Text style={styles.fallbackBadge}>Presentation fallback active</Text>
           )}
 
+          <View style={styles.progressRail}>
+            <View style={[styles.progressFill, { width: progressPercent }]} />
+          </View>
           <View style={styles.timelineRow}>
             {statusTimeline.map((status) => {
-              const isDone = statusTimeline.indexOf(status) <= statusTimeline.indexOf(orderStatus);
+              const isDone = statusTimeline.indexOf(status) <= currentStatusIndex;
               return (
                 <View key={status} style={styles.timelineItem}>
                   <View style={[styles.timelineDot, isDone ? styles.timelineDotActive : null]} />
-                  <Text style={styles.timelineLabel}>{getStatusLabel(status)}</Text>
+                  <Text style={[styles.timelineLabel, isDone ? styles.timelineLabelActive : null]}>{getStatusLabel(status)}</Text>
                 </View>
               );
             })}
           </View>
         </View>
 
-        {/* Map Image Box */}
-        <View style={[styles.section, styles.mapSection]}>
-                {location ? (
-                  <MapView
-                    style={styles.map}
-                    region={{
-                      latitude: location.coords.latitude,
-                      longitude: location.coords.longitude,
-                      latitudeDelta: 0.0922,
-                      longitudeDelta: 0.0421,
-                    }}
-                  >
-                    <Marker
-                      coordinate={{
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                      }}
-                      title="You are here"
-                      description="Current location"
-                    />
-                  </MapView>
-                ) : (
-                  <View style={styles.arrivalButtonContainer}>
-                    {errorMsg ? (
-                      <>
-                        <Text style={styles.errorMessage}>
-                          {errorMsg || "Location permission not granted."}
-                        </Text>
-                        <TouchableOpacity
-                          style={styles.button}
-                          onPress={handleUserArrived}
-                        >
-                          <Text style={styles.buttonText}>I've Arrived</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <Text>Loading...</Text>
-                    )}
-                  </View>
-                )}
-              </View>
+        <View style={styles.nearbySection}>
+          {isNearby ? (
+            <Text style={styles.nearbyText}>You are close by. The team is preparing your drink now.</Text>
+          ) : (
+            <Text style={styles.nearbyText}>Arrive within 500 yards and we will start making your drink.</Text>
+          )}
+        </View>
 
-        {/* Rating Box */}
-        <View style={[styles.section, styles.ratingSection]}>
-          <Text style={styles.ratingLabel}>Liked any of your drinks?</Text>
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Drink ready in</Text>
+            <Text style={styles.summaryValue}>{minutes}:{seconds}</Text>
+            {orderStatus === 'completed' && <Text style={styles.successMessage}>Your drink is ready!</Text>}
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Locker combo</Text>
+            <Text style={styles.summaryValue}>{lockerCombo || '-----'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.mapSection}>
+          <Text style={styles.mapTitle}>Arrival map</Text>
+          {location ? (
+            <MapView
+              style={styles.map}
+              region={{
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                latitudeDelta: 0.0922,
+                longitudeDelta: 0.0421,
+              }}
+            >
+              <Marker
+                coordinate={{
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                }}
+                title="You are here"
+                description="Current location"
+              />
+            </MapView>
+          ) : (
+            <View style={styles.arrivalButtonContainer}>
+              <Text style={styles.loadingText}>Map unavailable in demo mode.</Text>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleUserArrived}
+              >
+                <Text style={styles.actionButtonText}>I've Arrived</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.ratingSection}>
+          <Text style={styles.ratingLabel}>Rate your drinks</Text>
           <RatingCarosel purchasedDrinks={purchasedDrinks} />
         </View>
 
-        {/* Horizontal Container for Timer and Locker Combo */}
-        <View style={styles.timerAndLockerContainer}>
-          <View style={[styles.section, styles.timerSection]}>
-            <Text style={styles.heading}>Drink ready in:</Text>
-            <Text style={styles.timer}>
-              {minutes}:{seconds}
-            </Text>
-            {orderStatus === 'completed' && <Text style={styles.successMessage}>Your drink is ready!</Text>}
-          </View>
-
-          <View style={[styles.section, styles.lockerComboSection]}>
-            <Text style={styles.lockerCombo}>Locker combo: {lockerCombo}</Text>
-          </View>
-        </View>
         {orderStatus === 'completed' ? (
-          <TouchableOpacity onPress={goHomePage} style={styles.mediumButton}>
-            <Text style={styles.buttonText}>Back To Home Page</Text>
+          <TouchableOpacity onPress={goHomePage} style={styles.actionButtonLarge}>
+            <Text style={styles.actionButtonText}>Back To Home Page</Text>
           </TouchableOpacity>
         ) : isNearby ? (
           <></>
         ) : (
-          <TouchableOpacity onPress={makeDrink} style={styles.mediumButton}>
-            <Text style={styles.buttonText}>Location Not Working</Text>
-            <Text style= {styles.buttonText}>Press To Make Drink!</Text>
+          <TouchableOpacity onPress={makeDrink} style={styles.actionButtonLarge}>
+            <Text style={styles.actionButtonText}>Location Not Working</Text>
+            <Text style={styles.actionButtonText}>Tap To Start Drink</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -407,136 +405,162 @@ const PostCheckout = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#8DF1D3', 
+    backgroundColor: '#fffaf5',
   },
   scrollViewContainer: {
     flexGrow: 1,
-    padding: 10,
-    paddingBottom: 100,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 120,
   },
-  section: {
+  headerCard: {
     width: '100%',
-    marginBottom: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+    borderRadius: 22,
+    padding: 16,
+    backgroundColor: '#133a57',
+    shadowColor: '#0f2538',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  timerAndLockerContainer: {
-    paddingTop: 20,
+  headerEyebrow: {
+    color: '#98dcff',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  headerStatus: {
+    color: '#dcefff',
+    fontSize: 16,
+    marginTop: 8,
+    fontWeight: '700',
+  },
+  headerEta: {
+    color: '#dcefff',
+    fontSize: 16,
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  progressRail: {
+    height: 8,
+    borderRadius: 999,
+    marginTop: 12,
+    backgroundColor: '#2f5672',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#ffb347',
+  },
+  summaryRow: {
+    marginTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  timerSection: {
-    backgroundColor: '#C6C8EE',
-    flex: 1,
-    marginRight: 10,
-  },
-  lockerComboSection: {
-    backgroundColor: '#F92758',
-    flex: 1,
-    marginLeft: 10,
+  summaryCard: {
+    width: '48.5%',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#dfe9f2',
   },
   mapSection: {
-    backgroundColor: '#D30C7B',
+    marginTop: 12,
+    backgroundColor: '#ffffff',
     width: '100%',
-    height: 250,
+    minHeight: 280,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#dfe9f2',
+    padding: 12,
   },
   ratingSection: {
-    backgroundColor: '#FFA686', 
+    marginTop: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#dfe9f2',
     paddingBottom: 20,
+    paddingHorizontal: 10,
+    paddingTop: 8,
   },
-  heading: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginVertical: 5,
+  summaryLabel: {
+    color: '#37526d',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  timer: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#FFA686',
-    marginVertical: 5,
+  summaryValue: {
+    color: '#1b2f45',
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 6,
   },
   successMessage: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#8DF1D3', 
-    marginVertical: 10,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0e5f8a',
+    marginTop: 6,
   },
   ratingLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1b2f45',
     margin: 10,
   },
-  lockerCombo: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    alignSelf: 'center',
-    marginVertical: 20,
-  },
-  button: {
-    backgroundColor: '#D30C7B',
+  actionButton: {
+    backgroundColor: '#ff6a3d',
     paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginVertical: 5,
   },
-  buttonText: {
-    //color: '#fff',
-    color: 'black',
-    fontSize: 16,
-    fontWeight: 'bold',
+  actionButtonLarge: {
+    marginTop: 12,
+    backgroundColor: '#ff6a3d',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
   },
   map: {
-    width: '90%',
-    height: 200,
-    borderRadius: 8,
+    width: '100%',
+    height: 210,
+    borderRadius: 12,
   },
   nearbySection: {
-    backgroundColor: '#F92758',
-    justifyContent: 'center',
-    height: 40,
-  },
-  trackerSection: {
-    backgroundColor: '#1f3c88',
-    padding: 14,
-    alignItems: 'flex-start',
-  },
-  trackerTitle: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  trackerSubTitle: {
-    color: '#d8f3ff',
-    fontSize: 16,
-    marginTop: 4,
-    fontWeight: '600',
+    marginTop: 12,
+    backgroundColor: '#fff2df',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#ffd6a6',
+    padding: 12,
   },
   lastUpdate: {
-    color: '#c2f7d9',
+    color: '#bfe8ff',
     marginTop: 6,
     marginBottom: 8,
+    fontWeight: '600',
   },
   fallbackBadge: {
-    color: '#1f3c88',
+    color: '#133a57',
     backgroundColor: '#f9e76d',
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -548,52 +572,56 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginTop: 10,
   },
   timelineItem: {
     alignItems: 'center',
     flex: 1,
   },
   timelineDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#6c7cab',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#6f8aa1',
     marginBottom: 4,
   },
   timelineDotActive: {
-    backgroundColor: '#f9e76d',
+    backgroundColor: '#ffb347',
   },
   timelineLabel: {
-    color: '#fff',
+    color: '#b8d7ed',
     fontSize: 12,
     fontWeight: '700',
   },
+  timelineLabelActive: {
+    color: '#ffffff',
+  },
   nearbyText: {
-    fontWeight: '900',
+    fontWeight: '700',
+    color: '#7a4700',
   },
   arrivalButtonContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    height: '100%',
+    minHeight: 190,
   },
   errorMessage: {
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#264059',
     marginBottom: 10,
     textAlign: 'center',
   },
-  mediumButton: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#D30C7B',
-    borderRadius: 10,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+  mapTitle: {
+    alignSelf: 'flex-start',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1b2f45',
+    marginBottom: 10,
+  },
+  loadingText: {
+    color: '#264059',
+    fontWeight: '600',
   },
 });
 
