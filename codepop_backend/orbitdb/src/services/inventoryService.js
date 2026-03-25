@@ -4,7 +4,7 @@
 import { getInventoryDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateInventoryItemType, validatePositiveInteger } from "../utils/validation.js"
 
-export async function createInventoryItem(itemName, itemType, quantity, thresholdLevel) {
+export async function createInventoryItem(itemName, itemType, quantity, thresholdLevel, costPerUnit = null, supplier = null) {
   if (!itemName || !itemType) {
     throw new Error("Item name and type are required")
   }
@@ -18,6 +18,10 @@ export async function createInventoryItem(itemName, itemType, quantity, threshol
     throw new Error("Threshold level must be a positive integer")
   }
 
+  if (costPerUnit !== null && (isNaN(parseFloat(costPerUnit)) || parseFloat(costPerUnit) < 0)) {
+    throw new Error("Cost per unit must be a positive number")
+  }
+
   const inventoryDb = getInventoryDb()
   const itemId = await getNextId(inventoryDb, "inventory")
 
@@ -27,6 +31,9 @@ export async function createInventoryItem(itemName, itemType, quantity, threshol
     itemType,
     quantity: parseInt(quantity, 10),
     thresholdLevel: parseInt(thresholdLevel, 10),
+    costPerUnit: costPerUnit ? parseFloat(costPerUnit) : null,
+    supplier: supplier || null,
+    lastRestocked: getTimestamp(),
     lastUpdated: getTimestamp()
   }
 
@@ -82,8 +89,31 @@ export async function updateInventoryItem(itemId, updates) {
   if (updates.thresholdLevel !== undefined) {
     item.thresholdLevel = parseInt(updates.thresholdLevel, 10)
   }
+  if (updates.costPerUnit !== undefined) {
+    item.costPerUnit = updates.costPerUnit ? parseFloat(updates.costPerUnit) : null
+  }
+  if (updates.supplier !== undefined) {
+    item.supplier = updates.supplier || null
+  }
 
   item.lastUpdated = getTimestamp()
+  await inventoryDb.put(`inventory:${itemId}`, item)
+  return item
+}
+
+export async function restockItem(itemId, newQuantity) {
+  const inventoryDb = getInventoryDb()
+  const item = await inventoryDb.get(`inventory:${itemId}`)
+  if (!item) throw new Error("Inventory item not found")
+
+  if (!validatePositiveInteger(newQuantity) && newQuantity !== 0) {
+    throw new Error("New quantity must be a non-negative integer")
+  }
+
+  item.quantity = parseInt(newQuantity, 10)
+  item.lastRestocked = getTimestamp()
+  item.lastUpdated = getTimestamp()
+
   await inventoryDb.put(`inventory:${itemId}`, item)
   return item
 }

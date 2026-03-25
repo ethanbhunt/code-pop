@@ -57,15 +57,15 @@ npm run bootstrap
 
 Output:
 ```
-🚀 Starting CodePop Bootstrap Node...
-📚 Creating CodePop databases...
-  ✓ users-db created
-  ✓ tokens-db created
+[ ^ ] Starting CodePop Bootstrap Node...
+[ ^ ] Creating CodePop databases...
+[ ^ ] users-db created
+[ ^ ] tokens-db created
   ... (6 more databases)
-📝 Peer information written to peer-info.json
-   Peer ID: 12D3KooXXXXXXXXX...
-✅ Bootstrap node is ready!
-   HTTP API: http://localhost:3000
+[ ^ ] Peer information written to peer-info.json
+[ ^ ] Peer ID: 12D3KooXXXXXXXXX...
+[ ^ ] Bootstrap node is ready!
+[ ^ ] HTTP API: http://localhost:3000
 ```
 
 **Terminal 2 - Peer Node 1 (Main API Server)**
@@ -76,15 +76,15 @@ PORT=3001 npm run peer
 
 Output:
 ```
-🚀 Starting CodePop Peer Node (port 3001)...
-✓ Read bootstrap info from peer-info.json
-✓ libp2p configured
-🔌 Dialing bootstrap: /ip4/127.0.0.1/tcp/4000/p2p/12D3KooXXX...
-✓ Connected to bootstrap node
-📚 Opening CodePop databases...
+[ ^ ] Starting CodePop Peer Node (port 3001)...
+[ ^ ] Read bootstrap info from peer-info.json
+[ ^ ] libp2p configured
+[ ^ ] Dialing bootstrap: /ip4/127.0.0.1/tcp/4000/p2p/12D3KooXXX...
+[ ^ ] Connected to bootstrap node
+[ ^ ] Opening CodePop databases...
 ✓ Databases synchronized with bootstrap
-✅ Peer node is ready!
-   HTTP API: http://localhost:3001
+[ ^ ] Peer node is ready!
+[ ^ ] HTTP API: http://localhost:3001
 ```
 
 **Terminal 3 - React Native Frontend**
@@ -234,12 +234,16 @@ Token format: 64 hexadecimal characters
 - `PUT /backend/orders/:id` - Update order status (requires token)
 
 ### Full API Documentation
-See [API_ENDPOINTS.md](./API_ENDPOINTS.md) for complete endpoint list and examples.
+See [api.md](./doc/api.md) for complete endpoint list and examples.
 
 ## Project Structure
 
 ```
 codepop_backend/orbitdb/
+├── doc/
+|   ├── api.md                 # API documentation
+|   ├── quick_start_testing.md # Testing guide
+|   ├── starting_guide.md.     # Starting guide
 ├── bootstrap-node.js          # Bootstrap node (creates DBs)
 ├── peer-node.js               # Peer node with Express API
 ├── package.json               # Dependencies & scripts
@@ -302,25 +306,6 @@ npm run ios
 # Run web version
 npm run web
 ```
-
-## Phase 1 Status
-
-✅ **Complete:**
-- Bootstrap node with 8 database creation
-- Peer node with libp2p networking
-- Automatic database replication via gossipsub
-- Authentication middleware
-- Error handling middleware
-- Database accessor utility
-- Crypto utilities (password hashing, token generation)
-- REST API foundation with Health/Info endpoints
-
-🚧 **Phase 2 (Next):**
-- User authentication (register, login, logout)
-- CRUD endpoints for all entities
-- Input validation
-- Admin/staff permission checks
-- Error handling for all scenarios
 
 ## Deployment Strategy
 
@@ -498,35 +483,3 @@ npm install
 3. Token exists in tokens-db
 4. Token hasn't expired
 5. User is logged in and token stored in AsyncStorage
-
-## Next Steps
-
-1. **Phase 2**: Implement all user/auth endpoints
-2. **Phase 2**: Implement CRUD for Preferences, Drinks, Orders, etc.
-3. **Phase 3**: Port Python AI services (drinkAI, customerAI)
-4. **Phase 4**: Data migration from PostgreSQL
-5. **Phase 5**: Frontend integration & testing
-
-## Contributing
-
-When adding new endpoints:
-1. Create service in `src/services/`
-2. Create routes in `src/routes/`
-3. Add unit tests in `tests/services/`
-4. Add integration tests in `tests/integration/`
-5. Update this README
-
-## Resources
-
-- [OrbitDB Documentation](https://docs.orbitdb.org/)
-- [libp2p JavaScript](https://docs.libp2p.io/)
-- [Express.js Guide](https://expressjs.com/)
-- [CodePop AGENTS.md](../../AGENTS.md)
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Review Phase 1 implementation details above
-3. Check AGENTS.md for development guidelines
-4. Open an issue with logs from both bootstrap and peer nodes

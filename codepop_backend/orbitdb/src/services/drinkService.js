@@ -8,13 +8,30 @@ import { validateDrinkSize, validateDrinkIce, validateStringArray } from "../uti
  * Create a new drink
  */
 export async function createDrink(data) {
-  const { name, syrupsUsed, sodaUsed, addIns, price, size, ice, userCreated } = data
+  const {
+    name,
+    syrupsUsed,
+    sodaUsed,
+    addIns,
+    syrups,
+    sodas,
+    ingredients,
+    price,
+    size,
+    ice,
+    userCreated,
+    description,
+    isVegan,
+    isGlutenFree,
+    calories,
+    rating
+  } = data
 
-  if (!name || !sodaUsed || !price) {
-    throw new Error("Name, sodaUsed, and price are required")
+  if (!name || !sodaUsed && !sodas || !price) {
+    throw new Error("Name, soda/sodas, and price are required")
   }
 
-  if (!validateDrinkSize(size || "m")) {
+  if (!validateDrinkSize(size || "16oz")) {
     throw new Error("Invalid drink size")
   }
 
@@ -29,17 +46,31 @@ export async function createDrink(data) {
   const drinksDb = getDrinksDb()
   const drinkId = await getNextId(drinksDb, "drink")
 
+  // Support both old (syrupsUsed) and new (syrups) field names
+  const finalSyrups = syrups || syrupsUsed || []
+  const finalSodas = sodas || sodaUsed || []
+  const finalAddIns = addIns || []
+  const finalIngredients = ingredients || []
+
   const drink = {
     drinkId,
     name,
-    syrupsUsed: validateStringArray(syrupsUsed) ? syrupsUsed : [],
-    sodaUsed: validateStringArray(sodaUsed) ? sodaUsed : [],
-    addIns: validateStringArray(addIns) ? addIns : [],
-    rating: null,
+    description: description || "",
+    syrups: validateStringArray(finalSyrups) ? finalSyrups : [],
+    sodas: validateStringArray(finalSodas) ? finalSodas : [],
+    addIns: validateStringArray(finalAddIns) ? finalAddIns : [],
+    ingredients: validateStringArray(finalIngredients) ? finalIngredients : [],
+    // Keep old field names for backward compatibility
+    syrupsUsed: validateStringArray(finalSyrups) ? finalSyrups : [],
+    sodaUsed: validateStringArray(finalSodas) ? finalSodas : [],
     price: parseFloat(price),
-    size: size || "m",
+    size: size || "16oz",
     ice: ice || "normal",
     userCreated: Boolean(userCreated),
+    isVegan: Boolean(isVegan) || false,
+    isGlutenFree: Boolean(isGlutenFree) || false,
+    calories: calories ? parseInt(calories, 10) : null,
+    rating: rating ? parseFloat(rating) : null,
     favorites: [],
     createdAt: getTimestamp()
   }
@@ -132,14 +163,31 @@ export async function updateDrink(drinkId, updates) {
 
   // Validate and update fields
   if (updates.name) drink.name = updates.name
-  if (updates.syrupsUsed !== undefined) {
+  if (updates.description !== undefined) drink.description = updates.description || ""
+
+  // Handle new and old field names for syrups
+  if (updates.syrups !== undefined) {
+    drink.syrups = validateStringArray(updates.syrups) ? updates.syrups : []
+    drink.syrupsUsed = drink.syrups
+  } else if (updates.syrupsUsed !== undefined) {
     drink.syrupsUsed = validateStringArray(updates.syrupsUsed) ? updates.syrupsUsed : []
+    drink.syrups = drink.syrupsUsed
   }
-  if (updates.sodaUsed !== undefined) {
+
+  // Handle new and old field names for sodas
+  if (updates.sodas !== undefined) {
+    drink.sodas = validateStringArray(updates.sodas) ? updates.sodas : []
+    drink.sodaUsed = drink.sodas
+  } else if (updates.sodaUsed !== undefined) {
     drink.sodaUsed = validateStringArray(updates.sodaUsed) ? updates.sodaUsed : []
+    drink.sodas = drink.sodaUsed
   }
+
   if (updates.addIns !== undefined) {
     drink.addIns = validateStringArray(updates.addIns) ? updates.addIns : []
+  }
+  if (updates.ingredients !== undefined) {
+    drink.ingredients = validateStringArray(updates.ingredients) ? updates.ingredients : []
   }
   if (updates.price !== undefined) {
     const price = parseFloat(updates.price)
@@ -165,6 +213,15 @@ export async function updateDrink(drinkId, updates) {
     if (!isNaN(rating) && rating >= 0 && rating <= 5) {
       drink.rating = rating
     }
+  }
+  if (updates.isVegan !== undefined) {
+    drink.isVegan = Boolean(updates.isVegan)
+  }
+  if (updates.isGlutenFree !== undefined) {
+    drink.isGlutenFree = Boolean(updates.isGlutenFree)
+  }
+  if (updates.calories !== undefined) {
+    drink.calories = updates.calories ? parseInt(updates.calories, 10) : null
   }
 
   await drinksDb.put(`drink:${drinkId}`, drink)

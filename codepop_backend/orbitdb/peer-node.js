@@ -30,6 +30,8 @@ import orderRoutes from "./src/routes/orders.js"
 import inventoryRoutes from "./src/routes/inventory.js"
 import notificationRoutes from "./src/routes/notifications.js"
 import revenueRoutes from "./src/routes/revenues.js"
+import paymentRoutes from "./src/routes/payments.js"
+import qrcodeRoutes from "./src/routes/qrcodes.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -72,16 +74,16 @@ let libp2p = null
 let orbitdb = null
 
 async function start() {
-  console.log(`\n🚀 Starting CodePop Peer Node (port ${HTTP_PORT})...\n`)
+  console.log(`\n[ ^ ] Starting CodePop Peer Node (port ${HTTP_PORT})...\n`)
 
   try {
     // ── Read bootstrap peer info ──────────────────────────────────────────────
     if (!fs.existsSync(PEER_INFO_FILE)) {
-      console.error(`✗ ${PEER_INFO_FILE} not found — start the bootstrap node first`)
+      console.error(`[ X ] ${PEER_INFO_FILE} not found — start the bootstrap node first`)
       process.exit(1)
     }
     const bootstrapInfo = JSON.parse(fs.readFileSync(PEER_INFO_FILE, "utf8"))
-    console.log(`✓ Read bootstrap info from ${PEER_INFO_FILE}`)
+    console.log(`[ ^ ] Read bootstrap info from ${PEER_INFO_FILE}`)
     console.log(`  Bootstrap DB addresses:`)
     Object.entries(bootstrapInfo.dbAddresses).forEach(([key, addr]) => {
       console.log(`    ${key}: ${addr.substring(0, 50)}...`)
@@ -89,14 +91,14 @@ async function start() {
     console.log()
 
     // ── Build this peer's libp2p + Helia stack ────────────────────────────────
-    console.log("📦 Initializing blockstore and datastore...")
+    console.log("[ ^ ] Initializing blockstore and datastore...")
     const blockstore = new LevelBlockstore(`${REPO}/blocks`)
     const datastore = new LevelDatastore(`${REPO}/data`)
     await blockstore.open()
     await datastore.open()
-    console.log("✓ Blockstore and datastore initialized")
+    console.log("[ ^ ] Blockstore and datastore initialized")
 
-    console.log("🔗 Setting up libp2p networking...")
+    console.log("[ ^ ] Setting up libp2p networking...")
     libp2p = await createLibp2p({
       addresses: { listen: [`/ip4/0.0.0.0/tcp/${LIBP2P_PORT}`] },
       transports: [tcp()],
@@ -107,23 +109,23 @@ async function start() {
         identify: identify(),
       },
     })
-    console.log("✓ libp2p configured")
+    console.log("[ ^ ] libp2p configured")
 
-    console.log("🌍 Initializing Helia and OrbitDB...")
+    console.log("[ ^ ] Initializing Helia and OrbitDB...")
     const helia = await createHelia({ libp2p, blockstore, datastore })
     orbitdb = await createOrbitDB({ ipfs: helia, directory: `${REPO}/orbitdb` })
-    console.log("✓ Helia and OrbitDB initialized\n")
+    console.log("[ ^ ] Helia and OrbitDB initialized\n")
 
     // ── Dial bootstrap node ───────────────────────────────────────────────────
     const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.includes("127.0.0.1"))
       ?? bootstrapInfo.multiaddrs[0]
 
-    console.log(`🔌 Dialing bootstrap: ${bootstrapAddr}`)
+    console.log(`[ ^ ] Dialing bootstrap: ${bootstrapAddr}`)
     try {
       await libp2p.dial(multiaddr(bootstrapAddr))
-      console.log(`✓ Connected to bootstrap node`)
+      console.log(`[ ^ ] Connected to bootstrap node`)
     } catch (err) {
-      console.error(`✗ Failed to dial bootstrap: ${err.message}`)
+      console.error(`[ X ] Failed to dial bootstrap: ${err.message}`)
       process.exit(1)
     }
 
@@ -131,12 +133,12 @@ async function start() {
     await new Promise(r => setTimeout(r, 1000))
 
     // ── Initialize databases ──────────────────────────────────────────────────
-    console.log("📚 Opening CodePop databases...")
+    console.log("[ ^ ] Opening CodePop databases...")
     await initializeOrbitDB(orbitdb, bootstrapInfo.dbAddresses)
 
     // Wait for initial sync
     await new Promise(r => setTimeout(r, 2000))
-    console.log("✓ Databases synchronized with bootstrap\n")
+    console.log("[ ^ ] Databases synchronized with bootstrap\n")
 
     // ── Peer connection events ────────────────────────────────────────────────
     libp2p.addEventListener("peer:connect", (evt) => {
@@ -144,7 +146,7 @@ async function start() {
     })
 
     // ── REST API Endpoints ────────────────────────────────────────────────────
-    console.log("🌐 Setting up REST API endpoints...\n")
+    console.log("[ ^ ] Setting up REST API endpoints...\n")
 
     // Health check (no auth required)
     app.get("/health", (req, res) => {
@@ -179,6 +181,8 @@ async function start() {
     app.use("/backend/inventory", inventoryRoutes)
     app.use("/backend/notifications", notificationRoutes)
     app.use("/backend/revenues", revenueRoutes)
+    app.use("/backend/payments", paymentRoutes)
+    app.use("/backend/qrcodes", qrcodeRoutes)
 
     // ── Test endpoints (direct database access) ────────────────────────────────
     app.get("/test/users/get/:key", authenticate, (req, res) => {
@@ -204,27 +208,29 @@ async function start() {
 
     // ── Start HTTP server ────────────────────────────────────────────────────
     app.listen(HTTP_PORT, () => {
-      console.log(`✅ Peer node is ready!`)
+      console.log(`[ ^ ] Peer node is ready!`)
       console.log(`   HTTP API: http://localhost:${HTTP_PORT}`)
       console.log(`   libp2p: /ip4/0.0.0.0/tcp/${LIBP2P_PORT}`)
-      console.log(`\n📖 API Endpoints:`)
+      console.log(`\n[ ^ ] API Endpoints:`)
       console.log(`   GET  /health              - Health check`)
       console.log(`   GET  /info                - Node info`)
       console.log(`   GET  /                    - Server info`)
-      console.log(`\n🔐 Authentication:`)
+      console.log(`\n[ ^ ] Authentication:`)
       console.log(`   Use Authorization header: Token {tokenKey}`)
-      console.log(`\n✅ Phase 3 Complete: All routes mounted and ready`)
+      console.log(`\n[ ^ ] All routes mounted and ready`)
       console.log(`   - Auth & Users`)
       console.log(`   - Preferences`)
       console.log(`   - Drinks`)
       console.log(`   - Orders`)
       console.log(`   - Inventory`)
       console.log(`   - Notifications`)
-      console.log(`   - Revenues\n`)
+      console.log(`   - Revenues`)
+      console.log(`   - Payments`)
+      console.log(`   - QR Codes\n`)
     })
 
   } catch (err) {
-    console.error("💥 Fatal error:", err)
+    console.error("[ X ] Fatal error:", err)
     process.exit(1)
   }
 }
@@ -232,7 +238,7 @@ async function start() {
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 
 process.on("SIGINT", async () => {
-  console.log("\n\n🛑 Shutting down peer node...")
+  console.log("\n\n[ ^ ] Shutting down peer node...")
   if (libp2p) {
     try {
       await libp2p.stop()

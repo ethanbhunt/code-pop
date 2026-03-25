@@ -4,7 +4,7 @@
 import { getOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
 
-export async function createOrder(userId, drinkIds = []) {
+export async function createOrder(userId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
   const ordersDb = getOrdersDb()
   const orderId = await getNextId(ordersDb, "order")
 
@@ -12,9 +12,13 @@ export async function createOrder(userId, drinkIds = []) {
     orderId,
     userId,
     drinkIds: Array.isArray(drinkIds) ? drinkIds : [],
+    quantities: quantities || {},
+    specialInstructions: specialInstructions || "",
+    estimatedPickupTime: estimatedPickupTime || null,
     orderStatus: "pending",
     paymentStatus: "pending",
     pickupTime: null,
+    completedAt: null,
     creationTime: getTimestamp(),
     lockerCombo: null,
     stripeId: null
@@ -66,6 +70,15 @@ export async function updateOrder(orderId, updates) {
   if (updates.drinkIds !== undefined) {
     order.drinkIds = Array.isArray(updates.drinkIds) ? updates.drinkIds : []
   }
+  if (updates.quantities !== undefined) {
+    order.quantities = updates.quantities || {}
+  }
+  if (updates.specialInstructions !== undefined) {
+    order.specialInstructions = updates.specialInstructions || ""
+  }
+  if (updates.estimatedPickupTime !== undefined) {
+    order.estimatedPickupTime = updates.estimatedPickupTime
+  }
   if (updates.orderStatus !== undefined) {
     if (!validateOrderStatus(updates.orderStatus)) {
       throw new Error("Invalid order status")
@@ -80,6 +93,9 @@ export async function updateOrder(orderId, updates) {
   }
   if (updates.pickupTime !== undefined) {
     order.pickupTime = updates.pickupTime
+  }
+  if (updates.completedAt !== undefined) {
+    order.completedAt = updates.completedAt
   }
   if (updates.lockerCombo !== undefined) {
     order.lockerCombo = updates.lockerCombo

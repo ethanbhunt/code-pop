@@ -36,26 +36,28 @@ const DB_NAMES = {
   inventory: "inventory-db",
   orders: "orders-db",
   notifications: "notifications-db",
-  revenues: "revenues-db"
+  revenues: "revenues-db",
+  payments: "payments-db",
+  qrcodes: "qrcodes-db"
 }
 
 // Store database references
 const databases = {}
 
 async function start() {
-  console.log("🚀 Starting CodePop Bootstrap Node...\n")
+  console.log("[ ^ ] Starting CodePop Bootstrap Node...\n")
 
   try {
     // Initialize blockstore and datastore
-    console.log("📦 Initializing blockstore and datastore...")
+    console.log("[ ^ ] Initializing blockstore and datastore...")
     const blockstore = new LevelBlockstore(`${REPO}/blocks`)
     const datastore = new LevelDatastore(`${REPO}/data`)
     await blockstore.open()
     await datastore.open()
-    console.log("✓ Blockstore and datastore initialized")
+    console.log("[ ^ ] Blockstore and datastore initialized")
 
     // Create libp2p instance
-    console.log("🔗 Setting up libp2p networking...")
+    console.log("[ ^ ] Setting up libp2p networking...")
     const libp2p = await createLibp2p({
       addresses: { listen: [`/ip4/0.0.0.0/tcp/${LIBP2P_PORT}`] },
       transports: [tcp()],
@@ -69,16 +71,16 @@ async function start() {
     console.log("✓ libp2p configured")
 
     // Create Helia and OrbitDB instances
-    console.log("🌍 Initializing Helia and OrbitDB...")
+    console.log("[ ^ ] Initializing Helia and OrbitDB...")
     const helia = await createHelia({ libp2p, blockstore, datastore })
     const orbitdb = await createOrbitDB({
       ipfs: helia,
       directory: `${REPO}/orbitdb`
     })
-    console.log("✓ Helia and OrbitDB initialized\n")
+    console.log("[ ^ ] Helia and OrbitDB initialized\n")
 
     // Create all databases
-    console.log("📚 Creating CodePop databases...")
+    console.log("[ ^ ] Creating CodePop databases...")
     const dbAddresses = {}
 
     for (const [key, dbName] of Object.entries(DB_NAMES)) {
@@ -93,10 +95,10 @@ async function start() {
         })
         databases[key] = db
         dbAddresses[key] = db.address.toString()
-        console.log(`  ✓ ${dbName} created`)
+        console.log(`  [ ^ ] ${dbName} created`)
         console.log(`    Address: ${dbAddresses[key].substring(0, 50)}...`)
       } catch (err) {
-        console.error(`  ✗ Failed to create ${dbName}:`, err.message)
+        console.error(`  [ X ] Failed to create ${dbName}:`, err.message)
         // Try without AccessController if it fails
         try {
           const db = await orbitdb.open(dbName, { type: "keyvalue" })
@@ -118,11 +120,11 @@ async function start() {
       timestamp: new Date().toISOString()
     }
     fs.writeFileSync(PEER_INFO_FILE, JSON.stringify(peerInfo, null, 2))
-    console.log(`📝 Peer information written to ${PEER_INFO_FILE}`)
+    console.log(`[ ^ ] Peer information written to ${PEER_INFO_FILE}`)
     console.log(`   Peer ID: ${libp2p.peerId.toString()}\n`)
 
     // Set up event listeners for all databases
-    console.log("📡 Setting up database replication listeners...")
+    console.log("[ ^ ] Setting up database replication listeners...")
     Object.entries(databases).forEach(([key, db]) => {
       db.events.on("update", (entry) => {
         console.log(`  [${key}:update] key=${entry.payload.key}`)
@@ -131,7 +133,7 @@ async function start() {
     console.log()
 
     // REST API Endpoints
-    console.log("🌐 Setting up REST API endpoints...\n")
+    console.log("[ ^ ] Setting up REST API endpoints...\n")
 
     // Health check
     app.get("/health", (req, res) => {
@@ -211,27 +213,27 @@ async function start() {
 
     // Start HTTP server
     app.listen(HTTP_PORT, () => {
-      console.log(`✅ Bootstrap node is ready!`)
-      console.log(`   HTTP API: http://localhost:${HTTP_PORT}`)
-      console.log(`   libp2p: /ip4/0.0.0.0/tcp/${LIBP2P_PORT}`)
-      console.log(`\n📖 API Endpoints:`)
+      console.log(`[ ^ ] Bootstrap node is ready!`)
+      console.log(`[ ^ ] HTTP API: http://localhost:${HTTP_PORT}`)
+      console.log(`[ ^ ] libp2p: /ip4/0.0.0.0/tcp/${LIBP2P_PORT}`)
+      console.log(`\n[ ^ ] API Endpoints:`)
       console.log(`   GET  /health              - Health check`)
       console.log(`   GET  /info                - Node info with all DB addresses`)
       console.log(`   GET  /:dbName/get/:key   - Get value from database`)
       console.log(`   POST /:dbName/set        - Set key/value in database`)
       console.log(`   GET  /:dbName/all        - List all entries in database`)
-      console.log(`\n💡 Database names: ${Object.values(DB_NAMES).join(", ")}\n`)
+      console.log(`\n[ ^ ]  Database names: ${Object.values(DB_NAMES).join(", ")}\n`)
     })
 
   } catch (err) {
-    console.error("💥 Fatal error:", err)
+    console.error("[ X ] Fatal error:", err)
     process.exit(1)
   }
 }
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
-  console.log("\n\n🛑 Shutting down bootstrap node...")
+  console.log("\n\n[ ^ ]  Shutting down bootstrap node...")
   // Close all databases
   for (const db of Object.values(databases)) {
     try {

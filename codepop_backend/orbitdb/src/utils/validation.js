@@ -79,7 +79,7 @@ export function validatePreference(preference) {
  */
 export function validateDrinkSize(size) {
   if (!size || typeof size !== "string") return false
-  const allowedSizes = ["16oz", "24oz", "32oz"]
+  const allowedSizes = ["16oz", "24oz", "32oz", "m", "l", "xl"]
   return allowedSizes.includes(size.toLowerCase())
 }
 
@@ -163,4 +163,31 @@ export function validateRequiredFields(obj, requiredFields) {
     }
   }
   return missing
+}
+
+/**
+ * Validate preference type
+ */
+export function validatePreferenceType(type) {
+  if (!type || typeof type !== "string") return false
+  const allowedTypes = ["favorite", "allergic", "dislike", "recommended", "ingredient_preference"]
+  return allowedTypes.includes(type.toLowerCase())
+}
+
+/**
+ * Validate sweetness level
+ */
+export function validateSweetness(sweetness) {
+  if (!sweetness || typeof sweetness !== "string") return false
+  const allowedLevels = ["low", "medium", "high"]
+  return allowedLevels.includes(sweetness.toLowerCase())
+}
+
+/**
+ * Validate temperature
+ */
+export function validateTemperature(temperature) {
+  if (!temperature || typeof temperature !== "string") return false
+  const allowedTemperatures = ["hot", "cold", "iced"]
+  return allowedTemperatures.includes(temperature.toLowerCase())
 }
