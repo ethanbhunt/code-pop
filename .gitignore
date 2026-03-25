@@ -20,3 +20,4 @@ venv/
 **/venv/
 
 AGENTS.md
+codepop_backend/orbitdb/repo*

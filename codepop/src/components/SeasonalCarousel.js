@@ -11,57 +11,69 @@ const SeasonalCarousel = () => {
     const navigation = useNavigation();
     const [data, setData] = useState([]);
 
-     useEffect(() => {
-         const fetchData = async () => {
-              try {
-                 const token = await AsyncStorage.getItem('userToken');
-                 
-                 // Skip fetching drinks if user is not logged in
-                 if (!token) {
-                     console.log('No token found, skipping drinks fetch');
-                     setData([]);
-                     return;
-                 }
-                 
-                 const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                     method: 'GET',
-                     headers: {
-                         'Content-Type': 'application/json',
-                         'Authorization': `Token ${token}`,
-                     },
-                 });
-             const drinksResponse = await response.json();
-             
-             // Check if response has error or data is missing
-             if (!drinksResponse.data || !Array.isArray(drinksResponse.data)) {
-                 console.warn('No drinks data available or invalid response:', drinksResponse);
-                 setData([]);
-                 return;
-             }
-             
-             const drinks = drinksResponse.data;
+      useEffect(() => {
+          const fetchData = async () => {
+               try {
+                  const token = await AsyncStorage.getItem('userToken');
+                  
+                  // Skip fetching drinks if user is not logged in
+                  if (!token) {
+                      console.log('No token found, skipping drinks fetch');
+                      setData([]);
+                      return;
+                  }
+                  
+                  const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+                      method: 'GET',
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Token ${token}`,
+                      },
+                  });
+              
+              // Check if response is ok before parsing
+              if (!response.ok) {
+                  if (response.status === 401) {
+                      console.warn('Token invalid or expired. User should re-login.');
+                  } else {
+                      console.warn(`Failed to fetch drinks. Status: ${response.status}`);
+                  }
+                  setData([]);
+                  return;
+              }
+              
+              const drinksResponse = await response.json();
+              
+              // Check if response has error or data is missing
+              if (!drinksResponse.data || !Array.isArray(drinksResponse.data)) {
+                  console.warn('No drinks data available or invalid response:', drinksResponse);
+                  setData([]);
+                  return;
+              }
+              
+              const drinks = drinksResponse.data;
 
-             const parsedDrinks = drinks.map(drink => ({
-                 drinkId: drink.drinkId,
-                 name: drink.name,
-                 price: drink.price,
-                 sodaUsed: drink.sodaUsed,  // Default value if sodaUsed is null
-                 syrupsUsed: drink.syrupsUsed,
-                 addIns: drink.addIns,
-                 userCreated: drink.userCreated,    // Assuming the user is creating the drink
-                 // size: drink.size,
-                 // ice: drink.ice,
-             }));
-             console.log('parsed')
-             console.log(parsedDrinks);
-             setData(parsedDrinks);
-             } catch (error) {
-                 console.error('Error fetching drinks:', error);
-                 setData([]);
-             } 
-         };
-         fetchData();
-     }, []);
+              const parsedDrinks = drinks.map(drink => ({
+                  drinkId: drink.drinkId,
+                  name: drink.name,
+                  price: drink.price,
+                  sodaUsed: drink.sodaUsed,  // Default value if sodaUsed is null
+                  syrupsUsed: drink.syrupsUsed,
+                  addIns: drink.addIns,
+                  userCreated: drink.userCreated,    // Assuming the user is creating the drink
+                  // size: drink.size,
+                  // ice: drink.ice,
+              }));
+              console.log('parsed')
+              console.log(parsedDrinks);
+              setData(parsedDrinks);
+              } catch (error) {
+                  console.error('Error fetching drinks:', error);
+                  setData([]);
+              } 
+          };
+          fetchData();
+      }, []);
     
      const createDrink = async (item) => {
          console.log('creating drinks...');

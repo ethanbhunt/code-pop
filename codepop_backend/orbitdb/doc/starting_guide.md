@@ -1,312 +1,349 @@
-# CodePop - OrbitDB Startup Guide
-## Quick Start - 2 Minutes
-### Step 1: Use the Automatic Startup Script (RECOMMENDED)
+# CodePop Full Stack Startup Guide
 
-```bash
-/tmp/start_nodes.sh
+Complete guide to running CodePop with OrbitDB backend for web and mobile development.
+
+## System Architecture
+
+```
+Web/Mobile Client (React Native - Expo)
+        ↓
+http://localhost:19006
+        ↓
+REST API (Express.js + OrbitDB)
+        ↓
+http://localhost:3001
+        ↓
+OrbitDB Peer-to-Peer Network
+  - Bootstrap Node (port 3000)
+  - Peer Nodes (port 3001+)
+  - 8 Databases (users, drinks, orders, etc.)
 ```
 
-This script automatically:
-- Force-kills any orphaned processes
-- Cleans all repo directories and peer-info.json
-- Starts bootstrap node
-- Waits 8 seconds
-- Starts peer node
-- Verifies both nodes are healthy
+## Prerequisites
 
-### Step 2: Manual Startup (Alternative)
+- Node.js 18+
+- Python 3.8+
+- 4 terminal windows (or one with splitting)
+- Modern web browser
 
-If you prefer manual startup:
+## Quick Start (5 Minutes)
+
+### Terminal 1: Bootstrap Node
 
 ```bash
 cd codepop_backend/orbitdb
-
-# Force kill any old processes
-pkill -9 -f "node.*-node.js"
-
-# Clean up old database files
-rm -rf repo-bootstrap repo-peer-* peer-info.json
-
-# Wait a moment for ports to be released
-sleep 2
-
-# Start Bootstrap Node (Terminal 1)
-node bootstrap-node.js
-
-# Wait 8 seconds, then start Peer Node (Terminal 2)
-node peer-node.js
+npm install  # First time only
+npm run bootstrap
 ```
 
-### Step 2: Verify Backend is Running
+Watch for:
+```
+[ ^ ] Starting CodePop Bootstrap Node (port 3000)...
+[ ^ ] Bootstrap node is ready!
+```
+
+### Terminal 2: Peer Node (API Server)
 
 ```bash
-curl http://localhost:3001/health
+cd codepop_backend/orbitdb
+npm run peer
 ```
 
-Expected response:
-```json
-{
-  "status": "healthy",
-  "nodeType": "peer",
-  "port": 3001
-}
+Watch for:
+```
+[ ^ ] Peer node is ready!
+   HTTP API: http://localhost:3001
 ```
 
-### Step 3: Start Frontend
+### Terminal 3: Seed Data
+
+```bash
+cd codepop_backend/orbitdb
+python3 scripts/seed_data.py --all
+```
+
+Watch for:
+```
+============================================================
+Seeding Complete!
+============================================================
+
+Test Credentials:
+CUSTOMER Account:
+  Username: customer_jane
+  Password: Customer123!
+  ...
+```
+
+### Terminal 4: Frontend
 
 ```bash
 cd codepop
-npm install  # if needed
+npm install  # First time only
 npm start
 ```
 
-Then choose:
-- `i` for iOS simulator
-- `a` for Android emulator
-- `w` for web browser
+When prompted:
+```
+To open the app in a browser, press w.
+```
 
----
+Press `w` to open in browser at http://localhost:19006
+
+## Login & Test
+
+1. Open http://localhost:19006
+2. Login with:
+   ```
+   Username: customer_jane
+   Password: Customer123!
+   ```
+3. Browse 8 drinks
+4. Create an order
+5. See the full system working!
+
+## All Running Services
+
+When complete, you should have:
+
+| Service    | URL                    | Port  | Status  |
+| ---------- | ---------------------- | ----- | ------- |
+| Bootstrap  | N/A                    | 3000  | Running |
+| API Server | http://localhost:3001  | 3001  | Running |
+| Frontend   | http://localhost:19006 | 19006 | Running |
+
+## Available Commands
+
+### Backend Commands
+
+```bash
+cd codepop_backend/orbitdb
+
+# Start services
+npm run bootstrap        # Bootstrap node
+npm run peer           # API server
+
+# Seed data
+npm run seed           # Seed all data
+npm run seed:users     # Seed only users
+npm run seed:drinks    # Seed only drinks
+npm run seed:preferences
+npm run seed:inventory
+
+# Clear/Reset
+npm run seed:clear     # Delete test data
+npm run seed:reset     # Clear and reseed
+
+# Test APIs (with Python client)
+python3 client.py      # Run demo
+python3 scripts/seed_data.py --help
+```
+
+### Frontend Commands
+
+```bash
+cd codepop
+
+# Install/Start
+npm install    # First time only
+npm start      # Start Expo dev server
+
+# From Expo menu:
+w              # Web version
+a              # Android emulator
+i              # iOS simulator
+c              # Clear cache
+q              # Quit
+```
+
+## Test Credentials
+
+Three pre-seeded user accounts:
+
+### Customer Account
+```
+Username: customer_jane
+Email: jane@example.com
+Password: Customer123!
+```
+Can: Browse, order, rate, manage preferences
+
+### Staff Account
+```
+Username: staff_bob
+Email: bob@example.com
+Password: Staff123!
+```
+Can: Prepare orders, manage inventory
+
+### Admin Account
+```
+Username: admin_alex
+Email: alex@example.com
+Password: Admin123!
+```
+Can: Full access, create drinks, view analytics
+
+## Data Seeded
+
+- **3 Users**: Customer, Staff, Admin
+- **8 Drinks**: Coffee, Tea, Smoothies, Juice
+- **7 Preferences**: Favorites, allergies, dislikes
+- **5 Inventory Items**: Syrups, milk, beans
+
+See `TESTING_DATA_REFERENCE.md` for complete details.
+
+## Detailed Guides
+
+- **SETUP_QUICKSTART.md** - 5-minute setup
+- **SEEDING_GUIDE.md** - Seeding options and commands
+- **TESTING_DATA_REFERENCE.md** - All test data details
+- **FULL_STACK_WORKFLOW.md** - Complete testing scenarios
+- `codepop_backend/orbitdb/CLIENT_GUIDE.md` - API reference
 
 ## Troubleshooting
 
-### If you get "Database is not open" error:
+### "Backend is not running"
+
+Make sure both nodes are started:
+```bash
+# Terminal 1
+npm run bootstrap
+
+# Terminal 2
+npm run peer
+```
+
+### "Port already in use"
+
+Kill the process using the port:
+```bash
+lsof -i :3001        # Find process
+kill -9 <PID>        # Kill it
+```
+
+Then restart:
+```bash
+npm run peer
+```
+
+### "Connection refused"
+
+The backend might be slow to start. Wait 5 seconds and retry seeding:
+```bash
+sleep 5
+python3 scripts/seed_data.py --all
+```
+
+### "Token not found" when seeding
+
+Users didn't create properly. Reseed just users:
+```bash
+python3 scripts/seed_data.py --users
+```
+
+### Frontend won't load
+
+1. Make sure Expo is running: `npm start`
+2. Clear cache: Press `c` in Expo
+3. Reload browser: Ctrl+R or Cmd+R
+
+### Can't login in app
+
+1. Check test credentials in `TESTING_DATA_REFERENCE.md`
+2. Make sure data was seeded: `python3 scripts/seed_data.py --all`
+3. Try resetting: `python3 scripts/seed_data.py --reset`
+
+## Testing Workflows
+
+### Scenario 1: Simple Order
+1. Login as customer_jane
+2. Browse 8 drinks
+3. Add Vanilla Latte to cart
+4. Checkout and pay
+5. Get QR code
+
+### Scenario 2: Admin Dashboard
+1. Login as admin_alex
+2. View all users and orders
+3. Create new drink
+4. Check inventory
+5. View revenue
+
+### Scenario 3: Staff Operations
+1. Login as staff_bob
+2. View pending orders
+3. Mark order as ready
+4. Check inventory levels
+
+See `FULL_STACK_WORKFLOW.md` for complete scenarios.
+
+## Data Persistence
+
+- Data persists across restarts
+- Stored in local OrbitDB repositories
+- To clear: `python3 scripts/seed_data.py --clear`
+- To reset: `python3 scripts/seed_data.py --reset`
+
+## Mobile Testing (Android)
+
+After web works perfectly:
 
 ```bash
-# 1. Force-kill any running processes (use -9 flag)
-pkill -9 -f "node bootstrap-node.js"
-pkill -9 -f "node peer-node.js"
-sleep 2
-
-# 2. Clean database directories
-rm -rf codepop_backend/orbitdb/repo-bootstrap
-rm -rf codepop_backend/orbitdb/repo-peer-*
-rm codepop_backend/orbitdb/peer-info.json
-
-# 3. Restart fresh
-cd codepop_backend/orbitdb
-node bootstrap-node.js  # Terminal 1
-# Wait 8 seconds
-node peer-node.js       # Terminal 2
+# In Expo terminal
+npm start
+a  # Start Android emulator
 ```
 
-### If you get "No valid address" or "ERR_NO_VALID_ADDRESSES" error:
+Note: `ip_address.js` already configured for Android emulator:
+```javascript
+const BASE_URL = 'http://10.0.2.2:3001'; // Android special IP
+```
 
-This means ports 4000 or 4001 (libp2p ports) are locked by a previous process.
+## Mobile Testing (iOS)
 
 ```bash
-# 1. Check what's using the ports
-lsof -i :4000
-lsof -i :4001
-
-# 2. Force-kill all Node processes
-pkill -9 -f "node bootstrap-node.js"
-pkill -9 -f "node peer-node.js"
-sleep 3
-
-# 3. Clean everything
-rm -rf codepop_backend/orbitdb/repo-*
-rm codepop_backend/orbitdb/peer-info.json
-
-# 4. Restart (use the startup script or manual steps)
-/tmp/start_nodes.sh
+# In Expo terminal
+npm start
+i  # Start iOS simulator
 ```
 
-### If port 3000 or 3001 is already in use:
+For iOS, update `ip_address.js`:
+```javascript
+const BASE_URL = 'http://localhost:3001'; // iOS simulator
+```
 
+## API Testing
+
+### Health Check
 ```bash
-# Find and kill the process using port 3001
-lsof -i :3001
-kill -9 <PID>
-
-# Or use a different port
-PORT=3002 node peer-node.js
-```
-
-### If peer won't connect to bootstrap:
-
-Make sure bootstrap is fully started before starting peer. Wait at least 8 seconds between starts.
-
-### Check logs for errors:
-
-```bash
-# Bootstrap log
-tail -f /tmp/bootstrap.log
-
-# Peer log
-tail -f /tmp/peer.log
-```
-
----
-
-## Running Processes
-
-After startup, you should have 2 Node.js processes running:
-
-```bash
-ps aux | grep "node.*node.js"
-```
-
-You should see:
-- `bootstrap-node.js` on port 3000
-- `peer-node.js` on port 3001
-
----
-
-## Testing the API
-
-Once both nodes are running:
-
-```bash
-# Register user
-curl -X POST http://localhost:3001/backend/auth/register/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "Test@123",
-    "email": "test@example.com"
-  }'
-
-# Get token from response and test authenticated request
-TOKEN="your_token_here"
-
-curl -X POST http://localhost:3001/backend/drinks/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Token $TOKEN" \
-  -d '{
-    "name": "Test Drink",
-    "sodaUsed": ["Sprite"],
-    "price": 3.50,
-    "size": "16oz",
-    "ice": "normal"
-  }'
-```
-
----
-
-## Full Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│             React Native Frontend (Port 3000+)       │
-│                                                       │
-│    (iOS, Android, or Web via Expo)                  │
-└─────────────────────┬───────────────────────────────┘
-                      │ HTTP/REST API
-                      ↓
-┌─────────────────────────────────────────────────────┐
-│         OrbitDB Peer Node (Port 3001)                │
-│                                                       │
-│  - Authentication Service                           │
-│  - Drink Management                                 │
-│  - Order Processing                                 │
-│  - Inventory Management                             │
-│  - User Preferences                                 │
-└─────────────────┬──────────────────────────────────┘
-                  │ P2P Gossipsub
-                  ↓
-┌─────────────────────────────────────────────────────┐
-│      OrbitDB Bootstrap Node (Port 3000)              │
-│                                                       │
-│  - Initializes 8 Keyvalue Databases                 │
-│  - Provides Database Addresses to Peers             │
-│  - Manages Network Bootstrap                        │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## Database Files
-
-When running, the following directories will be created:
-
-```
-codepop_backend/orbitdb/
-├── repo-bootstrap/          # Bootstrap node data
-│   ├── blocks/              # Blockstore data
-│   ├── data/                # Datastore data
-│   └── orbitdb/             # OrbitDB databases
-│
-└── repo-peer-3001/          # Peer node data (same structure)
-```
-
-These are safe to delete if needed - they'll be recreated when nodes start.
-
----
-
-## Key Files
-
-- **`codepop_backend/orbitdb/bootstrap-node.js`** - Bootstrap node entry point
-- **`codepop_backend/orbitdb/peer-node.js`** - Peer node (API server) entry point
-- **`codepop_backend/orbitdb/peer-info.json`** - Bootstrap node info (auto-generated)
-- **`codepop/ip_address.js`** - Frontend API base URL configuration
-
----
-
-## Common Commands
-
-```bash
-# View bootstrap logs
-tail -f /tmp/bootstrap.log
-
-# View peer logs
-tail -f /tmp/peer.log
-
-# Stop all nodes
-pkill -f "bootstrap-node.js"
-pkill -f "peer-node.js"
-
-# Clean everything
-rm -rf codepop_backend/orbitdb/repo-*
-rm codepop_backend/orbitdb/peer-info.json
-
-# Test API endpoints
 curl http://localhost:3001/health
-
-# Check npm dependencies
-cd codepop_backend/orbitdb
-npm list
 ```
 
----
+### Get Drinks
+```bash
+curl http://localhost:3001/backend/drinks \
+  -H "Authorization: Token YOUR_TOKEN"
+```
 
-## Documentation
+### Use Python Client
+```bash
+python3 codepop_backend/orbitdb/client.py
+```
 
-For more detailed information, see:
+## Database Cleanup
 
-- **quick_start_testing.md** - Testing guide
-- **api.md** - Full API documentation (in `codepop_backend/orbitdb/`)
-
----
-
-## Status Check
-
-After startup, verify everything is working:
+To remove all local data and start fresh:
 
 ```bash
-# 1. Check bootstrap health
-curl http://localhost:3000/health
+# Stop all services (Ctrl+C in terminals)
 
-# 2. Check peer health  
-curl http://localhost:3001/health
+# Remove databases
+rm -rf codepop_backend/orbitdb/repo-bootstrap/
+rm -rf codepop_backend/orbitdb/repo-peer-*/
 
-# 3. Test user registration
-curl -X POST http://localhost:3001/backend/auth/register/ \
-  -H "Content-Type: application/json" \
-  -d '{"username":"test","password":"Test@123","email":"test@example.com"}'
+# Restart
+npm run bootstrap
+npm run peer
+python3 scripts/seed_data.py --all
 ```
-
-All should return `"status": "healthy"` and registration should return a valid token.
-
----
-
-## Getting Help
-
-If you encounter issues:
-
-1. **Check logs**: `tail -f /tmp/bootstrap.log` and `tail -f /tmp/peer.log`
-2. **Kill and restart**: Follow the troubleshooting section above
-3. **Clean slate**: Delete `repo-*` directories and restart
-4. **Check processes**: `ps aux | grep "node.*node.js"`
-5. **Test connectivity**: `curl http://localhost:3001/health`
-
----

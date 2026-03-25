@@ -48,8 +48,21 @@ const PreferencesPage = () => {
              'Authorization': `Token ${token}`,
            },
          });
+         if (!response.ok) {
+           if (response.status === 401) {
+             console.error('Inventory fetch failed with status 401: Invalid token');
+           } else {
+             console.error(`Inventory fetch failed with status ${response.status}`);
+           }
+           setInventoryData([]);
+           return;
+         }
          const inventoryResponse = await response.json();
-         const inventory = inventoryResponse.data;
+         const inventory = inventoryResponse.data || inventoryResponse;
+         if (!inventory || !Array.isArray(inventory)) {
+           setInventoryData([]);
+           return;
+         }
          const items = inventory.map(item => ({
            value: item.itemName,
            ItemType: item.itemType,
@@ -57,6 +70,7 @@ const PreferencesPage = () => {
          setInventoryData(items);
        } catch (error) {
          console.error('Error fetching inventory:', error);
+         setInventoryData([]);
        }
      };
   
@@ -69,8 +83,23 @@ const PreferencesPage = () => {
              'Authorization': `Token ${token}`,
            },
          });
+         if (!response.ok) {
+           if (response.status === 401) {
+             console.error('Preferences fetch failed with status 401: Invalid token');
+           } else {
+             console.error(`Preferences fetch failed with status ${response.status}`);
+           }
+           setUserPreferences([]);
+           setIsLoading(false);
+           return;
+         }
          const preferencesResponse = await response.json();
-         const preferences = preferencesResponse.data;
+         const preferences = preferencesResponse.data || preferencesResponse;
+         if (!preferences || !Array.isArray(preferences)) {
+           setUserPreferences([]);
+           setIsLoading(false);
+           return;
+         }
          setUserPreferences(preferences); // Store the preferences in state
    
          // Preselect preferences based on the user's saved preferences
@@ -92,6 +121,8 @@ const PreferencesPage = () => {
          setIsLoading(false); // Set loading to false once preferences are fetched
        } catch (error) {
          console.error("Error fetching preferences:", error);
+         setUserPreferences([]);
+         setIsLoading(false);
        }
      };
   
@@ -225,8 +256,16 @@ const PreferencesPage = () => {
            },
          });
      
+         if (!getResponse.ok) {
+           console.error(`Failed to fetch preferences with status ${getResponse.status}`);
+           return;
+         }
+     
          const preferencesResponse = await getResponse.json();
-         const preferences = preferencesResponse.data;
+         const preferences = preferencesResponse.data || preferencesResponse;
+         if (!preferences || !Array.isArray(preferences)) {
+           return;
+         }
      
          // Filter out preferences that belong to the current user and match the preference to be removed
          const filteredPreferences = preferences.filter(

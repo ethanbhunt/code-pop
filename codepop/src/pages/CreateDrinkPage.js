@@ -76,30 +76,33 @@ const CreateDrinkPage = () => {
              })
            });
     
-        if (!response.ok) {
-          throw new Error(`Failed to add drink. Status: ${response.status}`);
-        }
-        // add drink item (the drinks ID) to the checkout list from App.js
-         try{
-           // gets list of out of storage on your phone
-           cartList = await AsyncStorage.getItem("checkoutList");
-           const currentList = cartList ? JSON.parse(cartList) : [];
-           // takes the response (what we get after we create a drink) and extracts the drinkID
-           const responseData = await response.json();
-           const drinkID = responseData.data.drinkId; // API returns nested data with camelCase
-           // add the drinkID to the checkoutList
-           const updatedList = [...currentList, drinkID]
-           // Saves the checkoutlist back into the storage on the phone
-           await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-         }catch (error){
-           console.log(error)
+         if (!response.ok) {
+           const errorData = await response.json().catch(() => ({}));
+           const errorMessage = errorData.error || `Failed to add drink. Status: ${response.status}`;
+           throw new Error(errorMessage);
          }
+         // add drink item (the drinks ID) to the checkout list from App.js
+          try{
+            // gets list of out of storage on your phone
+            cartList = await AsyncStorage.getItem("checkoutList");
+            const currentList = cartList ? JSON.parse(cartList) : [];
+            // takes the response (what we get after we create a drink) and extracts the drinkID
+            const responseData = await response.json();
+            const drinkID = responseData.data.drinkId; // API returns nested data with camelCase
+            // add the drinkID to the checkoutList
+            const updatedList = [...currentList, drinkID]
+            // Saves the checkoutlist back into the storage on the phone
+            await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+          }catch (error){
+            console.log(error)
+          }
 
-        navigation.navigate('Cart');
-      }
-    } catch (error) {
-      console.error('Error adding drink to cart:', error);
-    }
+         navigation.navigate('Cart');
+       }
+     } catch (error) {
+       console.error('Error adding drink to cart:', error);
+       Alert.alert('Error', error.message || 'Failed to add drink to cart');
+     }
   };  
   
 

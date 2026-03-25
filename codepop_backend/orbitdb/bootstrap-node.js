@@ -68,7 +68,7 @@ async function start() {
         identify: identify(),
       },
     })
-    console.log("✓ libp2p configured")
+    console.log("[ ^ ] libp2p configured")
 
     // Create Helia and OrbitDB instances
     console.log("[ ^ ] Initializing Helia and OrbitDB...")
@@ -104,7 +104,7 @@ async function start() {
           const db = await orbitdb.open(dbName, { type: "keyvalue" })
           databases[key] = db
           dbAddresses[key] = db.address.toString()
-          console.log(`  ✓ ${dbName} created (fallback)`)
+          console.log(`  [ ^ ] ${dbName} created (fallback)`)
         } catch (err2) {
           throw err
         }

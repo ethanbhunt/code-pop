@@ -54,13 +54,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const { preference, userId } = req.body
 
-    // Use authenticated user's ID if not specified
-    const targetUserId = userId || req.user.userId
-
+    // Validate required fields before processing
     const missing = validateRequiredFields(req.body, ["preference"])
     if (missing.length > 0) {
       throw new ValidationError(`Missing required fields: ${missing.join(", ")}`)
     }
+
+    // Use authenticated user's ID if not specified
+    const targetUserId = userId || req.user.userId
 
     const newPref = await createPreference(targetUserId, preference)
 
