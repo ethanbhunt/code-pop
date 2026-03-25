@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>API Docs</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="container">
+    <aside class="sidebar">
+        <h2>Docs</h2>
+        <ul>
+<li><a href="#codepop-orbitdb-api-documentation">CodePop OrbitDB API Documentation</a></li>
+  <li><a href="#table-of-contents">Table of Contents</a></li>
+  <li><a href="#overview">Overview</a></li>
+    <li><a href="#data-model--relationships">Data Model & Relationships</a></li>
+    <li><a href="#security--compliance">Security & Compliance</a></li>
+  <li><a href="#authentication">Authentication</a></li>
+    <li><a href="#post-backendauthregister">POST /backend/auth/register</a></li>
+    <li><a href="#post-backendauthlogin">POST /backend/auth/login</a></li>
+    <li><a href="#post-backendauthlogout">POST /backend/auth/logout</a></li>
+  <li><a href="#user-management">User Management</a></li>
+    <li><a href="#get-backendusersprofile">GET /backend/users/profile</a></li>
+    <li><a href="#patch-backendusersprofile">PATCH /backend/users/profile</a></li>
+    <li><a href="#get-backendusers-(admin-only)">GET /backend/users (Admin Only)</a></li>
+    <li><a href="#get-backendusers:userid-(admin-only)">GET /backend/users/:userId (Admin Only)</a></li>
+    <li><a href="#patch-backendusers:userid-(admin-only)">PATCH /backend/users/:userId (Admin Only)</a></li>
+    <li><a href="#delete-backendusers:userid-(admin-only)">DELETE /backend/users/:userId (Admin Only)</a></li>
+    <li><a href="#delete-backendusersaccountdelete">DELETE /backend/users/account/delete</a></li>
+  <li><a href="#preferences">Preferences</a></li>
+    <li><a href="#get-backendpreferences">GET /backend/preferences</a></li>
+    <li><a href="#post-backendpreferences">POST /backend/preferences</a></li>
+    <li><a href="#get-backendpreferences:preferenceid">GET /backend/preferences/:preferenceId</a></li>
+    <li><a href="#patch-backendpreferences:preferenceid">PATCH /backend/preferences/:preferenceId</a></li>
+    <li><a href="#delete-backendpreferences:preferenceid">DELETE /backend/preferences/:preferenceId</a></li>
+  <li><a href="#drinks">Drinks</a></li>
+    <li><a href="#get-backenddrinks">GET /backend/drinks</a></li>
+    <li><a href="#post-backenddrinks-(admin-only)">POST /backend/drinks (Admin Only)</a></li>
+    <li><a href="#get-backenddrinks:drinkid">GET /backend/drinks/:drinkId</a></li>
+    <li><a href="#patch-backenddrinks:drinkid-(admin-only)">PATCH /backend/drinks/:drinkId (Admin Only)</a></li>
+    <li><a href="#delete-backenddrinks:drinkid-(admin-only)">DELETE /backend/drinks/:drinkId (Admin Only)</a></li>
+    <li><a href="#post-backenddrinks:drinkidfavorite">POST /backend/drinks/:drinkId/favorite</a></li>
+    <li><a href="#delete-backenddrinks:drinkidfavorite">DELETE /backend/drinks/:drinkId/favorite</a></li>
+    <li><a href="#patch-backenddrinks:drinkidrate">PATCH /backend/drinks/:drinkId/rate</a></li>
+  <li><a href="#orders">Orders</a></li>
+    <li><a href="#get-backendorders">GET /backend/orders</a></li>
+    <li><a href="#post-backendorders">POST /backend/orders</a></li>
+    <li><a href="#get-backendorders:orderid">GET /backend/orders/:orderId</a></li>
+    <li><a href="#patch-backendorders:orderid">PATCH /backend/orders/:orderId</a></li>
+    <li><a href="#delete-backendorders:orderid">DELETE /backend/orders/:orderId</a></li>
+    <li><a href="#patch-backendorders:orderidstatus-(admin-only)">PATCH /backend/orders/:orderId/status (Admin Only)</a></li>
+    <li><a href="#get-backendordersstatsdaily-(admin-only)">GET /backend/orders/stats/daily (Admin Only)</a></li>
+  <li><a href="#inventory">Inventory</a></li>
+    <li><a href="#get-backendinventory">GET /backend/inventory</a></li>
+    <li><a href="#post-backendinventory-(admin-only)">POST /backend/inventory (Admin Only)</a></li>
+    <li><a href="#get-backendinventory:inventoryid">GET /backend/inventory/:inventoryId</a></li>
+    <li><a href="#patch-backendinventory:inventoryid-(admin-only)">PATCH /backend/inventory/:inventoryId (Admin Only)</a></li>
+    <li><a href="#delete-backendinventory:inventoryid-(admin-only)">DELETE /backend/inventory/:inventoryId (Admin Only)</a></li>
+    <li><a href="#patch-backendinventory:inventoryidrestock-(admin-only)">PATCH /backend/inventory/:inventoryId/restock (Admin Only)</a></li>
+    <li><a href="#get-backendinventoryreportlow-stock-(admin-only)">GET /backend/inventory/report/low-stock (Admin Only)</a></li>
+  <li><a href="#notifications">Notifications</a></li>
+    <li><a href="#get-backendnotifications">GET /backend/notifications</a></li>
+    <li><a href="#post-backendnotifications-(admin-only)">POST /backend/notifications (Admin Only)</a></li>
+    <li><a href="#patch-backendnotifications:notificationidread">PATCH /backend/notifications/:notificationId/read</a></li>
+    <li><a href="#delete-backendnotifications:notificationid">DELETE /backend/notifications/:notificationId</a></li>
+    <li><a href="#delete-backendnotificationsclear-read">DELETE /backend/notifications/clear-read</a></li>
+    <li><a href="#get-backendnotificationsunread-count">GET /backend/notifications/unread-count</a></li>
+  <li><a href="#revenue">Revenue</a></li>
+    <li><a href="#get-backendrevenues-(admin-only)">GET /backend/revenues (Admin Only)</a></li>
+    <li><a href="#post-backendrevenues-(admin-only)">POST /backend/revenues (Admin Only)</a></li>
+    <li><a href="#get-backendrevenues:revenueid-(admin-only)">GET /backend/revenues/:revenueId (Admin Only)</a></li>
+    <li><a href="#patch-backendrevenues:revenueidstatus-(admin-only)">PATCH /backend/revenues/:revenueId/status (Admin Only)</a></li>
+    <li><a href="#get-backendrevenuesreportdaily-(admin-only)">GET /backend/revenues/report/daily (Admin Only)</a></li>
+    <li><a href="#get-backendrevenuesreportmonthly-(admin-only)">GET /backend/revenues/report/monthly (Admin Only)</a></li>
+  <li><a href="#payments">Payments</a></li>
+    <li><a href="#get-backendpayments-(admin-only)">GET /backend/payments (Admin Only)</a></li>
+    <li><a href="#post-backendpayments">POST /backend/payments</a></li>
+    <li><a href="#get-backendpayments:paymentid-(admin-only)">GET /backend/payments/:paymentId (Admin Only)</a></li>
+    <li><a href="#patch-backendpayments:paymentidrefund-(admin-only)">PATCH /backend/payments/:paymentId/refund (Admin Only)</a></li>
+  <li><a href="#qr-codes">QR Codes</a></li>
+    <li><a href="#get-backendqrcodes">GET /backend/qrcodes</a></li>
+    <li><a href="#post-backendqrcodes">POST /backend/qrcodes</a></li>
+    <li><a href="#get-backendqrcodes:qrcodeid">GET /backend/qrcodes/:qrcodeId</a></li>
+    <li><a href="#get-backendqrcodes:qrcodeidvalidate">GET /backend/qrcodes/:qrcodeId/validate</a></li>
+    <li><a href="#delete-backendqrcodes:qrcodeid-(admin-only)">DELETE /backend/qrcodes/:qrcodeId (Admin Only)</a></li>
+    <li><a href="#get-backendqrcodesorder:orderid">GET /backend/qrcodes/order/:orderId</a></li>
+  <li><a href="#external-integrations">External Integrations</a></li>
+    <li><a href="#stripe-integration-(payment-processing)">Stripe Integration (Payment Processing)</a></li>
+    <li><a href="#firebase-cloud-messaging-(fcm)-integration">Firebase Cloud Messaging (FCM) Integration</a></li>
+    <li><a href="#mapbox-integration-(geolocation--mapping)">Mapbox Integration (Geolocation & Mapping)</a></li>
+    <li><a href="#claude-api-integration-(ai-assistant)">Claude API Integration (AI Assistant)</a></li>
+  <li><a href="#error-handling">Error Handling</a></li>
+    <li><a href="#standard-error-response-format">Standard Error Response Format</a></li>
+    <li><a href="#error-codes">Error Codes</a></li>
+    <li><a href="#example-error-responses">Example Error Responses</a></li>
+  <li><a href="#health--info">Health & Info</a></li>
+    <li><a href="#get-health">GET /health</a></li>
+    <li><a href="#get-info">GET /info</a></li>
+    <li><a href="#get-">GET /</a></li>
+  <li><a href="#authentication-requirements-summary">Authentication Requirements Summary</a></li>
+  <li><a href="#rate-limiting--pagination">Rate Limiting & Pagination</a></li>
+    <li><a href="#pagination">Pagination</a></li>
+    <li><a href="#rate-limiting">Rate Limiting</a></li>
+  <li><a href="#data-consistency--transactions">Data Consistency & Transactions</a></li>
+    <li><a href="#order-workflow">Order Workflow</a></li>
+    <li><a href="#consistency-guarantees">Consistency Guarantees</a></li>
+  <li><a href="#security-best-practices">Security Best Practices</a></li>
+    <li><a href="#for-api-consumers">For API Consumers</a></li>
+    <li><a href="#for-backend-implementation">For Backend Implementation</a></li>
+  <li><a href="#testing-the-api">Testing the API</a></li>
+    <li><a href="#quick-start-test">Quick Start Test</a></li>
+                    <li><a href="#"></a></li>
+<li><a href="#1.-register-user">1. Register user</a></li>
+<li><a href="#2.-get-drinks">2. Get drinks</a></li>
+<li><a href="#3.-create-order">3. Create order</a></li>
+<li><a href="#4.-get-notifications">4. Get notifications</a></li>
+<li><a href="#5.-logout">5. Logout</a></li>
+  <li><a href="#api-versioning">API Versioning</a></li>
+</ul>
+    </aside>
+
+    <main class="content">
+        <h1 id="codepop-orbitdb-api-documentation">CodePop OrbitDB API Documentation</h1>
+<p><strong>Base URL</strong>: <code>http://localhost:3001</code></p>
+<p><strong>API Version</strong>: 1.0.0</p>
+<p><strong>Authentication</strong>: All endpoints except registration and login require token-based authentication.</p>
+<pre><code>Authorization: Token {tokenKey}
+</code></pre>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#data-model--relationships">Data Model &amp; Relationships</a></li>
+<li><a href="#authentication">Authentication</a></li>
+<li><a href="#user-management">User Management</a></li>
+<li><a href="#preferences">Preferences</a></li>
+<li><a href="#drinks">Drinks</a></li>
+<li><a href="#orders">Orders</a></li>
+<li><a href="#inventory">Inventory</a></li>
+<li><a href="#notifications">Notifications</a></li>
+<li><a href="#revenue">Revenue</a></li>
+<li><a href="#payments">Payments</a></li>
+<li><a href="#qr-codes">QR Codes</a></li>
+<li><a href="#external-integrations">External Integrations</a></li>
+<li><a href="#error-handling">Error Handling</a></li>
+<li><a href="#health--info">Health &amp; Info</a></li>
+</ol>
+<hr />
+<h2 id="overview">Overview</h2>
+<h3 id="data-model-relationships">Data Model &amp; Relationships</h3>
+<p>CodePop uses a decentralized architecture with OrbitDB keyvalue databases. The application manages the following core entities:</p>
+<p><strong>Entity Relationships</strong>:
+- <strong>User → Order</strong>: One-to-Many (user places multiple orders)
+- <strong>User → Preference</strong>: One-to-Many (user has multiple preferences)
+- <strong>User → Payment</strong>: One-to-Many (user makes multiple payments)
+- <strong>User → Notification</strong>: One-to-Many (user receives multiple notifications)
+- <strong>Order → Drink</strong>: Many-to-Many (order contains multiple drinks)
+- <strong>Order → QRCode</strong>: One-to-One (order generates one QR code for fridge access)
+- <strong>Order → Revenue</strong>: One-to-One (completed order creates revenue entry)
+- <strong>Inventory → Drink</strong>: Many-to-Many (inventory items used in drinks)
+- <strong>Revenue → Payment</strong>: One-to-One (revenue from completed payment)</p>
+<p><strong>Database Design</strong>: OrbitDB keyvalue stores (8 databases created by bootstrap node)
+- <code>users-db</code>: User accounts and authentication
+- <code>tokens-db</code>: Authentication tokens
+- <code>preferences-db</code>: User drink and ingredient preferences
+- <code>drinks-db</code>: Drink menu and recipes
+- <code>inventory-db</code>: Stock levels and supplies
+- <code>orders-db</code>: Order records and status
+- <code>notifications-db</code>: User notifications
+- <code>revenues-db</code>: Payment and revenue tracking</p>
+<h3 id="security-compliance">Security &amp; Compliance</h3>
+<ul>
+<li><strong>Authentication</strong>: Token-based (64-character hex strings)</li>
+<li><strong>Encryption</strong>: Passwords hashed with PBKDF2; sensitive data encrypted at rest (AES-256)</li>
+<li><strong>HTTPS</strong>: All API communications require TLS 1.3</li>
+<li><strong>GDPR/CCPA</strong>: Supports data deletion and export on request</li>
+<li><strong>PCI-DSS</strong>: Stripe handles payment data; CodePop never stores card data</li>
+</ul>
+<hr />
+<h2 id="authentication">Authentication</h2>
+<h3 id="post-backendauthregister">POST /backend/auth/register</h3>
+<p>Register a new user account.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;username&quot;: &quot;string (required, 3-30 chars, alphanumeric + underscore)&quot;,
+  &quot;email&quot;: &quot;string (required, valid email format)&quot;,
+  &quot;password&quot;: &quot;string (required, min 8 chars, uppercase + lowercase + number + special char)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: {
+    &quot;userId&quot;: 1,
+    &quot;username&quot;: &quot;john_doe&quot;,
+    &quot;email&quot;: &quot;john@example.com&quot;,
+    &quot;firstName&quot;: &quot;&quot;,
+    &quot;lastName&quot;: &quot;&quot;,
+    &quot;isStaff&quot;: false,
+    &quot;isSuperuser&quot;: false,
+    &quot;createdAt&quot;: &quot;2026-03-18T12:00:00.000Z&quot;,
+    &quot;token&quot;: &quot;64-character hex string&quot;
+  }
+}
+</code></pre>
+<p><strong>Errors</strong>:
+- <code>400</code>: Username already exists
+- <code>400</code>: Email already registered
+- <code>400</code>: Invalid email format
+- <code>400</code>: Password validation failed</p>
+<hr />
+<h3 id="post-backendauthlogin">POST /backend/auth/login</h3>
+<p>Authenticate and receive a token.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;username&quot;: &quot;string (username or email)&quot;,
+  &quot;password&quot;: &quot;string (user's password)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: {
+    &quot;userId&quot;: 1,
+    &quot;username&quot;: &quot;john_doe&quot;,
+    &quot;email&quot;: &quot;john@example.com&quot;,
+    &quot;isStaff&quot;: false,
+    &quot;isSuperuser&quot;: false,
+    &quot;token&quot;: &quot;64-character hex string&quot;
+  }
+}
+</code></pre>
+<p><strong>Errors</strong>:
+- <code>401</code>: Invalid credentials
+- <code>400</code>: User not found</p>
+<hr />
+<h3 id="post-backendauthlogout">POST /backend/auth/logout</h3>
+<p>Invalidate the current token.</p>
+<p><strong>Request</strong>: Token in Authorization header</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Logged out successfully&quot;
+}
+</code></pre>
+<hr />
+<h2 id="user-management">User Management</h2>
+<p>All user management endpoints require authentication.</p>
+<h3 id="get-backendusersprofile">GET /backend/users/profile</h3>
+<p>Get current user's profile.</p>
+<p><strong>Request</strong>: Token in Authorization header</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: {
+    &quot;userId&quot;: 1,
+    &quot;username&quot;: &quot;john_doe&quot;,
+    &quot;email&quot;: &quot;john@example.com&quot;,
+    &quot;firstName&quot;: &quot;John&quot;,
+    &quot;lastName&quot;: &quot;Doe&quot;,
+    &quot;isStaff&quot;: false,
+    &quot;isSuperuser&quot;: false,
+    &quot;createdAt&quot;: &quot;2026-03-18T12:00:00.000Z&quot;
+  }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendusersprofile">PATCH /backend/users/profile</h3>
+<p>Update current user's profile.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;firstName&quot;: &quot;string (optional)&quot;,
+  &quot;lastName&quot;: &quot;string (optional)&quot;,
+  &quot;email&quot;: &quot;string (optional, must be unique)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated user object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendusers-admin-only">GET /backend/users (Admin Only)</h3>
+<p>List all users.</p>
+<p><strong>Query Parameters</strong>:
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50, max: 100)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 10,
+  &quot;data&quot;: [ &quot;/* array of user objects */&quot; ]
+}
+</code></pre>
+<hr />
+<h3 id="get-backendusersuserid-admin-only">GET /backend/users/:userId (Admin Only)</h3>
+<p>Get specific user details.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* user object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendusersuserid-admin-only">PATCH /backend/users/:userId (Admin Only)</h3>
+<p>Update user as admin.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;firstName&quot;: &quot;string (optional)&quot;,
+  &quot;lastName&quot;: &quot;string (optional)&quot;,
+  &quot;isStaff&quot;: &quot;boolean (optional)&quot;,
+  &quot;isSuperuser&quot;: &quot;boolean (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated user object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendusersuserid-admin-only">DELETE /backend/users/:userId (Admin Only)</h3>
+<p>Delete a user account.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;User deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendusersaccountdelete">DELETE /backend/users/account/delete</h3>
+<p>Delete current user's account (requires own token).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Account deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h2 id="preferences">Preferences</h2>
+<p>User drink preferences and customization options.</p>
+<h3 id="get-backendpreferences">GET /backend/preferences</h3>
+<p>Get current user's all preferences.</p>
+<p><strong>Query Parameters</strong>:
+- <code>type</code>: string (optional: 'favorite', 'allergic', 'dislike', 'recommended', 'ingredient_preference')</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 2,
+  &quot;data&quot;: [
+    {
+      &quot;preferenceId&quot;: 1,
+      &quot;userId&quot;: 1,
+      &quot;drinkId&quot;: 5,
+      &quot;preferenceType&quot;: &quot;favorite&quot;,
+      &quot;sweetness&quot;: &quot;medium&quot;,
+      &quot;temperature&quot;: &quot;hot&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-18T10:00:00.000Z&quot;
+    },
+    {
+      &quot;preferenceId&quot;: 2,
+      &quot;userId&quot;: 1,
+      &quot;drinkId&quot;: 3,
+      &quot;preferenceType&quot;: &quot;allergic&quot;,
+      &quot;details&quot;: &quot;dairy allergy&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-18T11:00:00.000Z&quot;
+    },
+    {
+      &quot;preferenceId&quot;: 3,
+      &quot;userId&quot;: 1,
+      &quot;preferenceType&quot;: &quot;ingredient_preference&quot;,
+      &quot;ingredientName&quot;: &quot;vanilla syrup&quot;,
+      &quot;preferenceType&quot;: &quot;dislike&quot;,
+      &quot;details&quot;: &quot;too sweet&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-18T12:00:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendpreferences">POST /backend/preferences</h3>
+<p>Create a new preference.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;drinkId&quot;: &quot;integer (required for drink preferences, null for ingredient preferences)&quot;,
+  &quot;preferenceType&quot;: &quot;string (required: 'favorite', 'allergic', 'dislike', 'recommended', 'ingredient_preference')&quot;,
+  &quot;sweetness&quot;: &quot;string (optional: 'low', 'medium', 'high')&quot;,
+  &quot;temperature&quot;: &quot;string (optional: 'hot', 'cold', 'iced')&quot;,
+  &quot;ingredientName&quot;: &quot;string (required if preferenceType is 'ingredient_preference')&quot;,
+  &quot;details&quot;: &quot;string (optional, for notes or allergen details)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* preference object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendpreferencespreferenceid">GET /backend/preferences/:preferenceId</h3>
+<p>Get specific preference.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* preference object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendpreferencespreferenceid">PATCH /backend/preferences/:preferenceId</h3>
+<p>Update preference.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;preferenceType&quot;: &quot;string (optional)&quot;,
+  &quot;sweetness&quot;: &quot;string (optional)&quot;,
+  &quot;temperature&quot;: &quot;string (optional)&quot;,
+  &quot;details&quot;: &quot;string (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated preference object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendpreferencespreferenceid">DELETE /backend/preferences/:preferenceId</h3>
+<p>Delete preference.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Preference deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h2 id="drinks">Drinks</h2>
+<p>Drink menu items and recipes.</p>
+<h3 id="get-backenddrinks">GET /backend/drinks</h3>
+<p>List all drinks.</p>
+<p><strong>Query Parameters</strong>:
+- <code>category</code>: string (optional: 'coffee', 'tea', 'smoothie', 'juice', 'other')
+- <code>isVegan</code>: boolean (optional)
+- <code>isGlutenFree</code>: boolean (optional)
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 25,
+  &quot;data&quot;: [
+    {
+      &quot;drinkId&quot;: 1,
+      &quot;name&quot;: &quot;Espresso&quot;,
+      &quot;category&quot;: &quot;coffee&quot;,
+      &quot;description&quot;: &quot;Single shot espresso&quot;,
+      &quot;price&quot;: 2.99,
+      &quot;isVegan&quot;: false,
+      &quot;isGlutenFree&quot;: true,
+      &quot;calories&quot;: 10,
+      &quot;syrups&quot;: [&quot;vanilla&quot;],
+      &quot;sodas&quot;: [&quot;none&quot;],
+      &quot;addIns&quot;: [&quot;ice&quot;],
+      &quot;ingredients&quot;: [&quot;coffee beans&quot;, &quot;water&quot;],
+      &quot;rating&quot;: 4.5,
+      &quot;createdAt&quot;: &quot;2026-03-18T00:00:00.000Z&quot;
+    },
+    {
+      &quot;drinkId&quot;: 2,
+      &quot;name&quot;: &quot;Vanilla Latte&quot;,
+      &quot;category&quot;: &quot;coffee&quot;,
+      &quot;description&quot;: &quot;Espresso with steamed milk and vanilla&quot;,
+      &quot;price&quot;: 4.50,
+      &quot;isVegan&quot;: false,
+      &quot;isGlutenFree&quot;: true,
+      &quot;calories&quot;: 190,
+      &quot;syrups&quot;: [&quot;vanilla&quot;],
+      &quot;sodas&quot;: [&quot;none&quot;],
+      &quot;addIns&quot;: [&quot;foam&quot;, &quot;whipped cream&quot;],
+      &quot;ingredients&quot;: [&quot;espresso&quot;, &quot;milk&quot;, &quot;vanilla syrup&quot;],
+      &quot;rating&quot;: 4.8,
+      &quot;createdAt&quot;: &quot;2026-03-18T00:00:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backenddrinks-admin-only">POST /backend/drinks (Admin Only)</h3>
+<p>Create a new drink.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;string (required)&quot;,
+  &quot;category&quot;: &quot;string (required: 'coffee', 'tea', 'smoothie', 'juice', 'other')&quot;,
+  &quot;description&quot;: &quot;string (optional)&quot;,
+  &quot;price&quot;: &quot;number (required, must be &gt; 0)&quot;,
+  &quot;isVegan&quot;: &quot;boolean (optional, default: false)&quot;,
+  &quot;isGlutenFree&quot;: &quot;boolean (optional, default: false)&quot;,
+  &quot;calories&quot;: &quot;integer (optional)&quot;,
+  &quot;syrups&quot;: &quot;array of strings (optional)&quot;,
+  &quot;sodas&quot;: &quot;array of strings (optional)&quot;,
+  &quot;addIns&quot;: &quot;array of strings (optional)&quot;,
+  &quot;ingredients&quot;: &quot;array of strings (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* drink object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backenddrinksdrinkid">GET /backend/drinks/:drinkId</h3>
+<p>Get specific drink details.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* drink object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backenddrinksdrinkid-admin-only">PATCH /backend/drinks/:drinkId (Admin Only)</h3>
+<p>Update drink.</p>
+<p><strong>Request</strong>: (all fields optional)</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;string&quot;,
+  &quot;category&quot;: &quot;string&quot;,
+  &quot;description&quot;: &quot;string&quot;,
+  &quot;price&quot;: &quot;number&quot;,
+  &quot;isVegan&quot;: &quot;boolean&quot;,
+  &quot;isGlutenFree&quot;: &quot;boolean&quot;,
+  &quot;calories&quot;: &quot;integer&quot;,
+  &quot;syrups&quot;: &quot;array&quot;,
+  &quot;sodas&quot;: &quot;array&quot;,
+  &quot;addIns&quot;: &quot;array&quot;,
+  &quot;ingredients&quot;: &quot;array&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated drink object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backenddrinksdrinkid-admin-only">DELETE /backend/drinks/:drinkId (Admin Only)</h3>
+<p>Delete drink.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Drink deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="post-backenddrinksdrinkidfavorite">POST /backend/drinks/:drinkId/favorite</h3>
+<p>Add drink to user's favorites.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Added to favorites&quot;
+}
+</code></pre>
+<hr />
+<h3 id="delete-backenddrinksdrinkidfavorite">DELETE /backend/drinks/:drinkId/favorite</h3>
+<p>Remove drink from user's favorites.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Removed from favorites&quot;
+}
+</code></pre>
+<hr />
+<h3 id="patch-backenddrinksdrinkidrate">PATCH /backend/drinks/:drinkId/rate</h3>
+<p>Rate a drink (users can rate drinks they've ordered).</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;rating&quot;: &quot;number (required, 1-5)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated drink object with new rating */&quot; }
+}
+</code></pre>
+<hr />
+<h2 id="orders">Orders</h2>
+<p>Customer orders and order management.</p>
+<h3 id="get-backendorders">GET /backend/orders</h3>
+<p>List current user's orders.</p>
+<p><strong>Query Parameters</strong>:
+- <code>status</code>: string (optional: 'pending', 'preparing', 'ready', 'completed', 'cancelled')
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 5,
+  &quot;data&quot;: [
+    {
+      &quot;orderId&quot;: 1,
+      &quot;userId&quot;: 1,
+      &quot;drinkIds&quot;: [2, 5],
+      &quot;quantities&quot;: [1, 2],
+      &quot;totalPrice&quot;: 13.50,
+      &quot;orderStatus&quot;: &quot;completed&quot;,
+      &quot;paymentStatus&quot;: &quot;completed&quot;,
+      &quot;specialInstructions&quot;: &quot;extra hot, no foam&quot;,
+      &quot;pickupTime&quot;: &quot;2026-03-18T09:15:00.000Z&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-18T09:00:00.000Z&quot;,
+      &quot;completedAt&quot;: &quot;2026-03-18T09:15:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendorders">POST /backend/orders</h3>
+<p>Create a new order.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;drinkIds&quot;: &quot;array of integers (required)&quot;,
+  &quot;quantities&quot;: &quot;array of integers (required, parallel to drinkIds)&quot;,
+  &quot;specialInstructions&quot;: &quot;string (optional)&quot;,
+  &quot;estimatedPickupTime&quot;: &quot;ISO-8601 timestamp (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* order object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendordersorderid">GET /backend/orders/:orderId</h3>
+<p>Get specific order.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* order object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendordersorderid">PATCH /backend/orders/:orderId</h3>
+<p>Update order (only if pending).</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;drinkIds&quot;: &quot;array of integers (optional)&quot;,
+  &quot;quantities&quot;: &quot;array of integers (optional)&quot;,
+  &quot;specialInstructions&quot;: &quot;string (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated order object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendordersorderid">DELETE /backend/orders/:orderId</h3>
+<p>Cancel order (only if pending or preparing).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Order cancelled successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendordersorderidstatus-admin-only">PATCH /backend/orders/:orderId/status (Admin Only)</h3>
+<p>Update order status.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;string (required: 'pending', 'preparing', 'ready', 'completed', 'cancelled')&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated order object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendordersstatsdaily-admin-only">GET /backend/orders/stats/daily (Admin Only)</h3>
+<p>Get daily order statistics.</p>
+<p><strong>Query Parameters</strong>:
+- <code>date</code>: string (optional, format: YYYY-MM-DD, default: today)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: {
+    &quot;date&quot;: &quot;2026-03-18&quot;,
+    &quot;totalOrders&quot;: 47,
+    &quot;completedOrders&quot;: 45,
+    &quot;pendingOrders&quot;: 2,
+    &quot;totalRevenue&quot;: 189.50,
+    &quot;averageOrderValue&quot;: 4.03
+  }
+}
+</code></pre>
+<hr />
+<h2 id="inventory">Inventory</h2>
+<p>Stock and supply management.</p>
+<h3 id="get-backendinventory">GET /backend/inventory</h3>
+<p>List all inventory items.</p>
+<p><strong>Query Parameters</strong>:
+- <code>type</code>: string (optional: 'syrup', 'soda', 'supply', 'equipment')
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 15,
+  &quot;data&quot;: [
+    {
+      &quot;inventoryId&quot;: 1,
+      &quot;itemName&quot;: &quot;Vanilla Syrup&quot;,
+      &quot;itemType&quot;: &quot;syrup&quot;,
+      &quot;quantity&quot;: 25,
+      &quot;unit&quot;: &quot;liter&quot;,
+      &quot;minThreshold&quot;: 5,
+      &quot;maxCapacity&quot;: 50,
+      &quot;supplier&quot;: &quot;Local Syrup Co.&quot;,
+      &quot;costPerUnit&quot;: 12.50,
+      &quot;lastRestocked&quot;: &quot;2026-03-15T10:00:00.000Z&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-01T00:00:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendinventory-admin-only">POST /backend/inventory (Admin Only)</h3>
+<p>Create new inventory item.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;itemName&quot;: &quot;string (required)&quot;,
+  &quot;itemType&quot;: &quot;string (required: 'syrup', 'soda', 'supply', 'equipment')&quot;,
+  &quot;quantity&quot;: &quot;integer (required, min: 0)&quot;,
+  &quot;unit&quot;: &quot;string (required: 'liter', 'bag', 'count', 'oz', etc.)&quot;,
+  &quot;minThreshold&quot;: &quot;integer (required)&quot;,
+  &quot;maxCapacity&quot;: &quot;integer (required)&quot;,
+  &quot;supplier&quot;: &quot;string (optional)&quot;,
+  &quot;costPerUnit&quot;: &quot;number (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* inventory object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendinventoryinventoryid">GET /backend/inventory/:inventoryId</h3>
+<p>Get specific inventory item.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* inventory object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendinventoryinventoryid-admin-only">PATCH /backend/inventory/:inventoryId (Admin Only)</h3>
+<p>Update inventory item.</p>
+<p><strong>Request</strong>: (all fields optional)</p>
+<pre><code class="language-json">{
+  &quot;quantity&quot;: &quot;integer&quot;,
+  &quot;minThreshold&quot;: &quot;integer&quot;,
+  &quot;maxCapacity&quot;: &quot;integer&quot;,
+  &quot;supplier&quot;: &quot;string&quot;,
+  &quot;costPerUnit&quot;: &quot;number&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated inventory object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendinventoryinventoryid-admin-only">DELETE /backend/inventory/:inventoryId (Admin Only)</h3>
+<p>Delete inventory item.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Inventory item deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendinventoryinventoryidrestock-admin-only">PATCH /backend/inventory/:inventoryId/restock (Admin Only)</h3>
+<p>Restock an item.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;quantity&quot;: &quot;integer (required, amount to add)&quot;,
+  &quot;costPerUnit&quot;: &quot;number (optional, update cost if provided)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated inventory object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendinventoryreportlow-stock-admin-only">GET /backend/inventory/report/low-stock (Admin Only)</h3>
+<p>Get items below minimum threshold.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 3,
+  &quot;data&quot;: [
+    {
+      &quot;inventoryId&quot;: 5,
+      &quot;itemName&quot;: &quot;Milk&quot;,
+      &quot;quantity&quot;: 3,
+      &quot;minThreshold&quot;: 10,
+      &quot;status&quot;: &quot;CRITICAL&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h2 id="notifications">Notifications</h2>
+<p>System notifications and alerts.</p>
+<h3 id="get-backendnotifications">GET /backend/notifications</h3>
+<p>Get notifications for current user.</p>
+<p><strong>Query Parameters</strong>:
+- <code>type</code>: string (optional: 'order', 'promotion', 'alert', 'system')
+- <code>read</code>: boolean (optional, filter read/unread)
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 8,
+  &quot;unreadCount&quot;: 3,
+  &quot;data&quot;: [
+    {
+      &quot;notificationId&quot;: 1,
+      &quot;userId&quot;: 1,
+      &quot;type&quot;: &quot;order&quot;,
+      &quot;title&quot;: &quot;Order Ready&quot;,
+      &quot;message&quot;: &quot;Your order is ready for pickup&quot;,
+      &quot;isRead&quot;: false,
+      &quot;metadata&quot;: {
+        &quot;orderId&quot;: 42
+      },
+      &quot;createdAt&quot;: &quot;2026-03-18T14:30:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendnotifications-admin-only">POST /backend/notifications (Admin Only)</h3>
+<p>Send notification to user.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;userId&quot;: &quot;integer (required)&quot;,
+  &quot;type&quot;: &quot;string (required: 'order', 'promotion', 'alert', 'system')&quot;,
+  &quot;title&quot;: &quot;string (required)&quot;,
+  &quot;message&quot;: &quot;string (required)&quot;,
+  &quot;metadata&quot;: &quot;object (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* notification object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendnotificationsnotificationidread">PATCH /backend/notifications/:notificationId/read</h3>
+<p>Mark notification as read.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* notification object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendnotificationsnotificationid">DELETE /backend/notifications/:notificationId</h3>
+<p>Delete notification.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Notification deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="delete-backendnotificationsclear-read">DELETE /backend/notifications/clear-read</h3>
+<p>Delete all read notifications for current user.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;Cleared read notifications&quot;
+}
+</code></pre>
+<hr />
+<h3 id="get-backendnotificationsunread-count">GET /backend/notifications/unread-count</h3>
+<p>Get count of unread notifications for current user.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;unreadCount&quot;: 3
+}
+</code></pre>
+<hr />
+<h2 id="revenue">Revenue</h2>
+<p>Payment and revenue tracking.</p>
+<h3 id="get-backendrevenues-admin-only">GET /backend/revenues (Admin Only)</h3>
+<p>List all revenues.</p>
+<p><strong>Query Parameters</strong>:
+- <code>startDate</code>: string (optional, YYYY-MM-DD)
+- <code>endDate</code>: string (optional, YYYY-MM-DD)
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 150,
+  &quot;data&quot;: [
+    {
+      &quot;revenueId&quot;: 1,
+      &quot;orderId&quot;: 42,
+      &quot;userId&quot;: 5,
+      &quot;amount&quot;: 4.50,
+      &quot;paymentMethod&quot;: &quot;card&quot;,
+      &quot;paymentStatus&quot;: &quot;completed&quot;,
+      &quot;transactionId&quot;: &quot;stripe_ch_12345&quot;,
+      &quot;createdAt&quot;: &quot;2026-03-18T09:05:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendrevenues-admin-only">POST /backend/revenues (Admin Only)</h3>
+<p>Record revenue from completed order.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;orderId&quot;: &quot;integer (required)&quot;,
+  &quot;userId&quot;: &quot;integer (required)&quot;,
+  &quot;amount&quot;: &quot;number (required, must be &gt; 0)&quot;,
+  &quot;paymentMethod&quot;: &quot;string (required: 'cash', 'card', 'mobile')&quot;,
+  &quot;transactionId&quot;: &quot;string (optional)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* revenue object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendrevenuesrevenueid-admin-only">GET /backend/revenues/:revenueId (Admin Only)</h3>
+<p>Get specific revenue record.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* revenue object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendrevenuesrevenueidstatus-admin-only">PATCH /backend/revenues/:revenueId/status (Admin Only)</h3>
+<p>Update revenue payment status.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;paymentStatus&quot;: &quot;string (required: 'pending', 'completed', 'failed', 'refunded')&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated revenue object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendrevenuesreportdaily-admin-only">GET /backend/revenues/report/daily (Admin Only)</h3>
+<p>Get daily revenue report.</p>
+<p><strong>Query Parameters</strong>:
+- <code>date</code>: string (optional, YYYY-MM-DD, default: today)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: {
+    &quot;date&quot;: &quot;2026-03-18&quot;,
+    &quot;totalRevenue&quot;: 567.89,
+    &quot;totalTransactions&quot;: 98,
+    &quot;completedTransactions&quot;: 96,
+    &quot;failedTransactions&quot;: 2,
+    &quot;refundedAmount&quot;: 0.00,
+    &quot;byPaymentMethod&quot;: {
+      &quot;card&quot;: 456.50,
+      &quot;cash&quot;: 111.39,
+      &quot;mobile&quot;: 0.00
+    }
+  }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendrevenuesreportmonthly-admin-only">GET /backend/revenues/report/monthly (Admin Only)</h3>
+<p>Get monthly revenue report.</p>
+<p><strong>Query Parameters</strong>:
+- <code>month</code>: string (optional, YYYY-MM, default: current month)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: {
+    &quot;month&quot;: &quot;2026-03&quot;,
+    &quot;totalRevenue&quot;: 12450.75,
+    &quot;totalTransactions&quot;: 2150,
+    &quot;averageTransactionValue&quot;: 5.79,
+    &quot;trend&quot;: &quot;up 15% from previous month&quot;
+  }
+}
+</code></pre>
+<hr />
+<h2 id="payments">Payments</h2>
+<p>Payment processing and transaction records.</p>
+<h3 id="get-backendpayments-admin-only">GET /backend/payments (Admin Only)</h3>
+<p>List all payment transactions.</p>
+<p><strong>Query Parameters</strong>:
+- <code>status</code>: string (optional: 'pending', 'completed', 'failed', 'refunded')
+- <code>startDate</code>: string (optional, YYYY-MM-DD)
+- <code>endDate</code>: string (optional, YYYY-MM-DD)
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 200,
+  &quot;data&quot;: [
+    {
+      &quot;paymentId&quot;: 1,
+      &quot;orderId&quot;: 42,
+      &quot;userId&quot;: 5,
+      &quot;amount&quot;: 13.50,
+      &quot;paymentMethod&quot;: &quot;card&quot;,
+      &quot;paymentStatus&quot;: &quot;completed&quot;,
+      &quot;stripeTransactionId&quot;: &quot;pi_1A2B3C4D5E6F7G8H&quot;,
+      &quot;refundStatus&quot;: &quot;none&quot;,
+      &quot;refundedAmount&quot;: 0.00,
+      &quot;createdAt&quot;: &quot;2026-03-18T09:00:00.000Z&quot;,
+      &quot;completedAt&quot;: &quot;2026-03-18T09:01:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendpayments">POST /backend/payments</h3>
+<p>Process a new payment (typically called after order creation).</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;orderId&quot;: &quot;integer (required)&quot;,
+  &quot;userId&quot;: &quot;integer (required)&quot;,
+  &quot;amount&quot;: &quot;number (required, must be &gt; 0)&quot;,
+  &quot;paymentMethod&quot;: &quot;string (required: 'cash', 'card', 'mobile')&quot;,
+  &quot;stripeTokenId&quot;: &quot;string (required if paymentMethod is 'card', Stripe token)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* payment object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendpaymentspaymentid-admin-only">GET /backend/payments/:paymentId (Admin Only)</h3>
+<p>Get specific payment record.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* payment object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="patch-backendpaymentspaymentidrefund-admin-only">PATCH /backend/payments/:paymentId/refund (Admin Only)</h3>
+<p>Refund a payment.</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;refundAmount&quot;: &quot;number (optional, partial refund amount; if omitted, full refund)&quot;
+}
+</code></pre>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* updated payment object with refund status */&quot; }
+}
+</code></pre>
+<hr />
+<h2 id="qr-codes">QR Codes</h2>
+<p>QR code management for fridge access.</p>
+<h3 id="get-backendqrcodes">GET /backend/qrcodes</h3>
+<p>List all QR codes (Admin Only).</p>
+<p><strong>Query Parameters</strong>:
+- <code>orderId</code>: integer (optional, filter by order)
+- <code>isExpired</code>: boolean (optional, filter expired/active)
+- <code>offset</code>: integer (default: 0)
+- <code>limit</code>: integer (default: 50)</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;count&quot;: 15,
+  &quot;data&quot;: [
+    {
+      &quot;qrcodeId&quot;: 1,
+      &quot;orderId&quot;: 42,
+      &quot;userId&quot;: 5,
+      &quot;qrcodeData&quot;: &quot;https://fridge.codepop.local/open/abc123def456&quot;,
+      &quot;expirationTime&quot;: &quot;2026-03-18T10:00:00.000Z&quot;,
+      &quot;isExpired&quot;: false,
+      &quot;accessCount&quot;: 1,
+      &quot;createdAt&quot;: &quot;2026-03-18T09:05:00.000Z&quot;
+    }
+  ]
+}
+</code></pre>
+<hr />
+<h3 id="post-backendqrcodes">POST /backend/qrcodes</h3>
+<p>Create a new QR code for an order (typically called by system after order completion).</p>
+<p><strong>Request</strong>:</p>
+<pre><code class="language-json">{
+  &quot;orderId&quot;: &quot;integer (required)&quot;,
+  &quot;userId&quot;: &quot;integer (required)&quot;,
+  &quot;expirationTime&quot;: &quot;ISO-8601 timestamp (optional, default: 1 hour from now)&quot;
+}
+</code></pre>
+<p><strong>Response (201 Created)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;created&quot;,
+  &quot;data&quot;: { &quot;/* qrcode object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendqrcodesqrcodeid">GET /backend/qrcodes/:qrcodeId</h3>
+<p>Get specific QR code (user can view their own; admin can view all).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* qrcode object */&quot; }
+}
+</code></pre>
+<hr />
+<h3 id="get-backendqrcodesqrcodeidvalidate">GET /backend/qrcodes/:qrcodeId/validate</h3>
+<p>Validate and use a QR code (open fridge).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;QR code valid. Fridge unlocked.&quot;,
+  &quot;data&quot;: {
+    &quot;qrcodeId&quot;: 1,
+    &quot;orderId&quot;: 42,
+    &quot;isExpired&quot;: false,
+    &quot;accessCount&quot;: 2
+  }
+}
+</code></pre>
+<p><strong>Errors</strong>:
+- <code>410</code>: QR code expired
+- <code>404</code>: QR code not found
+- <code>400</code>: QR code already used maximum times</p>
+<hr />
+<h3 id="delete-backendqrcodesqrcodeid-admin-only">DELETE /backend/qrcodes/:qrcodeId (Admin Only)</h3>
+<p>Delete/revoke a QR code.</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;message&quot;: &quot;QR code deleted successfully&quot;
+}
+</code></pre>
+<hr />
+<h3 id="get-backendqrcodesorderorderid">GET /backend/qrcodes/order/:orderId</h3>
+<p>Get QR code for a specific order (user can view their own orders; admin can view all).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;success&quot;,
+  &quot;data&quot;: { &quot;/* qrcode object */&quot; }
+}
+</code></pre>
+<hr />
+<h2 id="external-integrations">External Integrations</h2>
+<p>CodePop integrates with external services to provide core functionality. This section documents the dependencies and fallback behavior.</p>
+<h3 id="stripe-integration-payment-processing">Stripe Integration (Payment Processing)</h3>
+<p><strong>Purpose</strong>: Secure payment processing without storing card data</p>
+<p><strong>Criticality</strong>: Critical - orders cannot be completed without payments</p>
+<p><strong>Endpoints Affected</strong>:
+- <code>POST /backend/payments</code> - initiates Stripe charge
+- <code>POST /backend/orders</code> - fails if payment processing fails
+- <code>PATCH /backend/payments/:paymentId/refund</code> - processes refunds via Stripe</p>
+<p><strong>Fallback Behavior</strong>:
+- Failed payments stored with status <code>pending</code>
+- Automatic retry with exponential backoff
+- Customer notified via email; can retry payment</p>
+<p><strong>API Reference</strong>: See <a href="https://stripe.com/docs/api">Stripe API Documentation</a></p>
+<hr />
+<h3 id="firebase-cloud-messaging-fcm-integration">Firebase Cloud Messaging (FCM) Integration</h3>
+<p><strong>Purpose</strong>: Push notifications for order status updates</p>
+<p><strong>Criticality</strong>: High - users won't receive real-time notifications but can check app</p>
+<p><strong>Endpoints Affected</strong>:
+- <code>PATCH /backend/orders/:orderId/status</code> - sends FCM notification when order ready
+- <code>POST /backend/notifications</code> - sends FCM notification to device</p>
+<p><strong>Fallback Behavior</strong>:
+- Notifications still stored in database
+- Users see notifications in-app
+- Email fallback for critical notifications</p>
+<hr />
+<h3 id="mapbox-integration-geolocation-mapping">Mapbox Integration (Geolocation &amp; Mapping)</h3>
+<p><strong>Purpose</strong>: Show nearby store locations and calculate pickup times</p>
+<p><strong>Criticality</strong>: High - location-based pickup unavailable but time-based pickup works</p>
+<p><strong>Endpoints Affected</strong>:
+- <code>GET /backend/orders</code> - includes estimated pickup times calculated from user location
+- Admin dashboards - show store locations on map</p>
+<p><strong>Fallback Behavior</strong>:
+- Time-based pickup ("ready in 15 minutes") used if Mapbox unavailable
+- User experience degraded but functional</p>
+<hr />
+<h3 id="claude-api-integration-ai-assistant">Claude API Integration (AI Assistant)</h3>
+<p><strong>Purpose</strong>: Intelligent customer support and personalized drink recommendations</p>
+<p><strong>Criticality</strong>: Low - optional feature with fallbacks</p>
+<p><strong>Endpoints Affected</strong>:
+- Complaints system - provides AI-generated responses
+- Recommendation engine - suggests drinks based on preferences</p>
+<p><strong>Fallback Behavior</strong>:
+- Pre-written FAQ responses for common complaints
+- Top 5 popular drinks suggested if AI unavailable
+- Always provide "Contact human support" option</p>
+<hr />
+<h2 id="error-handling">Error Handling</h2>
+<h3 id="standard-error-response-format">Standard Error Response Format</h3>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;Error message description&quot;,
+  &quot;code&quot;: &quot;ERROR_CODE&quot;,
+  &quot;details&quot;: &quot;optional additional context&quot;
+}
+</code></pre>
+<h3 id="error-codes">Error Codes</h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Code</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td>VALIDATION_ERROR</td>
+<td>Invalid input data or missing required fields</td>
+</tr>
+<tr>
+<td>400</td>
+<td>INVALID_TOKEN_FORMAT</td>
+<td>Authorization header format incorrect</td>
+</tr>
+<tr>
+<td>400</td>
+<td>BAD_REQUEST</td>
+<td>Malformed request</td>
+</tr>
+<tr>
+<td>401</td>
+<td>INVALID_TOKEN</td>
+<td>Token is invalid, expired, or revoked</td>
+</tr>
+<tr>
+<td>401</td>
+<td>UNAUTHORIZED</td>
+<td>Missing authorization header</td>
+</tr>
+<tr>
+<td>403</td>
+<td>NOT_ADMIN</td>
+<td>Admin privileges required for this endpoint</td>
+</tr>
+<tr>
+<td>404</td>
+<td>NOT_FOUND</td>
+<td>Resource not found</td>
+</tr>
+<tr>
+<td>409</td>
+<td>CONFLICT</td>
+<td>Resource already exists (e.g., duplicate username)</td>
+</tr>
+<tr>
+<td>410</td>
+<td>GONE</td>
+<td>Resource expired (e.g., QR code expired)</td>
+</tr>
+<tr>
+<td>429</td>
+<td>RATE_LIMITED</td>
+<td>Too many requests; retry after delay</td>
+</tr>
+<tr>
+<td>500</td>
+<td>INTERNAL_ERROR</td>
+<td>Server error</td>
+</tr>
+<tr>
+<td>500</td>
+<td>DATABASE_ERROR</td>
+<td>Database operation failed</td>
+</tr>
+<tr>
+<td>502</td>
+<td>EXTERNAL_SERVICE_ERROR</td>
+<td>External service (Stripe, FCM) unavailable</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-error-responses">Example Error Responses</h3>
+<p><strong>Validation Error</strong>:</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;Invalid email format&quot;,
+  &quot;code&quot;: &quot;VALIDATION_ERROR&quot;,
+  &quot;details&quot;: &quot;email: must be valid email address&quot;
+}
+</code></pre>
+<p><strong>Not Found</strong>:</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;Order not found&quot;,
+  &quot;code&quot;: &quot;NOT_FOUND&quot;,
+  &quot;details&quot;: &quot;orderId: 999&quot;
+}
+</code></pre>
+<p><strong>Unauthorized</strong>:</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: &quot;Invalid credentials&quot;,
+  &quot;code&quot;: &quot;UNAUTHORIZED&quot;,
+  &quot;details&quot;: &quot;username or password incorrect&quot;
+}
+</code></pre>
+<hr />
+<h2 id="health-info">Health &amp; Info</h2>
+<h3 id="get-health">GET /health</h3>
+<p>Health check endpoint (no authentication required).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;nodeType&quot;: &quot;peer&quot;,
+  &quot;peerId&quot;: &quot;12D3KooWSBNnxKtWGJP5waG16...&quot;,
+  &quot;port&quot;: 3001,
+  &quot;timestamp&quot;: &quot;2026-03-18T23:18:00.862Z&quot;
+}
+</code></pre>
+<hr />
+<h3 id="get-info">GET /info</h3>
+<p>Node information including database addresses (no authentication required).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;nodeType&quot;: &quot;peer&quot;,
+  &quot;port&quot;: 3001,
+  &quot;peerId&quot;: &quot;12D3KooWSBNnxKtWGJP5waG16...&quot;,
+  &quot;multiaddrs&quot;: [
+    &quot;/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWSBNnxKtWGJP5waG16...&quot;
+  ],
+  &quot;connectedPeers&quot;: [],
+  &quot;databases&quot;: {
+    &quot;users-db&quot;: &quot;orbitdb/zdpuAzFqYXQhSnmZB1ur9GbyDWwLZSuTawP27Xydo...&quot;,
+    &quot;tokens-db&quot;: &quot;orbitdb/zdpuAzJvGDd5vFpPVayxodpwoXEiPncf9pE8H2qeK...&quot;,
+    &quot;preferences-db&quot;: &quot;orbitdb/zdpuB17rWFqd6YFqfuwaNtodyFYc76SuNq9z3keqe...&quot;,
+    &quot;drinks-db&quot;: &quot;orbitdb/zdpuApfkSi9L9CF2E8TZDHewpr5g2uUs9fkrSGhcd...&quot;,
+    &quot;inventory-db&quot;: &quot;orbitdb/zdpuAppGMb6BoRPBppqa7EM3aCsjnMTUe465qrjcS...&quot;,
+    &quot;orders-db&quot;: &quot;orbitdb/zdpuAwYxBu8fnSyfgrMJCNrRwdbbojEpcBgCBJRj4...&quot;,
+    &quot;notifications-db&quot;: &quot;orbitdb/zdpuAtwbHWqSEzEfb6Fw1mSq2s8VZPRBy8mnFAisk...&quot;,
+    &quot;revenues-db&quot;: &quot;orbitdb/zdpuAtvPgq28r2KWkpAHWDJdhFGnJbJgex9aSV9VL...&quot;
+  },
+  &quot;timestamp&quot;: &quot;2026-03-18T23:18:00.862Z&quot;
+}
+</code></pre>
+<hr />
+<h3 id="get">GET /</h3>
+<p>Server information (no authentication required).</p>
+<p><strong>Response (200 OK)</strong>:</p>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;CodePop OrbitDB Backend&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;nodeType&quot;: &quot;peer&quot;,
+  &quot;port&quot;: 3001,
+  &quot;status&quot;: &quot;running&quot;
+}
+</code></pre>
+<hr />
+<h2 id="authentication-requirements-summary">Authentication Requirements Summary</h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Auth Required</th>
+<th>Admin Only</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST /auth/register</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /auth/login</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /auth/logout</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /users/profile</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /users/profile</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /users</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /users/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PATCH /users/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DELETE /users/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DELETE /users/account/delete</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /preferences</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /preferences</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /preferences/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /preferences/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DELETE /preferences/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /drinks</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /drinks</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /drinks/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /drinks/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DELETE /drinks/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>POST /drinks/:id/favorite</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /drinks/:id/rate</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /orders</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /orders</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /orders/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /orders/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DELETE /orders/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /orders/:id/status</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /orders/stats/daily</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /inventory</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /inventory</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /inventory/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>PATCH /inventory/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>DELETE /inventory/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PATCH /inventory/:id/restock</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /inventory/report/low-stock</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /notifications</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>POST /notifications</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PATCH /notifications/:id/read</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DELETE /notifications/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DELETE /notifications/clear-read</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /notifications/unread-count</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /revenues</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>POST /revenues</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /revenues/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PATCH /revenues/:id/status</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /revenues/report/daily</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /revenues/report/monthly</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /payments</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>POST /payments</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /payments/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>PATCH /payments/:id/refund</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /qrcodes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>POST /qrcodes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /qrcodes/:id</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /qrcodes/:id/validate</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>DELETE /qrcodes/:id</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>GET /qrcodes/order/:orderId</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /health</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /info</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td>GET /</td>
+<td>No</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="rate-limiting-pagination">Rate Limiting &amp; Pagination</h2>
+<h3 id="pagination">Pagination</h3>
+<p>All list endpoints support pagination via query parameters:
+- <code>offset</code>: Starting position (default: 0)
+- <code>limit</code>: Number of items to return (default: 50, max: 100)</p>
+<p><strong>Example</strong>: <code>GET /backend/drinks?offset=100&amp;limit=50</code></p>
+<h3 id="rate-limiting">Rate Limiting</h3>
+<p>Current implementation: No rate limiting</p>
+<p><strong>Recommended for Production</strong>:
+- 1000 requests per hour per token
+- 100 requests per hour per IP for auth endpoints
+- 429 status code for exceeded limits
+- Reset timer provided in response headers</p>
+<hr />
+<h2 id="data-consistency-transactions">Data Consistency &amp; Transactions</h2>
+<h3 id="order-workflow">Order Workflow</h3>
+<ol>
+<li><strong>Create Order</strong> → <code>POST /backend/orders</code></li>
+<li>Order created with status <code>pending</code></li>
+<li>
+<p>Payment not yet processed</p>
+</li>
+<li>
+<p><strong>Process Payment</strong> → <code>POST /backend/payments</code></p>
+</li>
+<li>Payment processed via Stripe</li>
+<li>Payment stored with status <code>pending</code> or <code>completed</code></li>
+<li>
+<p>Order remains in <code>pending</code> status</p>
+</li>
+<li>
+<p><strong>Order Ready</strong> → <code>PATCH /backend/orders/:orderId/status</code> (Admin)</p>
+</li>
+<li>Admin updates status to <code>ready</code></li>
+<li>FCM notification sent to user</li>
+<li>
+<p>QR code generated if not exists</p>
+</li>
+<li>
+<p><strong>User Redeems</strong> → <code>GET /backend/qrcodes/:qrcodeId/validate</code></p>
+</li>
+<li>QR code validated</li>
+<li>Fridge unlocked</li>
+<li>
+<p>Order access log created</p>
+</li>
+<li>
+<p><strong>Complete Order</strong> → <code>PATCH /backend/orders/:orderId/status</code> (Admin)</p>
+</li>
+<li>Admin updates status to <code>completed</code></li>
+<li>Revenue record created</li>
+<li>Notification sent to user</li>
+</ol>
+<h3 id="consistency-guarantees">Consistency Guarantees</h3>
+<ul>
+<li><strong>Database transactions</strong>: All critical operations use atomic transactions</li>
+<li><strong>Idempotency</strong>: Payment endpoints return same result if called multiple times</li>
+<li><strong>Eventual consistency</strong>: OrbitDB replicates changes across peer nodes</li>
+<li><strong>Data validation</strong>: All inputs validated before database operations</li>
+</ul>
+<hr />
+<h2 id="security-best-practices">Security Best Practices</h2>
+<h3 id="for-api-consumers">For API Consumers</h3>
+<ol>
+<li><strong>Token Management</strong>:</li>
+<li>Store tokens securely (never in localStorage for sensitive apps)</li>
+<li>Rotate tokens periodically</li>
+<li>
+<p>Invalidate tokens on logout</p>
+</li>
+<li>
+<p><strong>HTTPS Requirements</strong>:</p>
+</li>
+<li>Always use HTTPS (TLS 1.3 or newer)</li>
+<li>Verify SSL certificates</li>
+<li>
+<p>Implement certificate pinning for mobile apps</p>
+</li>
+<li>
+<p><strong>Password Requirements</strong>:</p>
+</li>
+<li>Minimum 8 characters</li>
+<li>Must include uppercase, lowercase, number, special character</li>
+<li>
+<p>Never transmit in plaintext</p>
+</li>
+<li>
+<p><strong>Input Validation</strong>:</p>
+</li>
+<li>Validate all user input on client side</li>
+<li>Sanitize inputs to prevent injection attacks</li>
+<li>Use parameterized queries (Django ORM does this by default)</li>
+</ol>
+<h3 id="for-backend-implementation">For Backend Implementation</h3>
+<ul>
+<li>Never log passwords or sensitive tokens</li>
+<li>Encrypt sensitive fields at rest (AES-256)</li>
+<li>Hash passwords with PBKDF2 or Argon2</li>
+<li>Implement rate limiting on sensitive endpoints</li>
+<li>Monitor for suspicious activity and unusual access patterns</li>
+</ul>
+<hr />
+<h2 id="testing-the-api">Testing the API</h2>
+<h3 id="quick-start-test">Quick Start Test</h3>
+<pre><code class="language-bash">#!/bin/bash
+
+BASE_URL=&quot;http://localhost:3001&quot;
+
+# 1. Register user
+echo &quot;=== Registering user ===&quot;
+RESPONSE=$(curl -s -X POST &quot;$BASE_URL/backend/auth/register&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;username&quot;: &quot;testuser&quot;,
+    &quot;email&quot;: &quot;test@example.com&quot;,
+    &quot;password&quot;: &quot;SecurePass123!&quot;
+  }')
+
+TOKEN=$(echo &quot;$RESPONSE&quot; | jq -r '.data.token')
+echo &quot;Token: $TOKEN&quot;
+
+# 2. Get drinks
+echo -e &quot;\n=== Fetching drinks ===&quot;
+curl -s -X GET &quot;$BASE_URL/backend/drinks&quot; \
+  -H &quot;Authorization: Token $TOKEN&quot; | jq .
+
+# 3. Create order
+echo -e &quot;\n=== Creating order ===&quot;
+curl -s -X POST &quot;$BASE_URL/backend/orders&quot; \
+  -H &quot;Authorization: Token $TOKEN&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;drinkIds&quot;: [1, 2],
+    &quot;quantities&quot;: [1, 1],
+    &quot;specialInstructions&quot;: &quot;extra hot&quot;
+  }' | jq .
+
+# 4. Get notifications
+echo -e &quot;\n=== Fetching notifications ===&quot;
+curl -s -X GET &quot;$BASE_URL/backend/notifications&quot; \
+  -H &quot;Authorization: Token $TOKEN&quot; | jq .
+
+# 5. Logout
+echo -e &quot;\n=== Logging out ===&quot;
+curl -s -X POST &quot;$BASE_URL/backend/auth/logout&quot; \
+  -H &quot;Authorization: Token $TOKEN&quot; | jq .
+</code></pre>
+<hr />
+<h2 id="api-versioning">API Versioning</h2>
+<p><strong>Current Version</strong>: 1.0.0</p>
+<p>All endpoints use the <code>/backend/</code> prefix for backward compatibility with the legacy Django backend.</p>
+<p>Future versions will be available at <code>/api/v2/</code> with proper deprecation notices.</p>
+<hr />
+<p><strong>Last Updated</strong>: 2026-03-18<br />
+<strong>Maintained By</strong>: CodePop Development Team</p>
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
