@@ -22,7 +22,7 @@ export async function initializeOrbitDB(orbitdbInstance, dbAddresses) {
     databases.payments = await orbitdb.open(dbAddresses.payments, { type: "keyvalue" })
     databases.qrcodes = await orbitdb.open(dbAddresses.qrcodes, { type: "keyvalue" })
     
-    console.log("✓ All databases initialized")
+    console.log("[ ^ ]  All databases initialized")
     return true
   } catch (err) {
     console.error("Error initializing databases:", err)

@@ -185,7 +185,8 @@
 <pre><code class="language-json">{
   &quot;username&quot;: &quot;string (required, 3-30 chars, alphanumeric + underscore)&quot;,
   &quot;email&quot;: &quot;string (required, valid email format)&quot;,
-  &quot;password&quot;: &quot;string (required, min 8 chars, uppercase + lowercase + number + special char)&quot;
+  &quot;password&quot;: &quot;string (required, min 8 chars, uppercase + lowercase + number + special char)&quot;,
+  &quot;enum&quot; : &quot;string (optional, default is 'customer', ['customer', 'admin', 'staff', 'repair', 'manager'])&quot;
 }
 </code></pre>
 <p><strong>Response (201 Created)</strong>:</p>
@@ -197,8 +198,7 @@
     &quot;email&quot;: &quot;john@example.com&quot;,
     &quot;firstName&quot;: &quot;&quot;,
     &quot;lastName&quot;: &quot;&quot;,
-    &quot;isStaff&quot;: false,
-    &quot;isSuperuser&quot;: false,
+    &quot;enum&quot; : &quot;customer&quot;
     &quot;createdAt&quot;: &quot;2026-03-18T12:00:00.000Z&quot;,
     &quot;token&quot;: &quot;64-character hex string&quot;
   }
@@ -225,8 +225,7 @@
     &quot;userId&quot;: 1,
     &quot;username&quot;: &quot;john_doe&quot;,
     &quot;email&quot;: &quot;john@example.com&quot;,
-    &quot;isStaff&quot;: false,
-    &quot;isSuperuser&quot;: false,
+    &quot;enum&quot; : &quot;customer&quot;
     &quot;token&quot;: &quot;64-character hex string&quot;
   }
 }
@@ -259,8 +258,7 @@
     &quot;email&quot;: &quot;john@example.com&quot;,
     &quot;firstName&quot;: &quot;John&quot;,
     &quot;lastName&quot;: &quot;Doe&quot;,
-    &quot;isStaff&quot;: false,
-    &quot;isSuperuser&quot;: false,
+    &quot;enum&quot; : &quot;customer&quot;,
     &quot;createdAt&quot;: &quot;2026-03-18T12:00:00.000Z&quot;
   }
 }
@@ -310,8 +308,7 @@
 <pre><code class="language-json">{
   &quot;firstName&quot;: &quot;string (optional)&quot;,
   &quot;lastName&quot;: &quot;string (optional)&quot;,
-  &quot;isStaff&quot;: &quot;boolean (optional)&quot;,
-  &quot;isSuperuser&quot;: &quot;boolean (optional)&quot;
+  &quot;enum&quot; : &quot;string (optional)&quot;
 }
 </code></pre>
 <p><strong>Response (200 OK)</strong>:</p>

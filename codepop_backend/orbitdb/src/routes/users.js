@@ -71,7 +71,7 @@ router.put(
     if (firstName !== undefined) updates.firstName = firstName
     if (lastName !== undefined) updates.lastName = lastName
     if (email !== undefined) updates.email = email
-
+    if (enum !== undefined) updates.enum = enum
     const user = await updateUser(userId, updates)
 
     res.json({

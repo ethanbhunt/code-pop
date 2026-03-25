@@ -80,7 +80,8 @@ Register a new user account.
 {
   "username": "string (required, 3-30 chars, alphanumeric + underscore)",
   "email": "string (required, valid email format)",
-  "password": "string (required, min 8 chars, uppercase + lowercase + number + special char)"
+  "password": "string (required, min 8 chars, uppercase + lowercase + number + special char)",
+  "enum" : "string (optional, default is 'customer', ['customer', 'admin', 'staff', 'repair', 'manager'])"
 }
 ```
 
@@ -94,8 +95,7 @@ Register a new user account.
     "email": "john@example.com",
     "firstName": "",
     "lastName": "",
-    "isStaff": false,
-    "isSuperuser": false,
+    "enum" : "customer"
     "createdAt": "2026-03-18T12:00:00.000Z",
     "token": "64-character hex string"
   }
@@ -130,8 +130,7 @@ Authenticate and receive a token.
     "userId": 1,
     "username": "john_doe",
     "email": "john@example.com",
-    "isStaff": false,
-    "isSuperuser": false,
+    "enum" : "customer"
     "token": "64-character hex string"
   }
 }
@@ -179,8 +178,7 @@ Get current user's profile.
     "email": "john@example.com",
     "firstName": "John",
     "lastName": "Doe",
-    "isStaff": false,
-    "isSuperuser": false,
+    "enum" : "customer",
     "createdAt": "2026-03-18T12:00:00.000Z"
   }
 }
@@ -253,8 +251,7 @@ Update user as admin.
 {
   "firstName": "string (optional)",
   "lastName": "string (optional)",
-  "isStaff": "boolean (optional)",
-  "isSuperuser": "boolean (optional)"
+  "enum" : "string (optional)"
 }
 ```
 
