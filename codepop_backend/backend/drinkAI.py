@@ -368,3 +368,58 @@ def generate_soda(user_preferences):
             drink['addins'] = []
 
         return drink
+
+# Generate drinks based on user prompt
+DESCRIPTOR_MAP = {
+    "sweet": ["vanilla", "cupcake", "cotton candy", "salted caramel", "butterscotch", "white chocolate", "brown sugar cinnamon"],
+    "fruity": ["mango", "strawberry", "peach", "pineapple", "watermelon", "raspberry", "kiwi"],
+    "tropical": ["mango", "pineapple", "coconut", "passion fruit", "guava", "banana"],
+    "sour": ["sour", "lemon", "lime", "grapefruit", "green apple", "sweetened lime"],
+    "berry": ["strawberry", "raspberry", "blackberry", "pomegranate", "cranberry", "huckleberry", "grape"],
+    "citrus": ["orange", "blood orange", "grapefruit", "lemon", "lime", "sweetened lime"],
+    "dessert": ["vanilla", "salted caramel", "chocolate milano", "choc chip cookie dough", "hazelnut", "cupcake", "butterscotch"],
+    "spicy": ["cinnamon", "pumpkin spice", "gingerbread", "peppermint", "irish cream"],
+    "candy": ["blue raspberry", "bubble gum", "cotton candy", "blue curacao", "sour"],
+    "creamy": ["vanilla", "salted caramel", "coconut", "cream", "coconut cream", "french vanilla creamer", "whip"],
+    "refreshing": ["mojito", "cucumber", "lavender", "lime", "lemon", "peppermint"],
+    "warm": ["cinnamon", "brown sugar cinnamon", "gingerbread", "pumpkin spice", "salted caramel", "irish cream", "butterbrew mix"],
+    "chocolate": ["chocolate milano", "choc chip cookie dough", "white chocolate", "hazelnut"],
+}
+
+def parse_prompt(prompt):
+    """
+    parse a user's natural langauge prompt into a list of ingredients preferences
+    that generate_soda() can understand.
+    """
+    prompt_lower = prompt.lower()
+    preferences = []
+
+    all_syrups = create_list(syrup_file_path)
+    all_sodas = create_list(soda_file_path)
+    all_addins = create_list(addin_file_path)
+    all_ingredients = all_syrups + all_sodas + all_addins
+
+    remaining = prompt_lower.replace(".", "")
+    for ingredient in sorted(all_ingredients, key=len, reverse=True):
+        normalized = ingredient.replace(".", "")
+        if normalized in remaining:
+            preferences.append(ingredient)
+            remaining = remaining.replace(normalized, "")
+
+    for descriptor, ingredients in DESCRIPTOR_MAP.items():
+        if descriptor in prompt_lower:
+            sample_size = min(random.randint(3, 5), len(ingredients))
+            preferences.extend(random.sample(ingredients, sample_size))
+
+    if len(preferences) == 0:
+        preferences = ["mango", "peach", "vanilla", "salted caramel", "orange", "lavender", "peppermint", "blue raspberry"]
+
+    # generate_soda() requires at least one valid syrup to work.
+    # If the parsed preferences only contain sodas/add-ins, add some default syrups.
+    valid_syrups = create_list(syrup_file_path)
+    has_syrup = any(p in valid_syrups for p in preferences)
+    if not has_syrup:
+        default_syrups = ["mango", "peach", "vanilla", "salted caramel", "orange", "lavender"]
+        preferences.extend(random.sample(default_syrups, min(3, len(default_syrups))))
+
+    return preferences
