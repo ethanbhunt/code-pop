@@ -52,21 +52,21 @@ const RatingCarosel = ({ purchasedDrinks }) => {
     const handleRatingSelected = async (newRating, drink) => {
         try {
             const token = await AsyncStorage.getItem('userToken');
-            const response = await fetch(`${BASE_URL}/backend/drinks/${drink.DrinkID}/`, {
+            const response = await fetch(`${BASE_URL}/backend/drinks/${drink.drinkId}/`, {
                 method: 'PUT',
                 headers: {
                 'Content-Type': 'application/json',
-                // 'Authorization': `Token ${token}`,
+                'Authorization': `Token ${token}`,
                 },
                 body: JSON.stringify({ 
-                    drinkID: drink.DrinkID,
-                    Name: drink.Name,
-                    Price: drink.Price,
-                    SodaUsed: drink.SodaUsed,  // Default value if SodaUsed is null
-                    syrupsUsed: drink.SyrupsUsed,
-                    addIns: drink.AddIns,
-                    User_Created: drink.User_Created,
-                    Rating: newRating, 
+                    drinkId: drink.drinkId,
+                    name: drink.name,
+                    price: drink.price,
+                    sodaUsed: drink.sodaUsed,  // Default value if sodaUsed is null
+                    syrupsUsed: drink.syrupsUsed,
+                    addIns: drink.addIns,
+                    userCreated: drink.userCreated,
+                    rating: newRating, 
                     size: drink.size,
                     ice: drink.ice,
                 }),
@@ -88,14 +88,14 @@ const RatingCarosel = ({ purchasedDrinks }) => {
         try {
             const userID = await AsyncStorage.getItem('userId');
             const token = await AsyncStorage.getItem('userToken');
-            const response = await fetch(`${BASE_URL}/backend/drinks/${drink.DrinkID}/`, {
+            const response = await fetch(`${BASE_URL}/backend/drinks/${drink.drinkId}/`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'Authorization': `Token ${token}`,
+                    'Authorization': `Token ${token}`,
                 },
                 body: JSON.stringify({ 
-                    Favorite: userID 
+                    favorite: userID 
                 }),
             });
 
@@ -108,12 +108,12 @@ const RatingCarosel = ({ purchasedDrinks }) => {
     };
 
     const renderItem = ({ item: drink }) => {
-        const layers = getLayers(drink.SodaUsed, drink.SyrupsUsed, drink.AddIns);
+        const layers = getLayers(drink.sodaUsed, drink.syrupsUsed, drink.addIns);
         return (
             <View style={styles.carouselItem}>
                 {/* Top: Drink ingredients */}
                 <Text style={styles.drinkName}>
-                    {drink.SodaUsed} with {drink.SyrupsUsed?.join(', ')} {drink.AddIns?.join(', ')}
+                    {drink.sodaUsed} with {drink.syrupsUsed?.join(', ')} {drink.addIns?.join(', ')}
                 </Text>
     
                 {/* Middle: Add to Favorites and Drink GIF */}

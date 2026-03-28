@@ -47,17 +47,17 @@ const AdminDash = () => {
     setUserToDelete(null)
   }
 
-  const openEditor = (user) => {
-    setUserToEdit(user)
-    setUserInfo({
-      username: user.username,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      password: "",
-      role: user.is_superuser ? "admin" : user.is_staff ? "staff" : "user",
-    })
-    setEditorIsOpen(true)
-  }
+   const openEditor = (user) => {
+     setUserToEdit(user)
+     setUserInfo({
+       username: user.username,
+       firstName: user.firstName,
+       lastName: user.lastName,
+       password: "",
+       role: user.isSuperuser ? "admin" : user.isStaff ? "staff" : "user",
+     })
+     setEditorIsOpen(true)
+   }
   const closeEditor = () => {
     setEditorIsOpen(false)
     setUserToEdit(null)
@@ -84,11 +84,11 @@ const AdminDash = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Error when trying to fetch a list of users. Status: ${response.status}`);
-      }
+         throw new Error(`Error when trying to fetch a list of users. Status: ${response.status}`);
+       }
 
-      const userList = await response.json();
-      setUsers(userList);
+       const userResponse = await response.json();
+       setUsers(userResponse.data);
     }
     catch (error) {
       console.error('Error when trying to fetch a list of users:', error);
@@ -198,15 +198,15 @@ const AdminDash = () => {
     }
   };
 
-  const renderUser = ({ item }) => {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.box}>
-          <View>
-            <Text style={styles.mainText}>{item.username}</Text>
-            <Text style={styles.secondaryText}>{item.first_name} {item.last_name}</Text>
-            <Text style={styles.secondaryText}>Role: {item.is_superuser ? <Text style={styles.role}>Admin</Text> : item.is_staff ? <Text style={styles.role}>Staff</Text> : "User"}</Text>
-          </View>
+   const renderUser = ({ item }) => {
+     return (
+       <GestureHandlerRootView style={{ flex: 1 }}>
+         <View style={styles.box}>
+           <View>
+             <Text style={styles.mainText}>{item.username}</Text>
+             <Text style={styles.secondaryText}>{item.firstName} {item.lastName}</Text>
+             <Text style={styles.secondaryText}>Role: {item.isSuperuser ? <Text style={styles.role}>Admin</Text> : item.isStaff ? <Text style={styles.role}>Staff</Text> : "User"}</Text>
+           </View>
 
           <View style={styles.userButtonContainer}>
             <TouchableOpacity onPress={() => openEditor(item)} style={styles.button}>

@@ -38,56 +38,93 @@ const PreferencesPage = () => {
       }
     };
   
-    const fetchInventory = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/backend/inventory/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventory = await response.json();
-        const items = inventory.map(item => ({
-          value: item.ItemName,
-          ItemType: item.ItemType,
-        }));
-        setInventoryData(items);
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-      }
-    };
+     const fetchInventory = async () => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const response = await fetch(`${BASE_URL}/backend/inventory/`, {
+           method: 'GET',
+           headers: { 
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         if (!response.ok) {
+           if (response.status === 401) {
+             console.error('Inventory fetch failed with status 401: Invalid token');
+           } else {
+             console.error(`Inventory fetch failed with status ${response.status}`);
+           }
+           setInventoryData([]);
+           return;
+         }
+         const inventoryResponse = await response.json();
+         const inventory = inventoryResponse.data || inventoryResponse;
+         if (!inventory || !Array.isArray(inventory)) {
+           setInventoryData([]);
+           return;
+         }
+         const items = inventory.map(item => ({
+           value: item.itemName,
+           ItemType: item.itemType,
+         }));
+         setInventoryData(items);
+       } catch (error) {
+         console.error('Error fetching inventory:', error);
+         setInventoryData([]);
+       }
+     };
   
-    const fetchUserPreferences = async (token, userId) => {
-      try {
-        const response = await fetch(`${BASE_URL}/backend/preferences/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-        });
-        const preferences = await response.json();
-        setUserPreferences(preferences); // Store the preferences in state
-  
-        // Preselect preferences based on the user's saved preferences
-        const filteredSoda = preferences
-          .filter(item => filterInventory("Soda").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
-        setSoda(filteredSoda);
-  
-        const filteredSyrups = preferences
-          .filter(item => filterInventory("Syrup").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
-        setSyrups(filteredSyrups);
-  
-        const filteredAddIns = preferences
-          .filter(item => filterInventory("Add In").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
-        setAddIns(filteredAddIns);
-  
-        setIsLoading(false); // Set loading to false once preferences are fetched
-      } catch (error) {
-        console.error("Error fetching preferences:", error);
-      }
-    };
+     const fetchUserPreferences = async (token, userId) => {
+       try {
+         const response = await fetch(`${BASE_URL}/backend/preferences/`, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+         if (!response.ok) {
+           if (response.status === 401) {
+             console.error('Preferences fetch failed with status 401: Invalid token');
+           } else {
+             console.error(`Preferences fetch failed with status ${response.status}`);
+           }
+           setUserPreferences([]);
+           setIsLoading(false);
+           return;
+         }
+         const preferencesResponse = await response.json();
+         const preferences = preferencesResponse.data || preferencesResponse;
+         if (!preferences || !Array.isArray(preferences)) {
+           setUserPreferences([]);
+           setIsLoading(false);
+           return;
+         }
+         setUserPreferences(preferences); // Store the preferences in state
+   
+         // Preselect preferences based on the user's saved preferences
+         const filteredSoda = preferences
+           .filter(item => filterInventory("Soda").some(inventoryItem => inventoryItem.value.toLowerCase() === item.preference.toLowerCase() && String(item.userId) === String(userId)))
+           .map(item => item.preference);
+         setSoda(filteredSoda);
+   
+         const filteredSyrups = preferences
+           .filter(item => filterInventory("Syrup").some(inventoryItem => inventoryItem.value.toLowerCase() === item.preference.toLowerCase() && String(item.userId) === String(userId)))
+           .map(item => item.preference);
+         setSyrups(filteredSyrups);
+   
+         const filteredAddIns = preferences
+           .filter(item => filterInventory("Add In").some(inventoryItem => inventoryItem.value.toLowerCase() === item.preference.toLowerCase() && String(item.userId) === String(userId)))
+           .map(item => item.preference);
+         setAddIns(filteredAddIns);
+   
+         setIsLoading(false); // Set loading to false once preferences are fetched
+       } catch (error) {
+         console.error("Error fetching preferences:", error);
+         setUserPreferences([]);
+         setIsLoading(false);
+       }
+     };
   
     useFocusEffect(
       React.useCallback(() => {
@@ -183,21 +220,21 @@ const PreferencesPage = () => {
       }
     };
   
-    const savePreferences = async (pref, type) => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const userId = await AsyncStorage.getItem('userId');
-        const response = await fetch(`${BASE_URL}/backend/preferences/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-          body: JSON.stringify({
-            UserID: userId,
-            Preference: pref,
-          }),
-        });
+     const savePreferences = async (pref, type) => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const userId = await AsyncStorage.getItem('userId');
+         const response = await fetch(`${BASE_URL}/backend/preferences/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify({
+             userId: userId,
+             preference: pref,
+           }),
+         });
         if (!response.ok) {
           throw new Error(`Failed to save ${type} preference`);
         }
@@ -206,28 +243,37 @@ const PreferencesPage = () => {
       }
     };
   
-    const removePreferences = async (pref) => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const userId = await AsyncStorage.getItem('userId');
-        
-        const getResponse = await fetch(`${BASE_URL}/backend/preferences/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-        });
-    
-        const preferences = await getResponse.json();
-    
-        // Filter out preferences that belong to the current user and match the preference to be removed
-        const filteredPreferences = preferences.filter(
-          (item) => String(item.UserID) === String(userId) && item.Preference.toLowerCase() === pref.toLowerCase()
-        );
-    
-        for (let preference of filteredPreferences) {
-          const deleteResponse = await fetch(`${BASE_URL}/backend/preferences/${preference.PreferenceID}/`, {
+     const removePreferences = async (pref) => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const userId = await AsyncStorage.getItem('userId');
+         
+         const getResponse = await fetch(`${BASE_URL}/backend/preferences/`, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+     
+         if (!getResponse.ok) {
+           console.error(`Failed to fetch preferences with status ${getResponse.status}`);
+           return;
+         }
+     
+         const preferencesResponse = await getResponse.json();
+         const preferences = preferencesResponse.data || preferencesResponse;
+         if (!preferences || !Array.isArray(preferences)) {
+           return;
+         }
+     
+         // Filter out preferences that belong to the current user and match the preference to be removed
+         const filteredPreferences = preferences.filter(
+           (item) => String(item.userId) === String(userId) && item.preference.toLowerCase() === pref.toLowerCase()
+         );
+     
+         for (let preference of filteredPreferences) {
+           const deleteResponse = await fetch(`${BASE_URL}/backend/preferences/${preference.preferenceId}/`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',

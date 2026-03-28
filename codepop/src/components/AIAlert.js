@@ -12,32 +12,34 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
 
   const createObj = async () => {
     try {
-      // Ensure SodaUsed, SyrupsUsed, and AddIns are arrays
-      const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
-      const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
-      const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
-  
-      // If SodaUsed is empty, set it to ["DefaultSoda"] (or any default soda)
-      if (sodaUsed.length === 0) {
-        console.warn('SodaUsed is empty, setting to default soda.');
-      }
-  
-      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          Name: "AI drink", // Example name for the drink
-          SodaUsed: sodaUsed, // Make sure it's an array with at least one item
-          SyrupsUsed: syrupsUsed, // Make sure it's an array
-          AddIns: addIns, // Make sure it's an array
-          Price: 2.00,
-          User_Created: true,
-          Size: drinkDict.Size || "24oz", // Default size
-          Ice: drinkDict.Ice || "regular", // Default ice amount
-        }),
-      });
+       const token = await AsyncStorage.getItem('userToken');
+       // Ensure sodaUsed, syrupsUsed, and addIns are arrays
+       const sodaUsed = Array.isArray(drinkDict.sodaUsed) && drinkDict.sodaUsed.length > 0 ? drinkDict.sodaUsed : [drinkDict.sodaUsed];
+       const syrupsUsed = Array.isArray(drinkDict.syrupsUsed) ? drinkDict.syrupsUsed : [];
+       const addIns = Array.isArray(drinkDict.addIns) ? drinkDict.addIns : [];
+   
+       // If sodaUsed is empty, set it to ["DefaultSoda"] (or any default soda)
+       if (sodaUsed.length === 0) {
+         console.warn('sodaUsed is empty, setting to default soda.');
+       }
+   
+       const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify({
+           name: "AI drink", // Example name for the drink
+           sodaUsed: sodaUsed, // Make sure it's an array with at least one item
+           syrupsUsed: syrupsUsed, // Make sure it's an array
+           addIns: addIns, // Make sure it's an array
+           price: 2.00,
+           userCreated: true,
+           size: drinkDict.size || "24oz", // Default size
+           ice: (drinkDict.ice || "normal").toLowerCase(), // Default ice amount, convert to lowercase
+         }),
+       });
   
       // Check if the response is not OK (status code not in the range 200-299)
       if (!response.ok) {
@@ -47,12 +49,13 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
         throw new Error(`Failed to create drink: ${response.status} - ${errorText}`);
       }
   
-      const data = await response.json();
+      const responseData = await response.json();
+      const data = responseData.data;
       // gets list of out of storage on your phone
       let cartList = await AsyncStorage.getItem("checkoutList");
       const currentList = cartList ? JSON.parse(cartList) : [];
   
-      const drinkID = data.DrinkID; // assuming the response contains DrinkID
+      const drinkID = data.drinkId; // assuming the response contains drinkId
       const updatedList = [...currentList, drinkID];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
 
@@ -115,9 +118,9 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     });
     return layers;
   };
-  const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
-  const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
-  const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
+  const sodaUsed = Array.isArray(drinkDict.sodaUsed) && drinkDict.sodaUsed.length > 0 ? drinkDict.sodaUsed : [drinkDict.sodaUsed];
+  const syrupsUsed = Array.isArray(drinkDict.syrupsUsed) ? drinkDict.syrupsUsed : [];
+  const addIns = Array.isArray(drinkDict.addIns) ? drinkDict.addIns : [];
 
   
 
@@ -136,9 +139,9 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     >
       <View style={styles.modalContent}>
         <Text style={styles.modalTitle}>Your Drink is ...</Text>
-        <Text style={styles.modalText}>
-          A {drinkDict.Size} drink with {drinkDict.Ice} Ice
-        </Text>
+         <Text style={styles.modalText}>
+           A {drinkDict.size} drink with {drinkDict.ice} Ice
+         </Text>
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
