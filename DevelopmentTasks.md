@@ -3,6 +3,163 @@
 ## Purpose
 This document is the execution-ready development backlog for the CodePop development phase. It consolidates all required implementation tasks and detailed steps.
 
+## Current Project State and Test Implementation Plan (March 2026)
+
+### Current State Snapshot
+
+1. Backend runtime and dependencies
+	- Django backend exists in `codepop_backend` with API routes, models, serializers, and one large backend test module at `codepop_backend/backend/tests.py`.
+	- Python is available in this environment.
+	- The selected virtual environment currently does not have Django/DRF importable, so backend tests cannot run without dependency/environment repair.
+
+2. Database schema state
+	- `codepop_backend/backend/models.py` defines the active schema for preferences, drinks, inventory, notifications, orders, and revenue.
+	- `codepop_backend/backend/migrations/` currently only contains `__init__.py` (no committed migrations). This is a high risk because schema changes are not versioned or reproducible across environments.
+	- Database engine is configured as PostgreSQL in `codepop_backend/codepop_backend/settings.py`.
+
+3. Dashboard web app state
+	- Dashboard app exists in `dashboard` (Next.js 16 + Auth.js).
+	- No dashboard test files are currently present.
+	- Dashboard auth flow depends on Django login endpoint; this integration should be treated as critical-path for testing.
+
+4. Mobile app state
+	- Expo React Native app exists in `codepop` and includes full page/navigation structure.
+	- No mobile test files are currently present.
+
+5. Local tooling state on this machine
+	- Python is installed.
+	- Node and npm are not available in current PowerShell environment, so dashboard/mobile lint/build/test execution is currently blocked locally.
+
+### Test Implementation by Major Part
+
+#### A. Database Schema and Migrations (Critical)
+
+Goal: Ensure schema is versioned, reproducible, and validated in CI.
+
+1. Commit baseline migrations for all current models.
+2. Add a CI guard that fails when model changes exist without migrations:
+	- `python manage.py makemigrations --check --dry-run`
+3. Add migration application test against disposable Postgres (Docker service):
+	- `python manage.py migrate`
+	- `python manage.py showmigrations`
+4. Add a rollback smoke check for the most recent migration (where safe).
+5. Add seed/population verification tests for critical reference data.
+
+Definition of done
+- Every model change requires migration files in PR.
+- CI fails on missing migrations or migration apply errors.
+
+#### B. Django Backend API and Business Logic
+
+Goal: Protect auth, order flow, inventory behavior, and role/permission behavior.
+
+Test layers
+1. Unit tests (logic-level)
+	- Keep using Django/DRF test framework already present.
+	- Split `backend/tests.py` into focused modules:
+	  - `test_auth.py`
+	  - `test_preferences.py`
+	  - `test_drinks.py`
+	  - `test_inventory.py`
+	  - `test_orders.py`
+	  - `test_notifications.py`
+	  - `test_revenue.py`
+2. Integration API tests
+	- Validate request/response contracts for all public endpoints under `/backend/`.
+	- Cover success, validation failures, auth failures, and permission failures.
+3. Database behavior tests
+	- Verify foreign key constraints and cascade behavior.
+	- Verify many-to-many updates for order drinks and drink favorites.
+
+High-priority scenarios
+1. Login/logout token lifecycle.
+2. Order create/update/delete and payment status transitions.
+3. Inventory decrement edge cases (zero stock, below threshold).
+4. Notification filters and user/global visibility rules.
+5. Role-restricted admin/manager operations.
+
+Execution commands
+- `python manage.py test`
+- Optional next step: add coverage and enforce a minimum threshold.
+
+#### C. Dashboard Web App (Next.js)
+
+Goal: Verify route protection, authentication behavior, and key UI/API interactions.
+
+Recommended stack
+1. Unit/component tests: Vitest + React Testing Library
+2. E2E tests: Playwright
+
+Implementation steps
+1. Add test tooling and scripts in `dashboard/package.json`:
+	- `test`
+	- `test:watch`
+	- `test:e2e`
+2. Add component tests for login form behavior and error states.
+3. Add auth middleware tests (protected routes redirect to `/login`).
+4. Add API contract tests for credential exchange with backend login response shape.
+5. Add Playwright flow:
+	- unauthenticated user redirected from `/` to `/login`
+	- valid login reaches dashboard home
+	- invalid login shows expected message
+
+Definition of done
+- Dashboard PRs require passing unit tests and at least one auth-path E2E test.
+
+#### D. Mobile App (Expo React Native)
+
+Goal: Verify navigation, API wiring, cart persistence, and role-based screens.
+
+Recommended stack
+1. Unit/component tests: Jest + `@testing-library/react-native`
+2. Device E2E (later phase): Detox
+
+Implementation steps
+1. Add Jest config (`jest-expo`) and scripts in `codepop/package.json`.
+2. Add tests for `App.js` navigation bootstrapping.
+3. Add tests for login, cart storage initialization, and logout behavior.
+4. Mock network calls to backend endpoints and assert request payloads.
+5. Add role-routing tests for manager/admin/customer navigation paths.
+
+Definition of done
+- Core customer flow (login -> browse -> cart -> checkout page transition) covered by automated tests.
+
+#### E. Cross-System Integration and Regression
+
+Goal: Ensure backend, dashboard, and mobile remain compatible as schema and endpoints evolve.
+
+1. Add contract tests for auth payload fields used by clients.
+2. Add a smoke suite that runs after backend migration:
+	- dashboard auth call
+	- mobile auth call
+3. Pin API expectations in test fixtures to catch breaking response changes early.
+
+### Suggested CI Pipeline (Minimal, High Value)
+
+1. Backend job
+	- Install Python deps
+	- Run migration check and migrate
+	- Run backend tests
+2. Dashboard job
+	- Install Node deps
+	- Run lint
+	- Run unit tests
+	- Run build
+3. Mobile job
+	- Install Node deps
+	- Run lint (if configured)
+	- Run Jest tests
+4. Optional nightly job
+	- Run cross-system E2E and heavier integration checks
+
+### Immediate Next Actions
+
+1. Repair and standardize local backend virtual environment.
+2. Generate and commit Django migrations for current models.
+3. Add baseline dashboard and mobile test harnesses (empty passing tests first).
+4. Wire minimal CI to run backend + dashboard + mobile checks on every PR.
+5. Expand test coverage in risk order: auth, orders, inventory, role permissions.
+
 ## Task Index (Prioritized)
 
 ### MUST HAVE

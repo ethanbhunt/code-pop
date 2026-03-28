@@ -11,8 +11,28 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
-from .models import Preference, Drink, Inventory, Notification, Order, Revenue
-from .serializers import CreateUserSerializer, GetUserSerializer, PreferenceSerializer, DrinkSerializer, InventorySerializer, NotificationSerializer, OrderSerializer, RevenueSerializer
+from .models import (
+    Preference,
+    Drink,
+    Inventory,
+    Notification,
+    Order,
+    Revenue,
+    SupplyHub,
+    StockTransfer,
+)
+from .serializers import (
+    CreateUserSerializer,
+    GetUserSerializer,
+    PreferenceSerializer,
+    DrinkSerializer,
+    InventorySerializer,
+    NotificationSerializer,
+    OrderSerializer,
+    RevenueSerializer,
+    SupplyHubSerializer,
+    StockTransferSerializer,
+)
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
 from django.conf import settings
@@ -25,6 +45,7 @@ from rest_framework.decorators import action
 from django.utils.dateparse import parse_datetime
 from .drinkAI import generate_soda, parse_prompt
 from rest_framework.permissions import BasePermission
+from .supply_services import SupplyHubService
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -268,6 +289,50 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             response_data['warning'] = warning
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class SupplyHubOperations(viewsets.ReadOnlyModelViewSet):
+    queryset = SupplyHub.objects.filter(Active=True)
+    serializer_class = SupplyHubSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['get'])
+    def inventory(self, request, pk=None):
+        hub = self.get_object()
+        items = Inventory.objects.filter(HubID=hub)
+        serializer = InventorySerializer(items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StockTransferOperations(viewsets.ModelViewSet):
+    queryset = StockTransfer.objects.all().order_by('-RequestedAt')
+    serializer_class = StockTransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        item_name = request.data.get('ItemName')
+        item_type = request.data.get('ItemType')
+        quantity = int(request.data.get('Quantity', 0))
+        store_id = request.data.get('StoreID')
+
+        if not all([item_name, item_type, quantity > 0, store_id]):
+            return Response(
+                {'detail': 'ItemName, ItemType, Quantity > 0, and StoreID are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            transfer = SupplyHubService.requestSupply(
+                item_name=item_name,
+                item_type=item_type,
+                quantity=quantity,
+                store_id=store_id,
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(transfer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class NotificationOperations(viewsets.ModelViewSet):

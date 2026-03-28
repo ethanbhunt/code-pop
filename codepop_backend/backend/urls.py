@@ -5,6 +5,7 @@ from .views import StripePaymentIntentView
 from .views import UserPreferenceLookup, PreferencesOperations
 from .views import DrinkOperations, UserDrinksLookup
 from .views import InventoryListAPIView, InventoryReportAPIView, InventoryUpdateAPIView
+from .views import SupplyHubOperations, StockTransferOperations
 from .views import NotificationOperations, UserNotificationLookup
 from .views import OrderOperations, UserOrdersLookup
 from .customerAI import Chatbot
@@ -57,6 +58,30 @@ order_list = OrderOperations.as_view({
 order_detail = OrderOperations.as_view({
     'get': 'retrieve',
     'put': 'update',
+    'delete': 'destroy'
+})
+
+supply_hub_list = SupplyHubOperations.as_view({
+    'get': 'list'
+})
+
+supply_hub_detail = SupplyHubOperations.as_view({
+    'get': 'retrieve'
+})
+
+supply_hub_inventory = SupplyHubOperations.as_view({
+    'get': 'inventory'
+})
+
+stock_transfer_list = StockTransferOperations.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+
+stock_transfer_detail = StockTransferOperations.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
     'delete': 'destroy'
 })
 
@@ -140,6 +165,13 @@ urlpatterns = [
     # - PATCH: Update the quantity of the specific inventory item.
     # - DELETE: Remove the specific inventory item from the database.
     path('inventory/<int:pk>/', InventoryUpdateAPIView.as_view(), name='inventory_update'),
+
+    # Supply hub and stock transfer URLs
+    path('supply-hubs/', supply_hub_list, name='supply_hub_list'),
+    path('supply-hubs/<int:pk>/', supply_hub_detail, name='supply_hub_detail'),
+    path('supply-hubs/<int:pk>/inventory/', supply_hub_inventory, name='supply_hub_inventory'),
+    path('stock-transfers/', stock_transfer_list, name='stock_transfer_list_create'),
+    path('stock-transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
 
     # Notification related URLs
     path('notifications/', notification_list, name='notification list and create'),

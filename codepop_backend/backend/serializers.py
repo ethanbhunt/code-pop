@@ -1,6 +1,16 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Preference, Drink, Inventory, Order, Notification, Revenue
+from .models import (
+    Preference,
+    Drink,
+    Inventory,
+    Order,
+    Notification,
+    Revenue,
+    Store,
+    SupplyHub,
+    StockTransfer,
+)
 
 
 class CreateUserSerializer(serializers.ModelSerializer):
@@ -98,9 +108,27 @@ class InventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inventory
         fields = [
-            'InventoryID', 'ItemName', 'ItemType', 
+            'InventoryID', 'StoreID', 'HubID', 'ItemName', 'ItemType',
             'Quantity', 'ThresholdLevel', 'LastUpdated'
         ]
+
+
+class StoreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Store
+        fields = '__all__'
+
+
+class SupplyHubSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupplyHub
+        fields = '__all__'
+
+
+class StockTransferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockTransfer
+        fields = '__all__'
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:

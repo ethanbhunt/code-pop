@@ -3,6 +3,33 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 
+
+class Store(models.Model):
+    StoreID = models.AutoField(primary_key=True)
+    Name = models.CharField(max_length=120)
+    Region = models.CharField(max_length=80)
+    City = models.CharField(max_length=80)
+    State = models.CharField(max_length=40, default='UT')
+    Latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    Longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    Active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.Name} ({self.Region})"
+
+
+class SupplyHub(models.Model):
+    HubID = models.AutoField(primary_key=True)
+    Name = models.CharField(max_length=120, unique=True)
+    Region = models.CharField(max_length=80)
+    Latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    Longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    MaxDeliveryRadiusMiles = models.PositiveIntegerField(default=1000)
+    Active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.Name} ({self.Region})"
+
 class Preference(models.Model):
     # Primary key will be automatically created as 'id' unless you specify otherwise
     # You can also explicitly declare PreferenceID if needed
@@ -25,8 +52,8 @@ class Drink(models.Model):
     AddIns = ArrayField(models.CharField(max_length=255), blank=True, null=True)
     Rating = models.FloatField(null=True, blank=True)
     Price = models.FloatField()
-    Size = models.CharField(default="m")
-    Ice = models.CharField(default="normal")
+    Size = models.CharField(max_length=10, default="24oz")
+    Ice = models.CharField(max_length=20, default="regular")
     User_Created = models.BooleanField()
     Favorite = models.ManyToManyField('auth.User', blank=True)
 
@@ -48,6 +75,8 @@ class Inventory(models.Model):
     ]
 
     InventoryID = models.AutoField(primary_key=True)
+    StoreID = models.ForeignKey(Store, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    HubID = models.ForeignKey(SupplyHub, on_delete=models.CASCADE, null=True, blank=True, related_name='inventory_items')
     ItemName = models.CharField(max_length=100)
     ItemType = models.CharField(max_length=50, choices=ITEM_TYPES)
     Quantity = models.PositiveIntegerField()
@@ -88,6 +117,7 @@ class Order(models.Model):
     ]
 
     OrderID = models.AutoField(primary_key=True)
+    StoreID = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     UserID = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     Drinks = models.ManyToManyField(Drink)
     OrderStatus = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default='pending')
@@ -95,7 +125,7 @@ class Order(models.Model):
     PickupTime = models.DateTimeField(null=True, blank=True)
     CreationTime = models.DateTimeField(auto_now_add=True)
     LockerCombo = models.BigIntegerField(null=True)
-    StripeID = models.CharField()
+    StripeID = models.CharField(max_length=255, blank=True, null=True)
     
     def add_drinks(self, drink_ids):
         # Assuming you have a ManyToMany field for drinks in your Order model
@@ -144,3 +174,29 @@ class Revenue(models.Model):
             return f"Revenue {self.RevenueID} for Order {self.OrderID}: ${self.TotalAmount:.2f}"
         except Order.DoesNotExist:
             return f"Revenue {self.RevenueID} for unknown Order {self.OrderID}: ${self.TotalAmount:.2f}"
+
+
+class StockTransfer(models.Model):
+    TRANSFER_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('in_transit', 'In Transit'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    StockTransferID = models.AutoField(primary_key=True)
+    HubID = models.ForeignKey(SupplyHub, on_delete=models.CASCADE, related_name='outgoing_transfers')
+    StoreID = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='incoming_transfers')
+    ItemName = models.CharField(max_length=100)
+    ItemType = models.CharField(max_length=50, choices=Inventory.ITEM_TYPES)
+    Quantity = models.PositiveIntegerField()
+    Status = models.CharField(max_length=30, choices=TRANSFER_STATUS_CHOICES, default='pending')
+    RequestedAt = models.DateTimeField(auto_now_add=True)
+    UpdatedAt = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return (
+            f"Transfer {self.StockTransferID}: {self.Quantity} {self.ItemName} "
+            f"from {self.HubID.Name} to {self.StoreID.Name} ({self.Status})"
+        )
