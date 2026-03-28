@@ -5,6 +5,7 @@ from .views import StripePaymentIntentView
 from .views import UserPreferenceLookup, PreferencesOperations
 from .views import DrinkOperations, UserDrinksLookup
 from .views import InventoryListAPIView, InventoryReportAPIView, InventoryUpdateAPIView
+from .views import AuditLogListAPIView
 from .views import SupplyHubOperations, StockTransferOperations
 from .views import NotificationOperations, UserNotificationLookup
 from .views import OrderOperations, UserOrdersLookup
@@ -59,6 +60,10 @@ order_detail = OrderOperations.as_view({
     'get': 'retrieve',
     'put': 'update',
     'delete': 'destroy'
+})
+
+order_fulfill = OrderOperations.as_view({
+    'post': 'fulfill'
 })
 
 supply_hub_list = SupplyHubOperations.as_view({
@@ -166,6 +171,9 @@ urlpatterns = [
     # - DELETE: Remove the specific inventory item from the database.
     path('inventory/<int:pk>/', InventoryUpdateAPIView.as_view(), name='inventory_update'),
 
+    # Audit log URLs
+    path('audit-logs/', AuditLogListAPIView.as_view(), name='audit_log_list'),
+
     # Supply hub and stock transfer URLs
     path('supply-hubs/', supply_hub_list, name='supply_hub_list'),
     path('supply-hubs/<int:pk>/', supply_hub_detail, name='supply_hub_detail'),
@@ -198,6 +206,7 @@ urlpatterns = [
     # - PATCH: Update the specific order (e.g., adding drinks).
     # - DELETE: Remove the specific order from the database.
     path('orders/<int:pk>/', order_detail, name='order_detail'),
+    path('orders/<int:pk>/fulfill/', order_fulfill, name='order_fulfill'),
 
     # Retrieve Orders by UserID
 

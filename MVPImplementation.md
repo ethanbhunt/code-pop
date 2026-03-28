@@ -155,3 +155,46 @@ If either prerequisite is missing, install dependencies first, then run commands
    - transfer request -> inventory deduction -> status progression.
 4. Add dashboard Logistics page consuming `/backend/supply-hubs/` and `/backend/stock-transfers/`.
 5. Add mobile manager-facing low-stock/transfer visibility once manager UI path is finalized.
+
+## March 2026 Follow-up: Endpoint Connection Evaluation
+
+### Current connection status
+1. Backend endpoint definitions are reachable for auth, drinks, orders, revenue, inventory, supply hubs, and stock transfers.
+2. OrbitDB services are additive and currently use different payload casing conventions from Django (`camelCase` vs `PascalCase`).
+
+### Issues found and fixed
+1. Mobile cart drink fetch expected nested `data` and camelCase fields only.
+  - Fixed by normalizing response payloads in `CartPage.js` to support both response shapes and both casing styles.
+2. Mobile checkout created orders/revenue using camelCase keys that Django does not natively expect.
+  - Fixed by sending Django-compatible request fields (`UserID`, `Drinks`, `OrderStatus`, `PaymentStatus`, `StripeID`, `OrderID`, `TotalAmount`).
+3. Django order creation had an internal bug using `order_status` instead of serializer field `OrderStatus`.
+  - Fixed to prevent silent order creation failures.
+
+## March 2026 Follow-up: Must-Have Task Start (Task-005)
+
+Implemented security hardening and auditability for inventory operations:
+
+1. Added `AuditLog` model to track inventory mutations with before/after quantities and actor.
+2. Added `AuditLogListAPIView` (`GET /backend/audit-logs/`) as read-only audit endpoint.
+3. Added manager/admin permission gate (`IsStoreManager`) and enforced on inventory mutation and audit log read access.
+4. Added audit writes on inventory reset/deduction flows.
+5. Added validation cap for extreme deduction payloads (`used_quantity > 1000`).
+6. Added test module `backend/test_inventory_audit.py` for authorization and audit behavior.
+
+## March 2026 Follow-up: Must-Have Task Start (Task-003)
+
+Implemented atomic order-completion inventory deduction:
+
+1. Added `OrderCompletionService` in `backend/order_completion_service.py`.
+  - `extract_ingredients(order)` aggregates ingredient quantities across all drinks.
+  - Uses row-level locks (`select_for_update`) and transaction boundary for atomic updates.
+2. Added fulfillment endpoint:
+  - `POST /backend/orders/<id>/fulfill/`
+  - Calls `OrderCompletionService.fulfill_order(order_id)`.
+3. Added rollback-safe failure behavior:
+  - If any ingredient inventory is missing/insufficient, no partial deduction is committed.
+  - A user notification with type `order_error` is created on fulfillment failure.
+4. Added test module `backend/test_order_fulfillment.py`:
+  - Success path with deductions and order completion status update.
+  - Insufficient-stock path validating rollback behavior.
+  - Authentication requirement on fulfill endpoint.

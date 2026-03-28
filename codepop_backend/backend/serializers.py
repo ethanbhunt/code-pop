@@ -10,6 +10,7 @@ from .models import (
     Store,
     SupplyHub,
     StockTransfer,
+    AuditLog,
 )
 
 
@@ -128,6 +129,12 @@ class SupplyHubSerializer(serializers.ModelSerializer):
 class StockTransferSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockTransfer
+        fields = '__all__'
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AuditLog
         fields = '__all__'
 
 class NotificationSerializer(serializers.ModelSerializer):

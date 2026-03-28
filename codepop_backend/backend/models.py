@@ -200,3 +200,22 @@ class StockTransfer(models.Model):
             f"Transfer {self.StockTransferID}: {self.Quantity} {self.ItemName} "
             f"from {self.HubID.Name} to {self.StoreID.Name} ({self.Status})"
         )
+
+
+class AuditLog(models.Model):
+    AuditLogID = models.AutoField(primary_key=True)
+    UserID = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    StoreID = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True)
+    HubID = models.ForeignKey(SupplyHub, on_delete=models.SET_NULL, null=True, blank=True)
+    Action = models.CharField(max_length=50)
+    ItemName = models.CharField(max_length=100)
+    ItemType = models.CharField(max_length=50, choices=Inventory.ITEM_TYPES)
+    QuantityBefore = models.IntegerField()
+    QuantityAfter = models.IntegerField()
+    Timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (
+            f"Audit {self.AuditLogID}: {self.Action} {self.ItemName} "
+            f"({self.QuantityBefore} -> {self.QuantityAfter})"
+        )

@@ -20,6 +20,7 @@ from .models import (
     Revenue,
     SupplyHub,
     StockTransfer,
+    AuditLog,
 )
 from .serializers import (
     CreateUserSerializer,
@@ -32,6 +33,7 @@ from .serializers import (
     RevenueSerializer,
     SupplyHubSerializer,
     StockTransferSerializer,
+    AuditLogSerializer,
 )
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
@@ -46,6 +48,7 @@ from django.utils.dateparse import parse_datetime
 from .drinkAI import generate_soda, parse_prompt
 from rest_framework.permissions import BasePermission
 from .supply_services import SupplyHubService
+from .order_completion_service import OrderCompletionService
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -57,6 +60,15 @@ class IsSuperUser(BasePermission):
     def has_permission(self, request, view):
         # Check if the user is authenticated and a superuser
         return request.user and request.user.is_authenticated and request.user.is_superuser
+
+
+class IsStoreManager(BasePermission):
+    """Allow inventory mutation and audit views for managers/admins."""
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and (
+            request.user.is_staff or request.user.is_superuser
+        )
     
 #Custom login to so that it get's a token but also the user's first name and the user id
 class CustomAuthToken(ObtainAuthToken):
@@ -212,9 +224,12 @@ class InventoryListAPIView(ListAPIView):
     """List all items that are not out of stock."""
     queryset = Inventory.objects.filter(Quantity__gt=0)
     serializer_class = InventorySerializer
+    permission_classes = [IsAuthenticated]
 
 class InventoryReportAPIView(APIView):
     """Generate an inventory report."""
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         inventory = Inventory.objects.all()
         report_data = {
@@ -237,6 +252,7 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
     """Update inventory based on what was ordered, with warnings for empty or low stock."""
     queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
+    permission_classes = [IsAuthenticated, IsStoreManager]
 
     def patch(self, request, *args, **kwargs):
         item = self.get_object()  # Retrieve the specific item based on ID
@@ -246,9 +262,21 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
 
         # Handle inventory reset
         if reset_quantity:
+            before_qty = item.Quantity
             # Reset the quantity to the threshold level (or a specific value)
             item.Quantity = item.ThresholdLevel  # Or you could use a custom value
             item.save()
+
+            AuditLog.objects.create(
+                UserID=request.user,
+                StoreID=item.StoreID,
+                HubID=item.HubID,
+                Action='reset',
+                ItemName=item.ItemName,
+                ItemType=item.ItemType,
+                QuantityBefore=before_qty,
+                QuantityAfter=item.Quantity,
+            )
 
             # Return the updated item details in the response
             return Response(self.get_serializer(item).data, status=status.HTTP_200_OK)
@@ -258,6 +286,12 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             return Response(
                 {"detail": "Invalid used quantity."}, 
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if int(used_quantity) > 1000:
+            return Response(
+                {"detail": "Used quantity exceeds allowed limit (1000)."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Check if the item is already out of stock
@@ -275,8 +309,20 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             )
 
         # Subtract the used quantity from the current stock
+        before_qty = item.Quantity
         item.Quantity -= int(used_quantity)
         item.save()
+
+        AuditLog.objects.create(
+            UserID=request.user,
+            StoreID=item.StoreID,
+            HubID=item.HubID,
+            Action='deduct',
+            ItemName=item.ItemName,
+            ItemType=item.ItemType,
+            QuantityBefore=before_qty,
+            QuantityAfter=item.Quantity,
+        )
 
         # Generate a warning if stock falls below the threshold level
         warning = None
@@ -289,6 +335,12 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             response_data['warning'] = warning
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class AuditLogListAPIView(ListAPIView):
+    queryset = AuditLog.objects.all().order_by('-Timestamp')
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated, IsStoreManager]
 
 
 class SupplyHubOperations(viewsets.ReadOnlyModelViewSet):
@@ -443,11 +495,11 @@ class OrderOperations(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Extract data from the request
-        user_id = request.data.get("UserID", None)
-        drinks = request.data.get("Drinks", [])
-        order_status = request.data.get("OrderStatus", "processing")
-        payment_status = request.data.get("PaymentStatus", "pending")
-        stripe_id = request.data.get("StripeID", None)
+        user_id = request.data.get("UserID", request.data.get("userId", None))
+        drinks = request.data.get("Drinks", request.data.get("drinks", []))
+        order_status = request.data.get("OrderStatus", request.data.get("orderStatus", "processing"))
+        payment_status = request.data.get("PaymentStatus", request.data.get("paymentStatus", "pending"))
+        stripe_id = request.data.get("StripeID", request.data.get("stripeId", None))
 
          # Log extracted values
         print(f"UserID: {user_id}, Drinks: {drinks}, OrderStatus: {order_status}, PaymentStatus: {payment_status}, StripeID: {stripe_id}")
@@ -455,7 +507,7 @@ class OrderOperations(viewsets.ModelViewSet):
         # Create a new order
         order_data = {
             "UserID": user_id,
-            "order_status": order_status,
+            "OrderStatus": order_status,
             "Drinks": drinks,
             "PaymentStatus": payment_status,
             "StripeID": stripe_id,
@@ -481,6 +533,27 @@ class OrderOperations(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def fulfill(self, request, pk=None):
+        if not request.user or not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        order = self.get_object()
+
+        try:
+            fulfilled_order = OrderCompletionService.fulfill_order(order.OrderID)
+            serializer = self.get_serializer(fulfilled_order)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except ValueError as exc:
+            if order.UserID:
+                Notification.objects.create(
+                    UserID=order.UserID,
+                    Message=f"Order {order.OrderID} fulfillment failed: {str(exc)}",
+                    Type='order_error',
+                    Global=False,
+                )
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 class UserOrdersLookup(ListCreateAPIView):
     serializer_class = OrderSerializer

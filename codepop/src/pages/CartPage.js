@@ -26,6 +26,22 @@ const CartPage = () => {
     initializePaymentSheet(); // Initialize payment sheet on page load
   }, [totalPrice]);
 
+  const normalizeDrink = (rawDrink) => {
+    if (!rawDrink) {
+      return null;
+    }
+
+    return {
+      drinkId: rawDrink.DrinkID ?? rawDrink.drinkId,
+      size: rawDrink.Size ?? rawDrink.size,
+      sodaUsed: rawDrink.SodaUsed ?? rawDrink.sodaUsed ?? [],
+      syrupsUsed: rawDrink.SyrupsUsed ?? rawDrink.syrupsUsed ?? [],
+      addIns: rawDrink.AddIns ?? rawDrink.addIns ?? [],
+      ice: rawDrink.Ice ?? rawDrink.ice,
+      price: rawDrink.Price ?? rawDrink.price,
+    };
+  };
+
   const fetchDrinks = async () => {
     try {
       const cartList = await AsyncStorage.getItem('checkoutList');
@@ -45,7 +61,7 @@ const CartPage = () => {
             },
           });
           const responseData = await response.json();
-          const drink = responseData.data; // Extract nested data object
+          const drink = normalizeDrink(responseData.data || responseData);
           if (drink != null && drink.size && drink.sodaUsed && drink.ice) {
             fetchedDrinks.push(drink); // Add each drink to the temporary array
           }

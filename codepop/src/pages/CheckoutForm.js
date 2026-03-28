@@ -63,18 +63,19 @@ export default function CheckoutForm(totalPrice) {
            'Authorization': `Token ${token}`,
          },
          body: JSON.stringify({
-           userId: userId,
-           drinks: currentList,
-           orderStatus: 'processing',
-           paymentStatus: 'paid',
-           stripeId: stripeNum,
+           UserID: Number(userId),
+           Drinks: currentList,
+           OrderStatus: 'processing',
+           PaymentStatus: 'paid',
+           StripeID: stripeNum,
          })
        });
 
        // Check if the request was successful
        if (response.ok) {
          const responseData = await response.json(); // Parse JSON if returned
-         orderNum = responseData.data.orderId; // API returns nested data with camelCase
+         const order = responseData.data || responseData;
+         const orderNum = order.OrderID || order.orderId;
          console.log('Order Num:', orderNum);
          await AsyncStorage.setItem("orderNum", orderNum.toString());
        } else {
@@ -108,8 +109,8 @@ export default function CheckoutForm(totalPrice) {
            'Authorization': `Token ${token}`,
          },
           body: JSON.stringify({
-            orderId: orderNum,
-            totalAmount: totalPrice,
+            OrderID: Number(orderNum),
+            TotalAmount: Number(totalPrice),
           }),
        });
     
