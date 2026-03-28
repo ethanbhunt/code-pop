@@ -10,11 +10,14 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       roles?: Role[];
+      /** OrbitDB API token (`Authorization: Token …`). */
+      accessToken?: string;
     };
   }
 
   interface User {
     roles?: Role[];
+    accessToken?: string;
   }
 }
 
@@ -23,6 +26,7 @@ declare module "@auth/core/types" {
   // so we augment it too for `user.roles`.
   interface User {
     roles?: Role[];
+    accessToken?: string;
   }
 }
 
@@ -32,5 +36,6 @@ declare module "next-auth/jwt" {
     email?: string;
     name?: string;
     roles?: Role[];
+    accessToken?: string;
   }
 }

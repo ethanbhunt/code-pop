@@ -39,7 +39,7 @@ class CodePopSeeder:
     
     def __init__(self, base_url="http://localhost:3001"):
         self.base_url = base_url.rstrip("/")
-        self.admin_token = None
+        self.admin_token = {}
         self.user_tokens = {}  # Store tokens by username
         self.user_ids = {}      # Store user IDs by username
         
@@ -352,6 +352,7 @@ Examples:
     try:
         if args.reset:
             # Clear and reseed
+            seeder.clear_data()
             seeder.seed_users()
             time.sleep(0.5)
             if seeder.admin_token:

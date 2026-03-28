@@ -10,12 +10,12 @@ import { validateEmail, validateUsername, validatePassword } from "../utils/vali
  * @param {string} username - Username
  * @param {string} password - Plain text password
  * @param {string} email - Email address
- * @param {string} enum - User's role default is 'customer'
+ * @param {string} role - User's role default is 'customer'
  * @param {string} firstName - First name (optional)
  * @param {string} lastName - Last name (optional)
  * @returns {Object} User data without password + token
  */
-export async function registerUser(username, password, email, enum = "customer",  firstName = "", lastName = "") {
+export async function registerUser(username, password, email, role = "customer",  firstName = "", lastName = "") {
   // Validate inputs
   if (!validateUsername(username)) {
     throw new Error("Invalid username. Must be 3-50 characters, alphanumeric and underscores only")
@@ -64,7 +64,7 @@ export async function registerUser(username, password, email, enum = "customer",
     email,
     firstName,
     lastName,
-    enum,
+    role,
     dateJoined: getTimestamp(),
     lastLogin: null
   }
@@ -91,7 +91,7 @@ export async function registerUser(username, password, email, enum = "customer",
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    enum: user.enum,
+    role: user.role,
     token: tokenKey
   }
 }
@@ -161,7 +161,7 @@ export async function loginUser(username, password) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    enum: user.enum,
+    role: user.role,
     token: tokenKey
   }
 }
@@ -210,7 +210,7 @@ export async function getUserById(userId) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    enum: user.enum,
+    role: user.role,
     dateJoined: user.dateJoined,
     lastLogin: user.lastLogin
   }
@@ -262,7 +262,7 @@ export async function updateUser(userId, updates) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    enum: user.enum
+    role: user.role
   }
 }
 
@@ -314,7 +314,7 @@ export async function listUsers(limit = 100) {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        enum: user.enum,
+        role: user.role,
         dateJoined: user.dateJoined,
         lastLogin: user.lastLogin
       })

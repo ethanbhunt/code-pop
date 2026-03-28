@@ -24,7 +24,8 @@ const router = express.Router()
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { username, password, email, firstName, lastName } = req.body
+    
+    const { username, password, email, role, firstName, lastName } = req.body
 
     // Validate required fields
     const missing = validateRequiredFields(req.body, ["username", "password", "email"])
@@ -32,7 +33,15 @@ router.post(
       throw new ValidationError(`Missing required fields: ${missing.join(", ")}`)
     }
 
-    const user = await registerUser(username, password, email, firstName || "", lastName || "")
+    // registerUser(username, password, email, role, firstName, lastName) — role must come before names
+    const user = await registerUser(
+  username,
+      password,
+      email,
+      typeof role === "string" && role.trim() ? role.trim() : "customer",
+      firstName,
+      lastName,
+    )
 
     res.status(201).json({
       status: "created",
@@ -56,6 +65,8 @@ router.post(
     }
 
     const user = await loginUser(username, password)
+
+    console.log(user);
 
     res.json({
       status: "authenticated",

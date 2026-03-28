@@ -4,18 +4,22 @@ import Credentials from "next-auth/providers/credentials";
 import { Role } from "@/lib/roles";
 
 /**
- * Auth.js config: validates users against codepop_backend (Django).
+ * Auth.js config: validates users against codepop_backend/orbitdb REST API.
  *
- * Backend: POST { baseUrl }/auth/login/
- *   Body: username & password (form-urlencoded or JSON)
- *   Success (200): { token, user_id, first_name, is_admin, is_manager }
+ * Backend: POST { baseUrl }/auth/login
+ *   Body: JSON { username, password }
+ *   Success (200): { status: "authenticated", data: { userId, username, email,
+ *     firstName, lastName, role, token } }
  *
- * NOTE: Your backend does not yet model fine-grained roles.
- * For now we infer a temporary role set from `is_admin` and `is_manager`.
+ * API auth header for protected routes: Authorization: Token {token}
+ *
+ * OrbitDB roles (`admin`, `staff`, `customer`) map to dashboard Role enums.
  */
-const djangoLoginUrl = process.env.DJANGO_API_URL
-  ? `${process.env.DJANGO_API_URL.replace(/\/$/, "")}/auth/login/`
-  : "";
+const orbitDbBaseUrl = (
+  process.env.ORBITDB_API_URL ?? process.env.DJANGO_API_URL
+)?.replace(/\/$/, "");
+
+const orbitDbLoginUrl = orbitDbBaseUrl ? `${orbitDbBaseUrl}/auth/login` : "";
 
 const devBypassEnabled =
   process.env.NODE_ENV !== "production" &&
@@ -24,10 +28,10 @@ const devBypassEnabled =
 
 const devUsername = process.env.DEV_AUTH_BYPASS_USERNAME ?? "dev";
 
-function inferRoles(data: { is_admin?: boolean; is_manager?: boolean }): Role[] {
-  // Temporary mapping until backend roles exist.
-  if (data.is_admin) return [Role.SuperAdmin, Role.Admin];
-  if (data.is_manager) return [Role.Manager, Role.LogisticsManager];
+function inferRolesFromOrbitRole(role: string | undefined): Role[] {
+  const r = (role ?? "").toLowerCase();
+  if (r === "admin") return [Role.Admin];
+  if (r === "staff") return [Role.Manager];
   return [Role.RepairStaff];
 }
 
@@ -61,39 +65,51 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           };
         }
 
-        if (!credentials?.username || !credentials?.password || !djangoLoginUrl) {
+        if (!credentials?.username || !credentials?.password || !orbitDbLoginUrl) {
           return null;
         }
 
-        const body = new URLSearchParams({
-          username: credentials.username as string,
-          password: credentials.password as string,
-        });
-
-        const res = await fetch(djangoLoginUrl, {
+        const res = await fetch(orbitDbLoginUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: body.toString(),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: credentials.username as string,
+            password: credentials.password as string,
+          }),
         });
 
         if (!res.ok) return null;
 
-        const data = (await res.json()) as {
-          token?: string;
-          user_id?: number;
-          first_name?: string;
-          is_admin?: boolean;
-          is_manager?: boolean;
+        const payload = (await res.json()) as {
+          status?: string;
+          data?: {
+            userId?: number;
+            username?: string;
+            email?: string;
+            firstName?: string;
+            lastName?: string;
+            role?: string;
+            token?: string;
+          };
         };
-        if (!data?.token || data.user_id == null) return null;
+        const data = payload?.data;
+        if (!data?.token || data.userId == null) return null;
 
-        const roles = inferRoles({ is_admin: data.is_admin, is_manager: data.is_manager });
+        const displayName =
+          [data.firstName, data.lastName].filter(Boolean).join(" ").trim() ||
+          data.username ||
+          (credentials.username as string);
+        
+        console.log(data.role);
+
+        const roles = inferRolesFromOrbitRole(data.role);
 
         return {
-          id: String(data.user_id),
-          email: credentials.username as string,
-          name: (data.first_name ?? credentials.username) as string,
+          id: String(data.userId),
+          email: data.email ?? (credentials.username as string),
+          name: displayName,
           roles,
+          accessToken: data.token,
         };
       },
     }),
@@ -109,6 +125,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.email = user.email;
         token.name = user.name;
         token.roles = (user as unknown as { roles?: Role[] }).roles ?? [];
+        token.accessToken = (user as { accessToken?: string }).accessToken;
       }
       return token;
     },
@@ -119,6 +136,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.name = token.name as string;
         (session.user as unknown as { roles?: Role[] }).roles =
           (token.roles ?? []) as Role[];
+        session.user.accessToken = token.accessToken as string | undefined;
       }
       return session;
     },

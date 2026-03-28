@@ -69,7 +69,7 @@ export async function authenticate(req, res, next) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      enum: user.enum
+      role: user.role
     }
     req.token = tokenKey
 
@@ -95,7 +95,7 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (!req.user.enum === "admin") {
+  if (!req.user.role === "admin") {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
@@ -116,7 +116,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (!req.user.enum === "staff") {
+  if (!req.user.role === "staff") {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"
@@ -173,7 +173,7 @@ export async function optionalAuth(req, res, next) {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        enum: user.enum
+        role: user.role
       }
       req.token = tokenKey
     } else {
