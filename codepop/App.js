@@ -3,7 +3,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Font from 'expo-font';
 import React, { useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Text, Alert} from 'react-native';
+import { TouchableOpacity, StyleSheet, Text, Alert, View, ActivityIndicator} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AdminDash from './src/pages/AdminDash';
 import AuthPage from './src/pages/AuthPage';
@@ -26,6 +26,8 @@ const title = 'CodePop'
 
 
 const App = () => {
+  const [initialRoute, setInitialRoute] = React.useState(null);
+
   // initialize cart list 
   const initCart = async () => {
     try{
@@ -38,9 +40,62 @@ const App = () => {
       console.error("error with initializing cart list", error);
     }
   };
+
+  // Check authentication status on app start
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        setInitialRoute('Auth');
+        return;
+      }
+
+      // Validate token by making a test API call with timeout
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const response = await fetch(`${BASE_URL}/backend/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          // Token is valid
+          setInitialRoute('GeneralHome');
+        } else {
+          // Token is invalid or expired
+          console.warn('Token validation failed. Clearing and redirecting to login.');
+          await AsyncStorage.removeItem('userToken');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('first_name');
+          await AsyncStorage.removeItem('userRole');
+          setInitialRoute('Auth');
+        }
+      } catch (error) {
+        console.error('Error validating token:', error);
+        // Clear invalid token and redirect to login
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userId');
+        await AsyncStorage.removeItem('first_name');
+        await AsyncStorage.removeItem('userRole');
+        setInitialRoute('Auth');
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setInitialRoute('Auth');
+    }
+  };
   
   useEffect(() => {
-    initCart()
+    initCart();
+    checkAuthStatus();
   }, []);
   useEffect(() => {
     const loadFonts = async () => {
@@ -52,9 +107,19 @@ const App = () => {
     loadFonts();
   }, []);
 
+  // Don't render navigation until initial route is determined
+  if (initialRoute === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#D30C7B" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="GeneralHome" screenOptions={{headerStyle: {backgroundColor: '#c8c8ee'}}}>
+      <Stack.Navigator initialRouteName={initialRoute} screenOptions={{headerStyle: {backgroundColor: '#c8c8ee'}}}>
         <Stack.Screen 
           name="Auth" 
           component={AuthPage} 
@@ -237,5 +302,19 @@ const handleLogout = async (navigation) => {
     Alert.alert('Logout failed, please try again later.');
   }
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#D30C7B',
+  },
+});
 
 export default App;

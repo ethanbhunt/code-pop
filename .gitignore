@@ -2,14 +2,22 @@
 **/__pycache__/
 *.pyc
 
-# Ignore Django migration files, except __init__.py
-**/migrations/*
-!**/migrations/__init__.py
+# macOS / Finder artifacts
+.DS_Store
+
+# Keep Django migrations versioned in git.
+# Do not ignore migration files, they are required for reproducible schema state.
 
 codepop_virtual_enviroment
 
 .idea
 node_modules
+**/node_modules/
+
+# Local env files
+.env
+*.env
+**/.env
 
 # Python virtual environments (local only)
 codepop_backend/backend/venv/
@@ -20,3 +28,4 @@ venv/
 **/venv/
 
 AGENTS.md
+codepop_backend/orbitdb/repo*

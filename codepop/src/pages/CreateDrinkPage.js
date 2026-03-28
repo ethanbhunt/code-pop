@@ -16,6 +16,8 @@ const CreateDrinkPage = () => {
   const [drinkDict, setDrinkDict] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [aiPromptText, setAiPromptText] = useState('');
+  const [lastPrompt, setLastPrompt] = useState(null);
   const [openDropdown, setOpenDropdown] = useState({
     sodas: false,
     syrups: false,
@@ -55,49 +57,54 @@ const CreateDrinkPage = () => {
         Alert.alert("Dont forget to choose a Soda, Size and, Ice Ammount!")
 
       }else{
-        const token = await AsyncStorage.getItem('userToken');
+         const token = await AsyncStorage.getItem('userToken');
+         console.log('Token retrieved:', token ? 'Token exists' : 'NO TOKEN FOUND');
+     
+           const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Token ${token}`,
+             },
+             body: JSON.stringify({ 
+               name: "Drink in User Cart",  // Example name for the drink
+               sodaUsed: SodaUsed,  // Default value if sodaUsed is null
+               syrupsUsed: SyrupsUsed,
+               addIns: AddIns,
+               price: 2.00,
+               userCreated: true,    // Assuming the user is creating the drink
+               size: selectedSize,
+               ice: selectedIce.toLowerCase(),  // Convert to lowercase for backend
+             })
+           });
     
-        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            Name: "Drink in User Cart",  // Example name for the drink
-            SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-            SyrupsUsed: SyrupsUsed,
-            AddIns: AddIns,
-            Price: 2.00,
-            User_Created: true,    // Assuming the user is creating the drink
-            Size: selectedSize,
-            Ice: selectedIce,
-          })
-        });
-    
-        if (!response.ok) {
-          throw new Error(`Failed to add drink. Status: ${response.status}`);
-        }
-        // add drink item (the drinks ID) to the checkout list from App.js
-        try{
-          // gets list of out of storage on your phone
-          cartList = await AsyncStorage.getItem("checkoutList");
-          const currentList = cartList ? JSON.parse(cartList) : [];
-          // takes the response (what we get after we create a drink) and extracts the drinkID
-          const data = await response.json();
-          const drinkID = data.DrinkID;
-          // add the drinkID to the checkoutList
-          const updatedList = [...currentList, drinkID]
-          // Saves the checkoutlist back into the storage on the phone
-          await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-        }catch (error){
-          console.log(error)
-        }
+         if (!response.ok) {
+           const errorData = await response.json().catch(() => ({}));
+           const errorMessage = errorData.error || `Failed to add drink. Status: ${response.status}`;
+           throw new Error(errorMessage);
+         }
+         // add drink item (the drinks ID) to the checkout list from App.js
+          try{
+            // gets list of out of storage on your phone
+            cartList = await AsyncStorage.getItem("checkoutList");
+            const currentList = cartList ? JSON.parse(cartList) : [];
+            // takes the response (what we get after we create a drink) and extracts the drinkID
+            const responseData = await response.json();
+            const drinkID = responseData.data.drinkId; // API returns nested data with camelCase
+            // add the drinkID to the checkoutList
+            const updatedList = [...currentList, drinkID]
+            // Saves the checkoutlist back into the storage on the phone
+            await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+          }catch (error){
+            console.log(error)
+          }
 
-        navigation.navigate('Cart');
-      }
-    } catch (error) {
-      console.error('Error adding drink to cart:', error);
-    }
+         navigation.navigate('Cart');
+       }
+     } catch (error) {
+       console.error('Error adding drink to cart:', error);
+       Alert.alert('Error', error.message || 'Failed to add drink to cart');
+     }
   };  
   
 
@@ -186,11 +193,45 @@ const CreateDrinkPage = () => {
 
       const drink = await response.json();
       setDrinkDict(drink);
+      setLastPrompt(null);
       setModalVisible(true);
       console.log(drink);
     }
     catch (error) {
       console.error('Error when trying to generate AI drink:', error);
+    }
+  };
+
+  const GenerateAIFromPrompt = async (promptText) => {
+    if (!promptText.trim()) return;
+    try {
+      const user_id = await AsyncStorage.getItem('userId');
+      let url = `${BASE_URL}/backend/generate/`;
+
+      if (user_id) {
+        url = `${BASE_URL}/backend/generate/${user_id}/`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: promptText }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error generating AI drink from prompt. Status: ${response.status}`);
+      }
+
+      const drink = await response.json();
+      setDrinkDict(drink);
+      setLastPrompt(promptText);
+      setModalVisible(true);
+      setAiPromptText('');
+      console.log(drink);
+    } catch (error) {
+      console.error('Error generating AI drink from prompt:', error);
     }
   };
 
@@ -258,8 +299,25 @@ const CreateDrinkPage = () => {
           <Gif layers={layers}/>
 
           {/* Button to generate drinks */}
-          <TouchableOpacity onPress={GenerateAI} style={styles.button}>
-            <Text style={styles.buttonText}>Generate Drink With AI!</Text>
+          {/* AI drink prompt input */}
+          <View style={styles.aiPromptContainer}>
+            <TextInput
+              placeholder="Describe a drink... (e.g. sweet, tropical)"
+              placeholderTextColor="#999"
+              style={styles.aiPromptInput}
+              value={aiPromptText}
+              onChangeText={setAiPromptText}
+              onSubmitEditing={() => GenerateAIFromPrompt(aiPromptText)}
+            />
+            <TouchableOpacity
+              onPress={() => GenerateAIFromPrompt(aiPromptText)}
+              style={styles.aiSendButton}
+            >
+              <Text style={styles.buttonText}>Go</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={GenerateAI} style={styles.randomDrinkButton}>
+            <Text style={styles.buttonText}>Random Drink</Text>
           </TouchableOpacity>
 
           {/* AIAlert Modal */}
@@ -268,13 +326,20 @@ const CreateDrinkPage = () => {
             isModalVisible={isModalVisible}
             toggleModal={() => (setModalVisible(false))}
             drinkDict={drinkDict}
+            onRegenerate={() => {
+              if (lastPrompt) {
+                GenerateAIFromPrompt(lastPrompt);
+              } else {
+                GenerateAI();
+              }
+            }}
           />
         )}
         </View>
 
         {/* Ice buttons on the right */}
         <View style={styles.buttonContainerRight}>
-          {['No Ice', 'Light', 'Regular', 'Extra'].map((ice) => (
+          {['Light', 'Normal', 'Extra'].map((ice) => (
             <TouchableOpacity
               key={ice}
               onPress={() => handleIceSelection(ice)}
@@ -432,6 +497,44 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     transform: [{ translateX: -5 }],  // Center the straw horizontally
     zIndex: 1, // Ensure straw appears on top of the drink container
+  },
+  aiPromptContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    width: '100%',
+  },
+  aiPromptInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: '#fff',
+    color: '#333',
+  },
+  aiSendButton: {
+    marginLeft: 6,
+    backgroundColor: '#D30C7B',
+    borderRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  randomDrinkButton: {
+    backgroundColor: '#8DF1D3',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    marginTop: 6,
   },
 });
 

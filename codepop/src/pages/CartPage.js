@@ -26,6 +26,22 @@ const CartPage = () => {
     initializePaymentSheet(); // Initialize payment sheet on page load
   }, [totalPrice]);
 
+  const normalizeDrink = (rawDrink) => {
+    if (!rawDrink) {
+      return null;
+    }
+
+    return {
+      drinkId: rawDrink.DrinkID ?? rawDrink.drinkId,
+      size: rawDrink.Size ?? rawDrink.size,
+      sodaUsed: rawDrink.SodaUsed ?? rawDrink.sodaUsed ?? [],
+      syrupsUsed: rawDrink.SyrupsUsed ?? rawDrink.syrupsUsed ?? [],
+      addIns: rawDrink.AddIns ?? rawDrink.addIns ?? [],
+      ice: rawDrink.Ice ?? rawDrink.ice,
+      price: rawDrink.Price ?? rawDrink.price,
+    };
+  };
+
   const fetchDrinks = async () => {
     try {
       const cartList = await AsyncStorage.getItem('checkoutList');
@@ -36,18 +52,20 @@ const CartPage = () => {
       // await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(currentList));
 
       const fetchedDrinks = [];
-      for (let i = 0; i < currentList.length; i++) {
-        const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        const data = await response.json();
-        if (data != null && data.Size && data.SodaUsed && data.Ice) {
-          fetchedDrinks.push(data); // Add each drink to the temporary array
-        }
-      }
+       for (let i = 0; i < currentList.length; i++) {
+          const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+          });
+          const responseData = await response.json();
+          const drink = normalizeDrink(responseData.data || responseData);
+          if (drink != null && drink.size && drink.sodaUsed && drink.ice) {
+            fetchedDrinks.push(drink); // Add each drink to the temporary array
+          }
+       }
       
       setDrinks(fetchedDrinks); // Update state once after all drinks are collected
       calculateTotalPrice(fetchedDrinks); // Calculate total price after fetching drinks
@@ -62,19 +80,19 @@ const CartPage = () => {
   
   
 
-  const calculatePrice = (drink) => {
-    // $2 base price + $0.30 per ingredient
-    if (drink.Price == 2) {
-      const syrupsCount = Array.isArray(drink.SyrupsUsed) ? drink.SyrupsUsed.length : 0;
-      const addInsCount = Array.isArray(drink.AddIns) ? drink.AddIns.length : 0;
-      return 2 + (syrupsCount + addInsCount) * 0.3;
-      // return 2 + (drink.SyrupsUsed.length + drink.AddIns.length) * 0.3;
-    } else {
-      // Carousel drink prices
-      return drink.Price;
-    }
+   const calculatePrice = (drink) => {
+     // $2 base price + $0.30 per ingredient
+     if (drink.price == 2) {
+       const syrupsCount = Array.isArray(drink.syrupsUsed) ? drink.syrupsUsed.length : 0;
+       const addInsCount = Array.isArray(drink.addIns) ? drink.addIns.length : 0;
+       return 2 + (syrupsCount + addInsCount) * 0.3;
+       // return 2 + (drink.syrupsUsed.length + drink.addIns.length) * 0.3;
+     } else {
+       // Carousel drink prices
+       return drink.price;
+     }
 
-  };
+   };
 
 
   const calculateTotalPrice = (drinksList) => {
@@ -112,7 +130,7 @@ const CartPage = () => {
       }
   
       // Update the local state to remove the drink from the cart page
-      const updatedDrinks = drinks.filter(data => data.DrinkID !== drinkId);
+      const updatedDrinks = drinks.filter(data => data.drinkId !== drinkId);
       setDrinks(updatedDrinks);
   
       // Update the AsyncStorage to remove the drink ID from the checkout list
@@ -132,26 +150,26 @@ const CartPage = () => {
   
   
 
-  const renderDrinkItem = (drink) => (
-    <View style={styles.drinkContainer}>
-      <Text style={styles.drinkText}>{drink.Size} Drink: {drink.SodaUsed.join(', ')} with {drink.Ice} Ice</Text>
-      <Text style={styles.ingredientsText}>
-        Syrups: {drink.SyrupsUsed ? drink.SyrupsUsed.join(', ') : ''}{'\n\n'}
-        Add Ins: {drink.AddIns ? drink.AddIns.join(', ') : ''}
-      </Text>
-      <Text style={styles.priceText}>Price: ${calculatePrice(drink).toFixed(2)}</Text>
+   const renderDrinkItem = (drink) => (
+     <View style={styles.drinkContainer}>
+       <Text style={styles.drinkText}>{drink.size} Drink: {drink.sodaUsed.join(', ')} with {drink.ice} Ice</Text>
+       <Text style={styles.ingredientsText}>
+         Syrups: {drink.syrupsUsed ? drink.syrupsUsed.join(', ') : ''}{'\n\n'}
+         Add Ins: {drink.addIns ? drink.addIns.join(', ') : ''}
+       </Text>
+       <Text style={styles.priceText}>Price: ${calculatePrice(drink).toFixed(2)}</Text>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.button}>
-          <Icon name="create-outline" size={24} color="#000" />
-        </TouchableOpacity>
-  
-        <TouchableOpacity onPress={() => removeDrink(drink.DrinkID)} style={styles.button}>
-          <Icon name="close-circle-outline" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+       <View style={styles.buttonRow}>
+         <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.button}>
+           <Icon name="create-outline" size={24} color="#000" />
+         </TouchableOpacity>
+   
+         <TouchableOpacity onPress={() => removeDrink(drink.drinkId)} style={styles.button}>
+           <Icon name="close-circle-outline" size={24} color="#000" />
+         </TouchableOpacity>
+       </View>
+     </View>
+   );
 
   const goToCheckout = () => {
     navigation.navigate('Checkout');
@@ -167,13 +185,13 @@ const CartPage = () => {
           <Text style={styles.emptyCartText}>Your cart is empty</Text>
           
         ) : (
-          <FlatList
-            style={styles.padding}
-            data={drinks}
-            keyExtractor={(item) => item.DrinkID ? item.DrinkID.toString() : Math.random().toString()}
-            renderItem={({ item }) => renderDrinkItem(item)}
-            contentContainerStyle={styles.listContainer}
-          />
+           <FlatList
+             style={styles.padding}
+             data={drinks}
+             keyExtractor={(item) => item.drinkId ? item.drinkId.toString() : Math.random().toString()}
+             renderItem={({ item }) => renderDrinkItem(item)}
+             contentContainerStyle={styles.listContainer}
+           />
         )}
 
 

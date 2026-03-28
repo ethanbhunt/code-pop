@@ -5,6 +5,8 @@ from .views import StripePaymentIntentView
 from .views import UserPreferenceLookup, PreferencesOperations
 from .views import DrinkOperations, UserDrinksLookup
 from .views import InventoryListAPIView, InventoryReportAPIView, InventoryUpdateAPIView
+from .views import AuditLogListAPIView
+from .views import SupplyHubOperations, StockTransferOperations
 from .views import NotificationOperations, UserNotificationLookup
 from .views import OrderOperations, UserOrdersLookup
 from .customerAI import Chatbot
@@ -57,6 +59,34 @@ order_list = OrderOperations.as_view({
 order_detail = OrderOperations.as_view({
     'get': 'retrieve',
     'put': 'update',
+    'delete': 'destroy'
+})
+
+order_fulfill = OrderOperations.as_view({
+    'post': 'fulfill'
+})
+
+supply_hub_list = SupplyHubOperations.as_view({
+    'get': 'list'
+})
+
+supply_hub_detail = SupplyHubOperations.as_view({
+    'get': 'retrieve'
+})
+
+supply_hub_inventory = SupplyHubOperations.as_view({
+    'get': 'inventory'
+})
+
+stock_transfer_list = StockTransferOperations.as_view({
+    'get': 'list',
+    'post': 'create'
+})
+
+stock_transfer_detail = StockTransferOperations.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
     'delete': 'destroy'
 })
 
@@ -141,6 +171,16 @@ urlpatterns = [
     # - DELETE: Remove the specific inventory item from the database.
     path('inventory/<int:pk>/', InventoryUpdateAPIView.as_view(), name='inventory_update'),
 
+    # Audit log URLs
+    path('audit-logs/', AuditLogListAPIView.as_view(), name='audit_log_list'),
+
+    # Supply hub and stock transfer URLs
+    path('supply-hubs/', supply_hub_list, name='supply_hub_list'),
+    path('supply-hubs/<int:pk>/', supply_hub_detail, name='supply_hub_detail'),
+    path('supply-hubs/<int:pk>/inventory/', supply_hub_inventory, name='supply_hub_inventory'),
+    path('stock-transfers/', stock_transfer_list, name='stock_transfer_list_create'),
+    path('stock-transfers/<int:pk>/', stock_transfer_detail, name='stock_transfer_detail'),
+
     # Notification related URLs
     path('notifications/', notification_list, name='notification list and create'),
     path('notifications/<int:pk>/', notification_detail, name='notification operations'),
@@ -166,6 +206,7 @@ urlpatterns = [
     # - PATCH: Update the specific order (e.g., adding drinks).
     # - DELETE: Remove the specific order from the database.
     path('orders/<int:pk>/', order_detail, name='order_detail'),
+    path('orders/<int:pk>/fulfill/', order_fulfill, name='order_fulfill'),
 
     # Retrieve Orders by UserID
 
