@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
   Card,
   CardContent,
@@ -43,16 +44,58 @@ type SupplyScheduleExport = {
   downloadUrl: string | null;
 };
 
+type OrbitInventoryItem = {
+  inventoryId: number;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  thresholdLevel: number;
+};
+
+const DELIVERY_STORE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+
 export function LogisticsManagerDashboard() {
   const [ctx, setCtx] = useState<StoreRegionContext | null>(null);
+  const [orbitInventory, setOrbitInventory] = useState<OrbitInventoryItem[] | null>(
+    null
+  );
+  const [loadingInv, setLoadingInv] = useState(false);
+
   const [aiPrediction, setAiPrediction] = useState<AiDemandPrediction | null>(null);
   const [forecastComparison, setForecastComparison] =
     useState<ForecastComparison | null>(null);
   const [exportMeta, setExportMeta] = useState<SupplyScheduleExport | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][] } | null>(
+    null
+  );
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [shipFrom, setShipFrom] = useState<string>("1");
+  const [shipTo, setShipTo] = useState<string>("2");
+  const [deliveryDraft, setDeliveryDraft] = useState<string | null>(null);
+
   const region = ctx?.region ?? "Region C";
   const storeId = ctx?.storeId ?? "1";
+
+  const loadInventory = useCallback(async () => {
+    setLoadingInv(true);
+    try {
+      const res = await fetch("/api/orbit/inventory");
+      if (!res.ok) {
+        setOrbitInventory(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: OrbitInventoryItem[] };
+      setOrbitInventory(json.data ?? []);
+    } finally {
+      setLoadingInv(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadInventory();
+  }, [loadInventory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,17 +104,17 @@ export function LogisticsManagerDashboard() {
       try {
         const [aiRes, cmpRes, expRes] = await Promise.all([
           fetch(
-            `/api/service-stubs/logistics/ai-demand-prediction?region=${encodeURIComponent(
+            `/api/orbit/placeholders/logistics/ai-demand-prediction?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
           fetch(
-            `/api/service-stubs/logistics/forecast-comparison?region=${encodeURIComponent(
+            `/api/orbit/placeholders/logistics/forecast-comparison?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
           fetch(
-            `/api/service-stubs/logistics/supply-schedule-export?region=${encodeURIComponent(
+            `/api/orbit/placeholders/logistics/supply-schedule-export?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
@@ -99,12 +142,89 @@ export function LogisticsManagerDashboard() {
     };
   }, [region, storeId]);
 
-  const mockInventory = [
-    { item: "Coke", type: "Soda", qty: 120, low: false },
-    { item: "Dr. Pepper", type: "Soda", qty: 38, low: true },
-    { item: "Vanilla", type: "Syrup", qty: 75, low: false },
-    { item: "Coconut", type: "Add In", qty: 12, low: true },
-  ];
+  const reloadAiPlaceholders = useCallback(async () => {
+    setLoadingAi(true);
+    try {
+      const [aiRes, cmpRes, expRes] = await Promise.all([
+        fetch(
+          `/api/orbit/placeholders/logistics/ai-demand-prediction?region=${encodeURIComponent(
+            region
+          )}&storeId=${encodeURIComponent(storeId)}`
+        ),
+        fetch(
+          `/api/orbit/placeholders/logistics/forecast-comparison?region=${encodeURIComponent(
+            region
+          )}&storeId=${encodeURIComponent(storeId)}`
+        ),
+        fetch(
+          `/api/orbit/placeholders/logistics/supply-schedule-export?region=${encodeURIComponent(
+            region
+          )}&storeId=${encodeURIComponent(storeId)}`
+        ),
+      ]);
+      const [ai, cmp, exp] = await Promise.all([
+        aiRes.json(),
+        cmpRes.json(),
+        expRes.json(),
+      ]);
+      setAiPrediction(ai as AiDemandPrediction);
+      setForecastComparison(cmp as ForecastComparison);
+      setExportMeta(exp as SupplyScheduleExport);
+    } finally {
+      setLoadingAi(false);
+    }
+  }, [region, storeId]);
+
+  function onCsvFile(file: File) {
+    setCsvError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result ?? "");
+        setCsvPreview(parseCsvText(text));
+      } catch (e) {
+        setCsvPreview(null);
+        setCsvError(e instanceof Error ? e.message : "Could not parse CSV");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function exportLogisticsCsv() {
+    if (!exportMeta?.csvPreviewRows?.length) return;
+    const header = ["date", "store", "hub", "item", "qty"];
+    const body = exportMeta.csvPreviewRows.map((r) => [
+      r.date,
+      r.store,
+      r.hub,
+      r.item,
+      String(r.qty),
+    ]);
+    downloadTextFile(
+      exportMeta.filename || "supply-schedule.csv",
+      rowsToCsv([header, ...body])
+    );
+  }
+
+  function exportSummaryCsv() {
+    if (!aiPrediction) return;
+    const rows: string[][] = [
+      ["field", "value"],
+      ["region", aiPrediction.region],
+      ["storeId", aiPrediction.storeId],
+      ["generatedAt", aiPrediction.generatedAt],
+      ["model", aiPrediction.confidence.model],
+    ];
+    aiPrediction.reorderRecommendations.forEach((r) => {
+      rows.push(["reorder", `${r.item}:${r.suggestedReorderQty}:${r.reason}`]);
+    });
+    downloadTextFile(`demand-summary-${storeId}.csv`, rowsToCsv(rows));
+  }
+
+  const lowStockItems = (orbitInventory ?? []).filter(
+    (i) => i.quantity < i.thresholdLevel
+  );
+  const lowStockNames = new Set(lowStockItems.map((i) => i.itemName));
 
   return (
     <section className="space-y-4">
@@ -114,9 +234,10 @@ export function LogisticsManagerDashboard() {
         <CardHeader>
           <CardTitle>Logistics Manager Dashboard</CardTitle>
           <CardDescription>
-            Regional supply coordination and forecasting (scaffold). {ctx
-              ? `Context: ${ctx.region} / ${ctx.storeLabel}`
-              : ""}
+            Regional supply coordination (scaffold). OrbitDB inventory is{" "}
+            <span className="font-medium">global</span>—region/store picker is UI-only until
+            the API supports locations.{" "}
+            {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -133,42 +254,116 @@ export function LogisticsManagerDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockInventory.map((inv) => (
-                    <tr key={inv.item} className="border-t">
-                      <td className="p-2">{inv.item}</td>
-                      <td className="p-2">{inv.type}</td>
-                      <td className="p-2">{inv.qty}</td>
-                      <td className="p-2">
-                        {inv.low ? (
-                          <span className="text-destructive">Low</span>
-                        ) : (
-                          <span className="text-muted-foreground">OK</span>
-                        )}
+                  {loadingInv && !orbitInventory ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={4}>
+                        Loading inventory…
                       </td>
                     </tr>
-                  ))}
+                  ) : !orbitInventory?.length ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={4}>
+                        No inventory rows.
+                      </td>
+                    </tr>
+                  ) : (
+                    orbitInventory.map((inv) => {
+                      const low = inv.quantity < inv.thresholdLevel;
+                      return (
+                        <tr key={inv.inventoryId} className="border-t">
+                          <td className="p-2">{inv.itemName}</td>
+                          <td className="p-2">{inv.itemType}</td>
+                          <td className="p-2">{inv.quantity}</td>
+                          <td className="p-2">
+                            {low ? (
+                              <span className="text-destructive">Low</span>
+                            ) : (
+                              <span className="text-muted-foreground">OK</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground">
-              TODO: populate with backend inventory + low-stock thresholds.
-            </p>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadInventory()}>
+                Refresh inventory
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
               <h3 className="text-sm font-medium">CSV Import: Historical Usage</h3>
               <div className="rounded-lg border p-3">
-                <input type="file" accept=".csv,text/csv" disabled />
-                <div className="mt-3 flex gap-2">
-                  <Button disabled>Import CSV</Button>
-                  <Button variant="outline" disabled>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) onCsvFile(f);
+                  }}
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={!csvPreview}
+                    onClick={() => void reloadAiPlaceholders()}
+                  >
+                    Refetch mock AI forecast
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      downloadTextFile(
+                        "usage-template.csv",
+                        rowsToCsv([
+                          ["date", "item", "units"],
+                          ["2026-03-01", "Example", "10"],
+                        ])
+                      )
+                    }
+                  >
                     Use Template
                   </Button>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  TODO: implement CSV parsing and AI demand prediction triggers.
-                </p>
+                {csvError ? (
+                  <p className="mt-2 text-xs text-destructive">{csvError}</p>
+                ) : null}
+                {csvPreview ? (
+                  <div className="mt-3 max-h-40 overflow-auto rounded-md border text-xs">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          {csvPreview.headers.map((h) => (
+                            <th key={h} className="p-1 text-left font-medium">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvPreview.rows.slice(0, 8).map((row, i) => (
+                          <tr key={i} className="border-t">
+                            {row.map((c, j) => (
+                              <td key={j} className="p-1">
+                                {c}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Choose a CSV to preview locally. Persisted usage ingestion requires Orbit.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -178,38 +373,63 @@ export function LogisticsManagerDashboard() {
               </h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  TODO: delivery assignment UI within and outside region.
+                  Draft assignment (client only). Persisted routing and distance rules require
+                  Orbit logistics APIs.
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground" htmlFor="shipFrom">
                       From Store
                     </label>
-                    <input
+                    <select
                       id="shipFrom"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      disabled
-                      placeholder="TODO"
-                    />
+                      value={shipFrom}
+                      onChange={(e) => setShipFrom(e.target.value)}
+                    >
+                      {DELIVERY_STORE_OPTIONS.map((id) => (
+                        <option key={`from-${id}`} value={id}>
+                          Store {id}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground" htmlFor="shipTo">
                       To Store
                     </label>
-                    <input
+                    <select
                       id="shipTo"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      disabled
-                      placeholder="TODO"
-                    />
+                      value={shipTo}
+                      onChange={(e) => setShipTo(e.target.value)}
+                    >
+                      {DELIVERY_STORE_OPTIONS.map((id) => (
+                        <option key={`to-${id}`} value={id}>
+                          Store {id}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <Button disabled>Assign Delivery</Button>
-                  <Button variant="outline" disabled>
-                    Cancel
+                  <Button
+                    type="button"
+                    onClick={() =>
+                      setDeliveryDraft(
+                        `Draft: ship from Store ${shipFrom} → Store ${shipTo} (${region})`
+                      )
+                    }
+                  >
+                    Assign Delivery
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setDeliveryDraft(null)}>
+                    Clear
                   </Button>
                 </div>
+                {deliveryDraft ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{deliveryDraft}</p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -218,7 +438,8 @@ export function LogisticsManagerDashboard() {
             <h3 className="text-sm font-medium">Coordinate Supply Transfers</h3>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                TODO: coordinate transfers between local stores and shared regional suppliers.
+                Coordinating transfers between stores and regional suppliers requires persisted
+                shipment/transfer APIs in Orbit—the table below is illustrative only.
               </p>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -345,7 +566,7 @@ export function LogisticsManagerDashboard() {
                           >
                             <span>{r.item}</span>
                             <span className="text-muted-foreground">
-                              {r.suggestedReorderQty} (TODO hook)
+                              Suggested {r.suggestedReorderQty} — {r.reason}
                             </span>
                           </li>
                         ))}
@@ -398,7 +619,8 @@ export function LogisticsManagerDashboard() {
                       </table>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      TODO: confidence intervals + deeper comparison dashboards.
+                      Mock confidence bands come from forecast `lower`/`upper` in the AI payload.
+                      Deeper analytics need historical actuals in Orbit.
                     </p>
                   </div>
                 ) : (
@@ -412,18 +634,39 @@ export function LogisticsManagerDashboard() {
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Low Inventory Notifications</h3>
               <div className="rounded-lg border p-3">
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-center justify-between gap-3">
-                    <span className="text-destructive">Coconut</span>
-                    <span className="text-muted-foreground">Suggested: 50 units</span>
-                  </li>
-                  <li className="flex items-center justify-between gap-3">
-                    <span className="text-destructive">Dr. Pepper</span>
-                    <span className="text-muted-foreground">Suggested: 35 units</span>
-                  </li>
-                </ul>
+                {lowStockItems.length === 0 && !aiPrediction?.reorderRecommendations?.length ? (
+                  <p className="text-sm text-muted-foreground">No low-stock rows from inventory.</p>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {lowStockItems.map((i) => (
+                      <li
+                        key={i.inventoryId}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="text-destructive">{i.itemName}</span>
+                        <span className="text-muted-foreground">
+                          {i.quantity} / {i.thresholdLevel} (threshold)
+                        </span>
+                      </li>
+                    ))}
+                    {(aiPrediction?.reorderRecommendations ?? [])
+                      .filter((r) => !lowStockNames.has(r.item))
+                      .map((r) => (
+                        <li
+                          key={`rec-${r.item}`}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <span className="text-foreground">{r.item}</span>
+                          <span className="text-muted-foreground">
+                            Suggested reorder: {r.suggestedReorderQty}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  TODO: notifications + reorder recommendations.
+                  Push/email notifications require a notification service; this list is from live
+                  inventory + mock AI suggestions.
                 </p>
               </div>
             </div>
@@ -462,12 +705,23 @@ export function LogisticsManagerDashboard() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    TODO: export to CSV for logistics partners.
+                    Load export metadata from the placeholder API (region/store context).
                   </p>
                 )}
                 <div className="mt-3 flex gap-2">
-                  <Button disabled>Export CSV</Button>
-                  <Button variant="outline" disabled>
+                  <Button
+                    type="button"
+                    disabled={!exportMeta?.csvPreviewRows?.length}
+                    onClick={() => exportLogisticsCsv()}
+                  >
+                    Export CSV
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!aiPrediction}
+                    onClick={() => exportSummaryCsv()}
+                  >
                     Export Summary
                   </Button>
                 </div>

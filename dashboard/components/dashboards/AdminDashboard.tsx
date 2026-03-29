@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -9,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { defaultDashboardRoleForOrbit } from "@/lib/orbit-role-map";
 
 type InventoryAuditLog = {
   id: string;
@@ -16,39 +18,162 @@ type InventoryAuditLog = {
   actor: { id: string; name: string; role: string };
   action: "inventory_update" | "threshold_update" | "inventory_import";
   target: { item: string; type: string; storeId: string };
-  changes: { fromQty?: number; toQty?: number; fromThreshold?: number; toThreshold?: number };
+  changes: {
+    fromQty?: number;
+    toQty?: number;
+    fromThreshold?: number;
+    toThreshold?: number;
+  };
+};
+
+type OrbitInventoryItem = {
+  inventoryId: number;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  thresholdLevel: number;
+  lastUpdated?: string;
+};
+
+type OrbitUser = {
+  userId: number;
+  username: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+};
+
+type AdminMetrics = {
+  totalUsers: number;
+  activeAccounts: number;
+  inventoryLowCount: number;
+  totalRevenueToday: number;
 };
 
 export function AdminDashboard() {
-  const [auditLogs, setAuditLogs] = useState<InventoryAuditLog[] | null>(null);
-  const [loadingAudit, setLoadingAudit] = useState(false);
+  const { data: session } = useSession();
+  const myUserId = session?.user?.id ? Number(session.user.id) : null;
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoadingAudit(true);
-      try {
-        const res = await fetch(
-          "/api/service-stubs/audit/inventory-logs?storeId=1&limit=25"
-        );
-        const data = await res.json();
-        if (!cancelled) setAuditLogs(data.logs as InventoryAuditLog[]);
-      } finally {
-        if (!cancelled) setLoadingAudit(false);
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [inventory, setInventory] = useState<OrbitInventoryItem[] | null>(null);
+  const [users, setUsers] = useState<OrbitUser[] | null>(null);
+  const [auditLogs, setAuditLogs] = useState<InventoryAuditLog[] | null>(null);
+
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [loadingInv, setLoadingInv] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const [draftQty, setDraftQty] = useState<Record<number, string>>({});
+
+  const loadMetrics = useCallback(async () => {
+    setLoadingMetrics(true);
+    try {
+      const res = await fetch("/api/orbit/admin/metrics");
+      if (!res.ok) {
+        setMetrics(null);
+        return;
       }
+      const data = (await res.json()) as AdminMetrics;
+      setMetrics(data);
+    } finally {
+      setLoadingMetrics(false);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  const mockUsers = [
-    { username: "test", role: "Repair Staff", active: true },
-    { username: "test2", role: "Manager", active: true },
-    { username: "staff", role: "Logistics Manager", active: true },
-    { username: "super", role: "Super Admin", active: false },
-  ];
+  const loadInventory = useCallback(async () => {
+    setLoadingInv(true);
+    try {
+      const res = await fetch("/api/orbit/inventory");
+      if (!res.ok) {
+        setInventory(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: OrbitInventoryItem[] };
+      setInventory(json.data ?? []);
+    } finally {
+      setLoadingInv(false);
+    }
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch("/api/orbit/users");
+      if (!res.ok) {
+        setUsers(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: OrbitUser[] };
+      setUsers(json.data ?? []);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  const loadAudit = useCallback(async () => {
+    setLoadingAudit(true);
+    try {
+      const res = await fetch(
+        "/api/orbit/admin/audit-inventory?storeId=global&limit=25"
+      );
+      if (!res.ok) {
+        setAuditLogs(null);
+        return;
+      }
+      const data = await res.json();
+      setAuditLogs(data.logs as InventoryAuditLog[]);
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMetrics();
+    void loadInventory();
+    void loadUsers();
+    void loadAudit();
+  }, [loadMetrics, loadInventory, loadUsers, loadAudit]);
+
+  async function saveQuantity(item: OrbitInventoryItem) {
+    const raw = draftQty[item.inventoryId];
+    const q = raw !== undefined ? parseInt(raw, 10) : item.quantity;
+    if (Number.isNaN(q) || q < 0) return;
+    setSavingId(item.inventoryId);
+    try {
+      const res = await fetch(`/api/orbit/inventory/${item.inventoryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: q }),
+      });
+      if (res.ok) {
+        setDraftQty((d) => {
+          const next = { ...d };
+          delete next[item.inventoryId];
+          return next;
+        });
+        await loadInventory();
+        await loadAudit();
+        await loadMetrics();
+      }
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteUserRow(u: OrbitUser) {
+    if (myUserId != null && u.userId === myUserId) return;
+    if (!window.confirm(`Delete user ${u.username}?`)) return;
+    const res = await fetch(`/api/orbit/users/${u.userId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      await loadUsers();
+      await loadMetrics();
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -56,7 +181,8 @@ export function AdminDashboard() {
         <CardHeader>
           <CardTitle>Admin Dashboard</CardTitle>
           <CardDescription>
-            Inventory tracking, user/account management, and reporting (scaffold).
+            Inventory, users, and revenue metrics from the OrbitDB API (admin role on
+            backend).
           </CardDescription>
         </CardHeader>
 
@@ -64,28 +190,44 @@ export function AdminDashboard() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">Total Users</p>
-              <p className="text-2xl font-semibold">4</p>
-              <p className="text-xs text-muted-foreground">TODO: backend-driven</p>
+              <p className="text-2xl font-semibold">
+                {loadingMetrics ? "…" : (metrics?.totalUsers ?? "—")}
+              </p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">Active Accounts</p>
-              <p className="text-2xl font-semibold">3</p>
-              <p className="text-xs text-muted-foreground">TODO: backend-driven</p>
+              <p className="text-sm text-muted-foreground">Accounts (listed)</p>
+              <p className="text-2xl font-semibold">
+                {loadingMetrics ? "…" : (metrics?.activeAccounts ?? "—")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                No separate &quot;active&quot; flag in OrbitDB yet.
+              </p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">Inventory (Low)</p>
-              <p className="text-2xl font-semibold">8</p>
-              <p className="text-xs text-muted-foreground">TODO: backend-driven</p>
+              <p className="text-2xl font-semibold">
+                {loadingMetrics ? "…" : (metrics?.inventoryLowCount ?? "—")}
+              </p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-semibold">$12,450</p>
-              <p className="text-xs text-muted-foreground">TODO: backend-driven</p>
+              <p className="text-sm text-muted-foreground">Revenue (Today)</p>
+              <p className="text-2xl font-semibold">
+                {loadingMetrics
+                  ? "…"
+                  : metrics
+                    ? `$${(metrics.totalRevenueToday ?? 0).toLocaleString()}`
+                    : "—"}
+              </p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Inventory Tracking</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Inventory Tracking</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadInventory()}>
+                Refresh
+              </Button>
+            </div>
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30">
@@ -95,79 +237,129 @@ export function AdminDashboard() {
                     <th className="p-2">Qty</th>
                     <th className="p-2">Threshold</th>
                     <th className="p-2">Status</th>
+                    <th className="p-2">Save</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="p-2">Coke</td>
-                    <td className="p-2">Soda</td>
-                    <td className="p-2">14</td>
-                    <td className="p-2">20</td>
-                    <td className="p-2 text-destructive">Low</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Vanilla</td>
-                    <td className="p-2">Syrup</td>
-                    <td className="p-2">62</td>
-                    <td className="p-2">30</td>
-                    <td className="p-2 text-muted-foreground">OK</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2">Cream</td>
-                    <td className="p-2">Add In</td>
-                    <td className="p-2">8</td>
-                    <td className="p-2">10</td>
-                    <td className="p-2 text-destructive">Low</td>
-                  </tr>
+                  {loadingInv && !inventory ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                        Loading inventory…
+                      </td>
+                    </tr>
+                  ) : !inventory?.length ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                        No inventory rows (or failed to load).
+                      </td>
+                    </tr>
+                  ) : (
+                    inventory.map((row) => {
+                      const low = row.quantity < row.thresholdLevel;
+                      const draft =
+                        draftQty[row.inventoryId] ?? String(row.quantity);
+                      return (
+                        <tr key={row.inventoryId} className="border-t">
+                          <td className="p-2">{row.itemName}</td>
+                          <td className="p-2">{row.itemType}</td>
+                          <td className="p-2">
+                            <input
+                              className="h-8 w-20 rounded border bg-transparent px-2"
+                              value={draft}
+                              onChange={(e) =>
+                                setDraftQty((d) => ({
+                                  ...d,
+                                  [row.inventoryId]: e.target.value,
+                                }))
+                              }
+                            />
+                          </td>
+                          <td className="p-2">{row.thresholdLevel}</td>
+                          <td className="p-2">
+                            {low ? (
+                              <span className="text-destructive">Low</span>
+                            ) : (
+                              <span className="text-muted-foreground">OK</span>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={savingId === row.inventoryId}
+                              onClick={() => void saveQuantity(row)}
+                            >
+                              Save
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground">
-              TODO: wire inventory data + low-stock thresholds.
-            </p>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">User/Account Metrics</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">User accounts</h3>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadUsers()}>
+                Refresh
+              </Button>
+            </div>
             <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30">
                   <tr className="text-left">
                     <th className="p-2">Username</th>
                     <th className="p-2">Role</th>
-                    <th className="p-2">Active</th>
+                    <th className="p-2">Email</th>
                     <th className="p-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockUsers.map((u) => (
-                    <tr key={u.username} className="border-t">
-                      <td className="p-2">{u.username}</td>
-                      <td className="p-2">{u.role}</td>
-                      <td className="p-2">
-                        {u.active ? (
-                          <span className="text-emerald-600">Yes</span>
-                        ) : (
-                          <span className="text-muted-foreground">No</span>
-                        )}
-                      </td>
-                      <td className="p-2">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" disabled>
-                            Disable
-                          </Button>
-                          <Button variant="outline" size="sm" disabled>
-                            Delete
-                          </Button>
-                        </div>
+                  {loadingUsers && !users ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={4}>
+                        Loading users…
                       </td>
                     </tr>
-                  ))}
+                  ) : !users?.length ? (
+                    <tr>
+                      <td className="p-2 text-muted-foreground" colSpan={4}>
+                        No users (or forbidden / not configured).
+                      </td>
+                    </tr>
+                  ) : (
+                    users.map((u) => (
+                      <tr key={u.userId} className="border-t">
+                        <td className="p-2">{u.username}</td>
+                        <td className="p-2">
+                          {defaultDashboardRoleForOrbit(u.role)}
+                        </td>
+                        <td className="p-2 text-muted-foreground">{u.email}</td>
+                        <td className="p-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={myUserId != null && u.userId === myUserId}
+                            onClick={() => void deleteUserRow(u)}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              TODO: hook to user management endpoints once implemented.
+              Disable/enable and role edits need PUT /api/orbit/users/:id (UI not wired
+              here).
             </p>
           </div>
 
@@ -176,7 +368,8 @@ export function AdminDashboard() {
               <h3 className="text-sm font-medium">Cost Tracking</h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm">
-                  TODO: inventory + maintenance cost summaries.
+                  Use inventory <code className="text-xs">costPerUnit</code> via API when
+                  populated; no aggregate endpoint yet.
                 </p>
               </div>
             </div>
@@ -185,7 +378,8 @@ export function AdminDashboard() {
               <h3 className="text-sm font-medium">Revenue Totals</h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm">
-                  TODO: total revenue, trends, and breakdowns.
+                  Today&apos;s total is in the KPI tile. Detailed reports:{" "}
+                  <code className="text-xs">GET /api/orbit/revenues/report</code>.
                 </p>
               </div>
             </div>
@@ -195,61 +389,22 @@ export function AdminDashboard() {
             <h3 className="text-sm font-medium">Complaints</h3>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                TODO: list general and account user complaints.
+                No complaints model in OrbitDB. Consider notifications API later.
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Manage User Accounts</h3>
-            <div className="rounded-lg border p-3">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" disabled>
-                  Override Locked Accounts
-                </Button>
-                <Button variant="outline" disabled>
-                  Disable/Enable Accounts
-                </Button>
-                <Button variant="outline" disabled>
-                  Delete Accounts
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                TODO: implement confirmation dialogs and backend calls.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Permissions for Managers</h3>
-            <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">
-                TODO: UI for granting manager permissions.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Button variant="outline" disabled>
-                  Grant Permission
-                </Button>
-                <Button variant="outline" disabled>
-                  Revoke Permission
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Inventory Audit Log</h3>
+            <h3 className="text-sm font-medium">Inventory audit (derived)</h3>
             <div className="rounded-lg border p-3">
               {loadingAudit && !auditLogs ? (
-                <p className="text-sm text-muted-foreground">Loading audit logs…</p>
-              ) : auditLogs ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : auditLogs?.length ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="border-b bg-muted/30">
                       <tr className="text-left">
                         <th className="p-2">Timestamp</th>
-                        <th className="p-2">Actor</th>
-                        <th className="p-2">Action</th>
                         <th className="p-2">Target</th>
                         <th className="p-2">Changes</th>
                       </tr>
@@ -259,22 +414,14 @@ export function AdminDashboard() {
                         <tr key={log.id} className="border-t">
                           <td className="p-2 text-muted-foreground">{log.timestamp}</td>
                           <td className="p-2">
-                            <div className="font-medium">{log.actor.name}</div>
-                            <div className="text-xs text-muted-foreground">{log.actor.role}</div>
-                          </td>
-                          <td className="p-2">{log.action}</td>
-                          <td className="p-2">
                             <div className="font-medium">{log.target.item}</div>
-                            <div className="text-xs text-muted-foreground">{log.target.type}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {log.target.type}
+                            </div>
                           </td>
                           <td className="p-2 text-xs text-muted-foreground">
-                            {typeof log.changes.fromQty === "number" || typeof log.changes.toQty === "number"
-                              ? `qty: ${log.changes.fromQty ?? "?"} → ${log.changes.toQty ?? "?"}`
-                              : log.changes.fromThreshold != null || log.changes.toThreshold != null
-                                ? `threshold: ${log.changes.fromThreshold ?? "?"} → ${
-                                    log.changes.toThreshold ?? "?"
-                                  }`
-                                : "—"}
+                            qty: {String(log.changes.toQty ?? "—")}, thr:{" "}
+                            {String(log.changes.toThreshold ?? "—")}
                           </td>
                         </tr>
                       ))}
@@ -282,11 +429,8 @@ export function AdminDashboard() {
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-destructive">Audit logs unavailable.</p>
+                <p className="text-sm text-destructive">Audit data unavailable.</p>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                TODO: add filters, pagination, and real backend wiring later.
-              </p>
             </div>
           </div>
         </CardContent>
@@ -294,4 +438,3 @@ export function AdminDashboard() {
     </section>
   );
 }
-

@@ -39,6 +39,9 @@ export function StoreRegionPicker({
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Region and store are UI context only; OrbitDB inventory is not scoped by location yet.
+      </p>
       <div className="flex flex-col gap-2">
         <Label htmlFor="region">Region</Label>
         <select

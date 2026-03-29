@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 import { Role } from "@/lib/roles";
+import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
 
 /**
  * Auth.js config: validates users against codepop_backend/orbitdb REST API.
@@ -13,7 +14,7 @@ import { Role } from "@/lib/roles";
  *
  * API auth header for protected routes: Authorization: Token {token}
  *
- * OrbitDB roles (`admin`, `staff`, `customer`) map to dashboard Role enums.
+ * OrbitDB roles map to dashboard `Role` via `orbitRoleToDashboardRoles`.
  */
 const orbitDbBaseUrl = (
   process.env.ORBITDB_API_URL ?? process.env.DJANGO_API_URL
@@ -27,13 +28,6 @@ const devBypassEnabled =
     process.env.DEV_AUTH_BYPASS === "true");
 
 const devUsername = process.env.DEV_AUTH_BYPASS_USERNAME ?? "dev";
-
-function inferRolesFromOrbitRole(role: string | undefined): Role[] {
-  const r = (role ?? "").toLowerCase();
-  if (r === "admin") return [Role.Admin];
-  if (r === "staff") return [Role.Manager];
-  return [Role.RepairStaff];
-}
 
 function coerceRole(value: unknown): Role | null {
   if (typeof value !== "string") return null;
@@ -61,7 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: "dev",
             email: usernameValue,
             name: "Dev",
-            roles: [selected ?? Role.RepairStaff],
+            roles: [selected ?? Role.Customer],
           };
         }
 
@@ -100,9 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data.username ||
           (credentials.username as string);
         
-        console.log(data.role);
-
-        const roles = inferRolesFromOrbitRole(data.role);
+        const roles = orbitRoleToDashboardRoles(data.role);
 
         return {
           id: String(data.userId),

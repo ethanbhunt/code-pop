@@ -3,6 +3,18 @@
 
 import { getTokensDb, getUsersDb } from "../utils/db.js"
 
+/** DB / seed may use legacy names; admin routes accept these. */
+function hasAdminPrivileges(role) {
+  const r = String(role ?? "").toLowerCase()
+  return r === "admin" || r === "superadmin"
+}
+
+/** Staff-tier and above (legacy `manager` = store manager). */
+function hasStaffPrivileges(role) {
+  const r = String(role ?? "").toLowerCase()
+  return ["staff", "manager", "admin", "superadmin"].includes(r)
+}
+
 /**
  * Authenticate request using token from Authorization header
  * Expects: Authorization: Token {tokenKey}
@@ -95,7 +107,7 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (!req.user.role === "admin") {
+  if (!hasAdminPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
@@ -116,7 +128,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (!req.user.role === "staff") {
+  if (!hasStaffPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"

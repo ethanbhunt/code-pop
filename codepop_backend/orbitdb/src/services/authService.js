@@ -5,6 +5,16 @@ import { getUsersDb, getTokensDb, getNextId, getTimestamp } from "../utils/db.js
 import { hashPassword, comparePassword, generateToken } from "../utils/crypto.js"
 import { validateEmail, validateUsername, validatePassword } from "../utils/validation.js"
 
+/** Persist only customer | staff | admin; map seed/legacy names. */
+function normalizeOrbitRoleForStorage(role) {
+  const r = String(role ?? "customer").trim().toLowerCase()
+  if (!r) return "customer"
+  if (r === "superadmin" || r === "admin") return "admin"
+  if (r === "manager" || r === "staff") return "staff"
+  if (r === "customer" || r === "user") return "customer"
+  return null
+}
+
 /**
  * Register a new user
  * @param {string} username - Username
@@ -50,6 +60,11 @@ export async function registerUser(username, password, email, role = "customer",
     throw new Error("Email already exists")
   }
 
+  const normalizedRole = normalizeOrbitRoleForStorage(role)
+  if (normalizedRole === null) {
+    throw new Error("Invalid role. Use customer, staff, or admin")
+  }
+
   // Hash password
   const passwordHash = await hashPassword(password)
 
@@ -64,7 +79,7 @@ export async function registerUser(username, password, email, role = "customer",
     email,
     firstName,
     lastName,
-    role,
+    role: normalizedRole,
     dateJoined: getTimestamp(),
     lastLogin: null
   }
@@ -231,8 +246,21 @@ export async function updateUser(userId, updates) {
   }
 
   // Only allow certain fields to be updated
-  if (updates.firstName) user.firstName = updates.firstName
-  if (updates.lastName) user.lastName = updates.lastName
+  if (updates.firstName !== undefined) user.firstName = updates.firstName
+  if (updates.lastName !== undefined) user.lastName = updates.lastName
+
+  if (updates.role !== undefined) {
+    const raw = String(updates.role).trim().toLowerCase()
+    if (raw === "" || raw === "unchanged") {
+      // no-op (Django-style sentinel or empty)
+    } else {
+      const normalized = normalizeOrbitRoleForStorage(updates.role)
+      if (normalized === null) {
+        throw new Error("Invalid role")
+      }
+      user.role = normalized
+    }
+  }
 
   // Email can be updated but must be unique
   if (updates.email) {

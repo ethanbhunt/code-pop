@@ -2,8 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { Role } from "@/lib/roles";
+import { Suspense, useState } from "react";
+import { ALL_ROLES, Role } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
@@ -30,7 +30,7 @@ export default function LoginPage() {
   const devBypassEnabled =
     process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true" ||
     process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
-  const [devRole, setDevRole] = useState<Role>(Role.RepairStaff);
+  const [devRole, setDevRole] = useState<Role>(Role.Customer);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
@@ -120,7 +120,7 @@ export default function LoginPage() {
                     }
                     className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none"
                   >
-                    {Object.values(Role).map((r) => (
+                    {ALL_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {r}
                       </option>
@@ -143,5 +143,19 @@ export default function LoginPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 text-sm text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }
