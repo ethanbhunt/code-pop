@@ -191,3 +191,48 @@ export function validateTemperature(temperature) {
   const allowedTemperatures = ["hot", "cold", "iced"]
   return allowedTemperatures.includes(temperature.toLowerCase())
 }
+
+/**
+ * Validate transfer status
+ */
+export function validateTransferStatus(status) {
+  if (!status || typeof status !== "string") return false
+  const allowedStatuses = ["pending", "scheduled", "in_transit", "delivered", "cancelled"]
+  return allowedStatuses.includes(status.toLowerCase())
+}
+
+/**
+ * Validate machine status
+ */
+export function validateMachineStatus(status) {
+  if (!status || typeof status !== "string") return false
+  const allowedStatuses = ["operational", "in_service", "out_of_service"]
+  return allowedStatuses.includes(status.toLowerCase())
+}
+
+/**
+ * Validate assignment status
+ */
+export function validateAssignmentStatus(status) {
+  if (!status || typeof status !== "string") return false
+  const allowedStatuses = ["scheduled", "in_transit", "delivered", "cancelled"]
+  return allowedStatuses.includes(status.toLowerCase())
+}
+
+/**
+ * Validate reorder notification status
+ */
+export function validateReorderStatus(status) {
+  if (!status || typeof status !== "string") return false
+  const allowedStatuses = ["pending", "acknowledged", "fulfilled"]
+  return allowedStatuses.includes(status.toLowerCase())
+}
+
+/**
+ * Validate user role/enum
+ */
+export function validateUserRole(role) {
+  if (!role || typeof role !== "string") return false
+  const allowedRoles = ["customer", "staff", "repair", "manager", "admin", "super_admin"]
+  return allowedRoles.includes(role.toLowerCase())
+}

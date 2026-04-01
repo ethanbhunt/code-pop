@@ -4,13 +4,14 @@
 import { getOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
 
-export async function createOrder(userId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
+export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
   const ordersDb = getOrdersDb()
   const orderId = await getNextId(ordersDb, "order")
 
   const order = {
     orderId,
     userId,
+    storeId,
     drinkIds: Array.isArray(drinkIds) ? drinkIds : [],
     quantities: quantities || {},
     specialInstructions: specialInstructions || "",
@@ -46,6 +47,23 @@ export async function getUserOrders(userId) {
     }
   }
   return orders
+}
+
+export async function getStoreOrders(storeId, offset = 0, limit = 50) {
+  const ordersDb = getOrdersDb()
+  const allOrders = await ordersDb.all()
+  
+  const storeOrders = allOrders
+    .filter(entry => entry.value && entry.value.storeId === storeId)
+    .map(entry => entry.value)
+    .sort((a, b) => new Date(b.creationTime) - new Date(a.creationTime))
+  
+  const paginatedOrders = storeOrders.slice(offset, offset + limit)
+  
+  return {
+    count: storeOrders.length,
+    data: paginatedOrders
+  }
 }
 
 export async function listAllOrders(limit = 100) {

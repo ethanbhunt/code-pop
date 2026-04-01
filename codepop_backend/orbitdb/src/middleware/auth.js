@@ -69,7 +69,8 @@ export async function authenticate(req, res, next) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      enum: user.enum
+      userRole: user.userRole,
+      assignedStores: user.assignedStores || []
     }
     req.token = tokenKey
 
@@ -95,11 +96,111 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (!req.user.enum === "admin") {
+  if (req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
     })
+  }
+
+  next()
+}
+
+/**
+ * Require super admin permission
+ */
+export function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "super_admin") {
+    return res.status(403).json({
+      error: "Super admin privileges required",
+      code: "NOT_SUPER_ADMIN"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require manager or admin permission
+ */
+export function requireManager(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "manager" && req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
+    return res.status(403).json({
+      error: "Manager privileges required",
+      code: "NOT_MANAGER"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require repair user permission
+ */
+export function requireRepair(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "repair") {
+    return res.status(403).json({
+      error: "Repair user privileges required",
+      code: "NOT_REPAIR"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require store access (manager/admin must have store in assignedStores)
+ */
+export function requireStoreAccess(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  // Super admin can access all stores
+  if (req.user.userRole === "super_admin") {
+    return next()
+  }
+
+  // Manager/admin must have store in assignedStores
+  if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    const storeId = parseInt(req.params.storeId || req.query.storeId)
+    if (!storeId) {
+      return res.status(400).json({
+        error: "storeId parameter required",
+        code: "MISSING_STORE_ID"
+      })
+    }
+
+    if (!req.user.assignedStores.includes(storeId)) {
+      return res.status(403).json({
+        error: "Access denied to this store",
+        code: "STORE_ACCESS_DENIED"
+      })
+    }
   }
 
   next()
@@ -116,7 +217,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (!req.user.enum === "staff") {
+  if (req.user.userRole !== "staff" && req.user.userRole !== "manager" && req.user.userRole !== "admin") {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"
@@ -166,16 +267,17 @@ export async function optionalAuth(req, res, next) {
     const usersDb = getUsersDb()
     const user = await usersDb.get(`user:${tokenEntry.userId}`)
 
-    if (user) {
-      req.user = {
-        userId: user.userId,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        enum: user.enum
-      }
-      req.token = tokenKey
+     if (user) {
+       req.user = {
+         userId: user.userId,
+         username: user.username,
+         email: user.email,
+         firstName: user.firstName,
+         lastName: user.lastName,
+         userRole: user.userRole,
+         assignedStores: user.assignedStores || []
+       }
+       req.token = tokenKey
     } else {
       req.user = null
     }
