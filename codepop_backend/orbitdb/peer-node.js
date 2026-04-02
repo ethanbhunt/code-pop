@@ -32,6 +32,10 @@ import notificationRoutes from "./src/routes/notifications.js"
 import revenueRoutes from "./src/routes/revenues.js"
 import paymentRoutes from "./src/routes/payments.js"
 import qrcodeRoutes from "./src/routes/qrcodes.js"
+import storeRoutes from "./src/routes/stores.js"
+import maintenanceRoutes from "./src/routes/maintenance.js"
+import logisticsRoutes from "./src/routes/logistics.js"
+import adminRoutes from "./src/routes/admin.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -183,6 +187,10 @@ async function start() {
     app.use("/backend/revenues", revenueRoutes)
     app.use("/backend/payments", paymentRoutes)
     app.use("/backend/qrcodes", qrcodeRoutes)
+    app.use("/backend/stores", storeRoutes)
+    app.use("/backend/maintenance", maintenanceRoutes)
+    app.use("/backend/logistics", logisticsRoutes)
+    app.use("/backend/admin", adminRoutes)
 
     // ── Test endpoints (direct database access) ────────────────────────────────
     app.get("/test/users/get/:key", authenticate, (req, res) => {
@@ -221,12 +229,16 @@ async function start() {
       console.log(`   - Auth & Users`)
       console.log(`   - Preferences`)
       console.log(`   - Drinks`)
-      console.log(`   - Orders`)
-      console.log(`   - Inventory`)
-      console.log(`   - Notifications`)
+      console.log(`   - Orders (store-scoped)`)
+      console.log(`   - Inventory (store-scoped)`)
+      console.log(`   - Notifications (with reorder alerts)`)
       console.log(`   - Revenues`)
       console.log(`   - Payments`)
-      console.log(`   - QR Codes\n`)
+      console.log(`   - QR Codes`)
+      console.log(`   - Stores Management`)
+      console.log(`   - Maintenance & Machines`)
+      console.log(`   - Logistics & Transfers`)
+      console.log(`   - Admin Reports\n`)
     })
 
   } catch (err) {

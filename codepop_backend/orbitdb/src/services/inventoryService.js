@@ -3,8 +3,9 @@
 
 import { getInventoryDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateInventoryItemType, validatePositiveInteger } from "../utils/validation.js"
+import * as reorderService from "./reorderService.js"
 
-export async function createInventoryItem(itemName, itemType, quantity, thresholdLevel, costPerUnit = null, supplier = null) {
+export async function createInventoryItem(storeId, itemName, itemType, quantity, thresholdLevel, costPerUnit = null, supplier = null) {
   if (!itemName || !itemType) {
     throw new Error("Item name and type are required")
   }
@@ -27,10 +28,11 @@ export async function createInventoryItem(itemName, itemType, quantity, threshol
 
   const item = {
     inventoryId: itemId,
+    storeId: storeId,
     itemName,
     itemType,
     quantity: parseInt(quantity, 10),
-    thresholdLevel: parseInt(thresholdLevel, 10),
+    minThreshold: parseInt(thresholdLevel, 10),
     costPerUnit: costPerUnit ? parseFloat(costPerUnit) : null,
     supplier: supplier || null,
     lastRestocked: getTimestamp(),
@@ -71,9 +73,26 @@ export async function updateInventoryQuantity(itemId, newQuantity) {
     throw new Error("Quantity must be a non-negative integer")
   }
 
+  const oldQuantity = item.quantity
   item.quantity = parseInt(newQuantity, 10)
   item.lastUpdated = getTimestamp()
   await inventoryDb.put(`inventory:${itemId}`, item)
+  
+  // Check if crossed threshold downward - auto-trigger reorder notification
+  if (oldQuantity > item.minThreshold && item.quantity <= item.minThreshold) {
+    // Check if notification already exists to avoid duplicates
+    const hasNotif = await reorderService.hasOpenReorderNotification(itemId)
+    if (!hasNotif) {
+      await reorderService.createReorderNotification(
+        item.storeId,
+        itemId,
+        item.itemName,
+        item.minThreshold,
+        item.quantity
+      )
+    }
+  }
+  
   return item
 }
 
@@ -86,8 +105,11 @@ export async function updateInventoryItem(itemId, updates) {
   if (updates.quantity !== undefined) {
     item.quantity = parseInt(updates.quantity, 10)
   }
+  if (updates.minThreshold !== undefined) {
+    item.minThreshold = parseInt(updates.minThreshold, 10)
+  }
   if (updates.thresholdLevel !== undefined) {
-    item.thresholdLevel = parseInt(updates.thresholdLevel, 10)
+    item.minThreshold = parseInt(updates.thresholdLevel, 10)
   }
   if (updates.costPerUnit !== undefined) {
     item.costPerUnit = updates.costPerUnit ? parseFloat(updates.costPerUnit) : null
@@ -126,17 +148,39 @@ export async function deleteInventoryItem(itemId) {
   return true
 }
 
-export async function getLowStockItems() {
+export async function getLowStockItems(storeId = null) {
   const inventoryDb = getInventoryDb()
   const allItems = await inventoryDb.all()
   const lowStock = []
   for (const entry of allItems) {
     const item = entry.value
-    if (item && item.inventoryId && item.quantity <= item.thresholdLevel) {
-      lowStock.push(item)
+    if (item && item.inventoryId) {
+      const threshold = item.minThreshold || item.thresholdLevel || 0
+      if (item.quantity <= threshold) {
+        if (storeId === null || item.storeId === storeId) {
+          lowStock.push(item)
+        }
+      }
     }
   }
   return lowStock
+}
+
+export async function getStoreInventory(storeId, offset = 0, limit = 50) {
+  const inventoryDb = getInventoryDb()
+  const allItems = await inventoryDb.all()
+  
+  const storeItems = allItems
+    .filter(entry => entry.value && entry.value.storeId === storeId)
+    .map(entry => entry.value)
+    .sort((a, b) => a.itemName.localeCompare(b.itemName))
+  
+  const paginatedItems = storeItems.slice(offset, offset + limit)
+  
+  return {
+    count: storeItems.length,
+    data: paginatedItems
+  }
 }
 
 export async function generateInventoryReport() {
@@ -150,7 +194,8 @@ export async function generateInventoryReport() {
     const item = entry.value
     if (item && item.inventoryId) {
       items.push(item)
-      if (item.quantity <= item.thresholdLevel) {
+      const threshold = item.minThreshold || item.thresholdLevel || 0
+      if (item.quantity <= threshold) {
         lowStockItems.push(item)
       }
     }

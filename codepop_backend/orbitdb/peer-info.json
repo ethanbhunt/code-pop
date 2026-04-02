@@ -9,13 +9,16 @@
     "notifications": "/orbitdb/zdpuAtwbHWqSEzEfb6Fw1mSq2s8VZPRBy8mnFAiskkj2HCXJE",
     "revenues": "/orbitdb/zdpuAtvPgq28r2KWkpAHWDJdhFGnJbJgex9aSV9VLNURYjmGp",
     "payments": "/orbitdb/zdpuAsenCBsAfgFoZzWfayo2L9BoyjF9CqBZdbd6d3xVpdjPS",
-    "qrcodes": "/orbitdb/zdpuAy4xogptVRVNLfSHinzzgSEcgXXUbukDmNyXgXHjRhgnX"
+    "qrcodes": "/orbitdb/zdpuAy4xogptVRVNLfSHinzzgSEcgXXUbukDmNyXgXHjRhgnX",
+    "stores": "/orbitdb/zdpuAmeRid5xXzFuxKtMR8pwx8uHpD8rVXU4neFhmiS2i1aFE",
+    "maintenance": "/orbitdb/zdpuAthTfFMPZGPMryWV6icE6GNteVXxVvidXL8sVghCR6mkk",
+    "logistics": "/orbitdb/zdpuApdjtyqwTVGJxGYLvphH52rZtoJqYHsY7aEPUbpRJA61E"
   },
   "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWJ3nzMnBmR4MkTEbQrgkA6bwbF9JCDKffGsKu2mCwoR2h",
-    "/ip4/144.39.111.212/tcp/4000/p2p/12D3KooWJ3nzMnBmR4MkTEbQrgkA6bwbF9JCDKffGsKu2mCwoR2h",
-    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWJ3nzMnBmR4MkTEbQrgkA6bwbF9JCDKffGsKu2mCwoR2h"
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWFBUqA1HNw8qqwWzZKWrWTZfmMaxq3HubKsNERQwku558",
+    "/ip4/144.39.111.212/tcp/4000/p2p/12D3KooWFBUqA1HNw8qqwWzZKWrWTZfmMaxq3HubKsNERQwku558",
+    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWFBUqA1HNw8qqwWzZKWrWTZfmMaxq3HubKsNERQwku558"
   ],
-  "peerId": "12D3KooWJ3nzMnBmR4MkTEbQrgkA6bwbF9JCDKffGsKu2mCwoR2h",
-  "timestamp": "2026-03-25T00:59:20.511Z"
+  "peerId": "12D3KooWFBUqA1HNw8qqwWzZKWrWTZfmMaxq3HubKsNERQwku558",
+  "timestamp": "2026-04-01T23:19:22.629Z"
 }
