@@ -1,25 +1,25 @@
 // Ingredients.js
 // you may have to change juice options to add ins
 const sodaOptions = [
-  { label: 'mtn. dew', value: 'mtn. dew', color: '#76cfae' },  // Bright yellow-green
-  { label: 'diet mtn. dew', value: 'diet mtn. dew', color: '#a9dbc9' },  // Light green-yellow
-  { label: 'dr. pepper', value: 'dr. pepper', color: '#6A1B9A' },  // Purple
-  { label: 'diet dr. pepper', value: 'diet dr. pepper', color: '#9C27B0' },  // Light purple
-  { label: 'dr. pepper zero', value: 'dr. pepper zero', color: '#9C27B9' },
-  { label: 'dr pepper cream soda', value: 'dr pepper cream soda', color: '#fc1947' },  // Dark red
-  { label: 'sprite', value: 'sprite', color: '#A2D2A6' },  // Mint green
-  { label: 'sprite zero', value: 'sprite zero', color: '#C8E6C9' },  // Soft green
-  { label: 'coke', value: 'coke', color: '#fc1947' },  // Dark red
-  { label: 'diet coke', value: 'diet coke', color: '#f75979' },  // Light gray
-  { label: 'coke zero', value: 'coke zero', color: '#fc1940' },  // Dark red
-  { label: 'pepsi', value: 'pepsi', color: '#1565C0' },  // Blue
-  { label: 'diet pepsi', value: 'diet pepsi', color: '#1E88E5' },  // Lighter blue
-  { label: 'rootbeer', value: 'rootbeer', color: '#4E342E' },  // Dark brown
-  { label: 'fanta', value: 'fanta', color: '#FF7043' },  // Orange
-  { label: 'big red', value: 'big red', color: '#c75552' },  // Red
-  { label: 'poweraid', value: 'poweraid', color: '#71bde3' },  // Purple pink
-  { label: 'lemonade', value: 'lemonade', color: '#FBC02D' },  // Lemon yellow
-  { label: 'light lemonade', value: 'light lemonade', color: '#FFF176' },  // Soft yellow
+  { label: 'mtn. dew', value: 'mtn. dew', color: '#76cfae', image: require('../../assets/sodas/mtn_dew.png') },  // Bright yellow-green
+  { label: 'diet mtn. dew', value: 'diet mtn. dew', color: '#a9dbc9', image: require('../../assets/sodas/diet_mtn_dew.png') },  // Light green-yellow
+  { label: 'dr. pepper', value: 'dr. pepper', color: '#6A1B9A', image: require('../../assets/sodas/dr_pepper.png') },  // Purple
+  { label: 'diet dr. pepper', value: 'diet dr. pepper', color: '#9C27B0', image: require('../../assets/sodas/dr_pepper.png') },  // Light purple
+  { label: 'dr. pepper zero', value: 'dr. pepper zero', color: '#9C27B9', image: require('../../assets/sodas/dr_pepper.png') },
+  { label: 'dr pepper cream soda', value: 'dr pepper cream soda', color: '#fc1947', image: require('../../assets/sodas/dr_pepper.png') },  // Dark red
+  { label: 'sprite', value: 'sprite', color: '#A2D2A6', image: require('../../assets/sodas/sprite.png') },  // Mint green
+  { label: 'sprite zero', value: 'sprite zero', color: '#C8E6C9', image: require('../../assets/sodas/sprite.png') },  // Soft green
+  { label: 'coke', value: 'coke', color: '#fc1947', image: require('../../assets/sodas/coke.png') },  // Dark red
+  { label: 'diet coke', value: 'diet coke', color: '#f75979', image: require('../../assets/sodas/diet_coke.png') },  // Light gray
+  { label: 'coke zero', value: 'coke zero', color: '#fc1940', image: require('../../assets/sodas/coke_zero.png') },  // Dark red
+  { label: 'pepsi', value: 'pepsi', color: '#1565C0', image: require('../../assets/sodas/pepsi.png') },  // Blue
+  { label: 'diet pepsi', value: 'diet pepsi', color: '#1E88E5', image: require('../../assets/sodas/diet_pepsi.png') },  // Lighter blue
+  { label: 'rootbeer', value: 'rootbeer', color: '#4E342E', image: require('../../assets/sodas/rootbeer.png') },  // Dark brown
+  { label: 'fanta', value: 'fanta', color: '#FF7043', image: require('../../assets/sodas/fanta.png') },  // Orange
+  { label: 'big red', value: 'big red', color: '#c75552', image: require('../../assets/sodas/big_red.png') },  // Red
+  { label: 'powerade', value: 'powerade', color: '#71bde3', image: require('../../assets/sodas/powerade.png') },  // Purple pink
+  { label: 'lemonade', value: 'lemonade', color: '#FBC02D', image: require('../../assets/sodas/lemonade.png') },  // Lemon yellow
+  { label: 'light lemonade', value: 'light lemonade', color: '#FFF176', image: require('../../assets/sodas/lemonade.png') },  // Soft yellow
 ];
 
 const syrupOptions = [

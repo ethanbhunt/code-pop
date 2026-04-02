@@ -16,6 +16,9 @@ const CreateDrinkPage = () => {
   const [drinkDict, setDrinkDict] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [aiPromptText, setAiPromptText] = useState('');
+  const [lastPrompt, setLastPrompt] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [openDropdown, setOpenDropdown] = useState({
     sodas: false,
     syrups: false,
@@ -31,10 +34,7 @@ const CreateDrinkPage = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (route.params?.fromGenerateButton) {
-        console.log("Generating drinks activated from home page button");
-        GenerateAI();
-      }
+      // Auto-generation disabled; user must manually click Random Drink or enter a prompt
       resetDrinkForm();
     }, [route.params?.fromGenerateButton, route.params?.fromCartPage])
   );
@@ -52,11 +52,9 @@ const CreateDrinkPage = () => {
       // check if ice and size have been selected
       if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
 
-        Alert.alert("Dont forget to choose a Soda, Size and, Ice Ammount!")
+        Alert.alert("Choose soda, size, and ice before adding your drink.")
 
       }else{
-        const token = await AsyncStorage.getItem('userToken');
-    
         const response = await fetch(`${BASE_URL}/backend/drinks/`, {
           method: 'POST',
           headers: {
@@ -80,7 +78,7 @@ const CreateDrinkPage = () => {
         // add drink item (the drinks ID) to the checkout list from App.js
         try{
           // gets list of out of storage on your phone
-          cartList = await AsyncStorage.getItem("checkoutList");
+          let cartList = await AsyncStorage.getItem("checkoutList");
           const currentList = cartList ? JSON.parse(cartList) : [];
           // takes the response (what we get after we create a drink) and extracts the drinkID
           const data = await response.json();
@@ -165,6 +163,7 @@ const CreateDrinkPage = () => {
   // function for generate drink button which generates a drink with AI   
     
   const GenerateAI = async () => {
+    setIsGenerating(true);
     try {
       const user_id = await AsyncStorage.getItem('userId');
       let url = `${BASE_URL}/backend/generate/`;
@@ -186,11 +185,52 @@ const CreateDrinkPage = () => {
 
       const drink = await response.json();
       setDrinkDict(drink);
+      setLastPrompt(null);
       setModalVisible(true);
       console.log(drink);
     }
     catch (error) {
       console.error('Error when trying to generate AI drink:', error);
+      Alert.alert('AI generator unavailable', 'Try again in a moment.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const GenerateAIFromPrompt = async (promptText) => {
+    if (!promptText.trim()) return;
+    setIsGenerating(true);
+    try {
+      const user_id = await AsyncStorage.getItem('userId');
+      let url = `${BASE_URL}/backend/generate/`;
+
+      if (user_id) {
+        url = `${BASE_URL}/backend/generate/${user_id}/`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: promptText }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error generating AI drink from prompt. Status: ${response.status}`);
+      }
+
+      const drink = await response.json();
+      setDrinkDict(drink);
+      setLastPrompt(promptText);
+      setModalVisible(true);
+      setAiPromptText('');
+      console.log(drink);
+    } catch (error) {
+      console.error('Error generating AI drink from prompt:', error);
+      Alert.alert('Prompt generation failed', 'Please try a different prompt.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -226,109 +266,149 @@ const CreateDrinkPage = () => {
   };  
   
   const layers = getLayers(SodaUsed, SyrupsUsed, AddIns);
+
+  const formatSelection = (list) => (list.length ? list.join(', ') : 'None');
   
 
   return (
     <View style={styles.wholePage}>
+      <ScrollView style={styles.padding} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.aiHeroCard}>
+          <Text style={styles.heroLabel}>AI Mixologist</Text>
+          <Text style={styles.heroTitle}>Randomize your drink!</Text>
+          <Text style={styles.heroBody}>
+            Enter what drink, syrups, or add-ins you want included.
+          </Text>
 
-      <ScrollView style={styles.padding}>
-      <View style={styles.rowContainer}>
-        {/* Size buttons on the left */}
-        <View style={styles.buttonContainerLeft}>
-          {['16oz', '24oz', '32oz'].map((size) => (
+          <View style={styles.aiPromptContainer}>
+            <TextInput
+              placeholder="Enter your drink keywords"
+              placeholderTextColor="#7b8da1"
+              style={styles.aiPromptInput}
+              value={aiPromptText}
+              onChangeText={setAiPromptText}
+              onSubmitEditing={() => GenerateAIFromPrompt(aiPromptText)}
+            />
             <TouchableOpacity
-              key={size}
-              onPress={() => handleSizeSelection(size)}
-              style={[
-                styles.circularButton,
-                selectedSize === size && styles.circularButtonSelected,
-              ]}
+              onPress={() => GenerateAIFromPrompt(aiPromptText)}
+              style={styles.aiSendButton}
+              disabled={isGenerating}
             >
-              <Text style={[styles.buttonText, selectedSize === size && styles.selectedButtonText]}>
-                {size}
-              </Text>
+              <Text style={styles.aiSendButtonText}>{isGenerating ? '...' : 'Go'}</Text>
             </TouchableOpacity>
-          ))}
+          </View>
+          <TouchableOpacity onPress={GenerateAI} style={styles.randomDrinkButton} disabled={isGenerating}>
+            <Text style={styles.randomDrinkButtonText}>{isGenerating ? 'Generating...' : 'Surprise Me'}</Text>
+          </TouchableOpacity>
         </View>
 
-        
-        <View style={styles.graphicContainer}>
-          <View style={styles.straw}></View>
-          {/* Drink graphic in the center */}
-          <Gif layers={layers}/>
+        <View style={styles.previewCard}>
+          <View style={styles.selectionRow}>
+            <View style={styles.selectionCard}>
+              <Text style={styles.selectionTitle}>Size</Text>
+              <View style={styles.selectionPillsWrap}>
+                {['16oz', '24oz', '32oz'].map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    onPress={() => handleSizeSelection(size)}
+                    style={[
+                      styles.pillButton,
+                      selectedSize === size && styles.pillButtonSelected,
+                    ]}
+                  >
+                    <Text style={[styles.pillText, selectedSize === size && styles.pillTextSelected]}>{size}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-          {/* Button to generate drinks */}
-          <TouchableOpacity onPress={GenerateAI} style={styles.button}>
-            <Text style={styles.buttonText}>Generate Drink With AI!</Text>
-          </TouchableOpacity>
+            <View style={styles.selectionCard}>
+              <Text style={styles.selectionTitle}>Ice</Text>
+              <View style={styles.selectionPillsWrap}>
+                {['No Ice', 'Light', 'Regular', 'Extra'].map((ice) => (
+                  <TouchableOpacity
+                    key={ice}
+                    onPress={() => handleIceSelection(ice)}
+                    style={[
+                      styles.pillButton,
+                      selectedIce === ice && styles.pillButtonSelected,
+                    ]}
+                  >
+                    <Text style={[styles.pillText, selectedIce === ice && styles.pillTextSelected]}>{ice}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
 
-          {/* AIAlert Modal */}
+          
+        </View>
+
         {drinkDict && (
           <AIAlert
             isModalVisible={isModalVisible}
             toggleModal={() => (setModalVisible(false))}
             drinkDict={drinkDict}
+            onRegenerate={() => {
+              if (lastPrompt) {
+                GenerateAIFromPrompt(lastPrompt);
+              } else {
+                GenerateAI();
+              }
+            }}
           />
         )}
+
+        <View style={styles.ingredientsCard}>
+          <TextInput
+            placeholder="Search ingredients"
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={handleSearch}
+            placeholderTextColor="#6f7f91"
+          />
+
+          <DropDown
+            title="Sodas"
+            options={filterOptions(sodaOptions)}
+            onSelect={handleSodaSelection}
+            isOpen={openDropdown.sodas}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
+            selectedValues={SodaUsed}
+          />
+          <DropDown
+            title="Syrups"
+            options={filterOptions(syrupOptions)}
+            onSelect={handleSyrupSelection}
+            isOpen={openDropdown.syrups}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
+            selectedValues={SyrupsUsed}
+            tintByFlavor
+          />
+          <DropDown
+            title="AddIns"
+            options={filterOptions(AddInOptions)}
+            onSelect={handleAddInSelection}
+            isOpen={openDropdown.addins}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, addins: !prev.addins }))}
+            selectedValues={AddIns}
+            tintByFlavor
+          />
         </View>
 
-        {/* Ice buttons on the right */}
-        <View style={styles.buttonContainerRight}>
-          {['No Ice', 'Light', 'Regular', 'Extra'].map((ice) => (
-            <TouchableOpacity
-              key={ice}
-              onPress={() => handleIceSelection(ice)}
-              style={[
-                styles.circularButton,
-                selectedIce === ice && styles.circularButtonSelected,
-              ]}
-            >
-              <Text style={[styles.buttonText, selectedIce === ice && styles.selectedButtonText]}>{ice}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryHeading}>Current Drink</Text>
+          <Text style={styles.summaryText}>Size: {selectedSize || 'None'}</Text>
+          <Text style={styles.summaryText}>Ice: {selectedIce || 'None'}</Text>
+          <Text style={styles.summaryText}>Soda: {formatSelection(SodaUsed)}</Text>
+          <Text style={styles.summaryText}>Syrups: {formatSelection(SyrupsUsed)}</Text>
+          <Text style={styles.summaryText}>Add-ins: {formatSelection(AddIns)}</Text>
         </View>
-      </View>
 
-      {/* Button to add to cart */}
-      <TouchableOpacity onPress={addToCart} style={styles.button}>
-        <Text style={styles.buttonText}>Add to Cart</Text>
-      </TouchableOpacity>
+        <TouchableOpacity onPress={addToCart} style={styles.button}>
+            <Text style={styles.buttonText}>Add to Cart</Text>
+          </TouchableOpacity>
 
-      {/* Search Input */}
-      <TextInput
-        placeholder="Search ingredients"
-        style={styles.searchInput}
-        value={searchText}
-        onChangeText={handleSearch}
-      />
-
-      {/* Dropdowns */}
-      <View style={styles.navBarSpace}>
-        <DropDown 
-          title="Sodas" 
-          options={filterOptions(sodaOptions)} 
-          onSelect={handleSodaSelection} 
-          isOpen={openDropdown.sodas}
-          setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
-          selectedValues={SodaUsed}
-        />
-        <DropDown 
-          title="Syrups" 
-          options={filterOptions(syrupOptions)} 
-          onSelect={handleSyrupSelection} 
-          isOpen={openDropdown.syrups}
-          setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
-          selectedValues={SyrupsUsed}
-        />
-        <DropDown 
-          title="AddIns" 
-          options={filterOptions(AddInOptions)} 
-          onSelect={handleAddInSelection} 
-          isOpen={openDropdown.addins}
-          setOpen={() => setOpenDropdown(prev => ({ ...prev, addins: !prev.addins }))}
-          selectedValues={AddIns}
-        />
-      </View>
       </ScrollView>
       <NavBar/>
     </View>
@@ -338,100 +418,199 @@ const CreateDrinkPage = () => {
 const styles = StyleSheet.create({
   wholePage: {
     flex: 1,
-    backgroundColor: '#FFA686',
-    // padding: 10,
+    backgroundColor: '#ffffff',
   },
   padding: {
-    padding: 10,
+    paddingHorizontal: 12,
   },
-  navBarSpace: {
-    marginBottom: 80,
+  contentContainer: {
+    paddingTop: 12,
+    paddingBottom: 120,
   },
-  rowContainer: {
+  aiHeroCard: {
+    borderRadius: 15,
+    backgroundColor: '#022B3A',
+    padding: 16,
+    shadowColor: '#0f2538',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    elevation: 7,
+  },
+  heroLabel: {
+    color: '#BFDBF7',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    marginTop: 6,
+    color: '#fff',
+    fontSize: 27,
+    fontWeight: '800',
+    lineHeight: 31,
+  },
+  heroBody: {
+    marginTop: 8,
+    color: '#dcefff',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  previewCard: {
+    marginTop: 12,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  selectionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10, // Add padding on sides
-    flex: 1,
   },
-  buttonContainerLeft: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'space-around',
-    width: '30%', // Adjust width as needed
+  selectionCard: {
+    width: '48.5%',
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff',
   },
-  buttonContainerRight: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    width: '30%', // Adjust width as needed
+  selectionTitle: {
+    color: '#1c334d',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  selectionPillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   graphicContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1, // Center the graphic
+    minHeight: 240,
+    marginTop: 12,
   },
-  drinkGraphicText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  summaryCard: {
+    marginTop: 6,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  summaryHeading: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginBottom: 4,
+  },
+  summaryText: {
+    color: '#49627d',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   button: {
-    backgroundColor: '#D30C7B',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    backgroundColor: '#1F7A8C',
+    paddingVertical: 14,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginVertical: 5,
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '800',
   },
-  circularButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#D30C7B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F92758',
-    margin: 5,
+  pillButton: {
+    backgroundColor: '#E1E5F2',
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
+    borderRadius: 999,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginRight: 9,
+    marginBottom: 9,
   },
-  circularButtonSelected: {
-    borderColor: '#8DF1D3',
-    backgroundColor: '#E8F5E9',
+  pillButtonSelected: {
+    backgroundColor: '#1F7A8C',
+    borderColor: '#1F7A8C',
   },
-  selectedButtonText: {
-    color: '#000', // Black color for selected text
+  pillText: {
+    color: '#2f4a66',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  pillTextSelected: {
+    color: '#fff',
   },
   searchInput: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 3,
-    paddingHorizontal: 10,
-    width: '80%',
-    marginVertical: 15,
-    borderRadius: 5,
-    alignSelf: 'center', // Center the search input
+    borderColor: '#d6e5f3',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    color: '#243b52',
+    marginVertical: 10,
   },
-  straw: {
-    position: 'absolute',
-    top: 10, // Position the straw above the cup
-    left: '50%',
-    width: 10,
-    height: 240,
-    backgroundColor: 'F92758',  // Straw color
-    borderRadius: 5,
-    transform: [{ translateX: -5 }],  // Center the straw horizontally
-    zIndex: 1, // Ensure straw appears on top of the drink container
+  aiPromptContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  aiPromptInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d6e5f3',
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: '#fff',
+    color: '#243b52',
+  },
+  aiSendButton: {
+    marginLeft: 6,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  aiSendButtonText: {
+    color: '#fff',
+    fontWeight: '800',
+  },
+  randomDrinkButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 10,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  randomDrinkButtonText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  ingredientsCard: {
+    marginTop: 12,
+    marginBottom: 10,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    padding: 12,
+  },
+  ingredientsTitle: {
+    color: '#1c334d',
+    fontSize: 18,
+    fontWeight: '800',
   },
 });
 

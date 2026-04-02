@@ -7,37 +7,39 @@ import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
 import Modal from 'react-native-modal';
 
-const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
+const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
   const navigation = useNavigation();
 
   const createObj = async () => {
     try {
-      // Ensure SodaUsed, SyrupsUsed, and AddIns are arrays
-      const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
-      const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
-      const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
-  
-      // If SodaUsed is empty, set it to ["DefaultSoda"] (or any default soda)
-      if (sodaUsed.length === 0) {
-        console.warn('SodaUsed is empty, setting to default soda.');
-      }
-  
-      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          Name: "AI drink", // Example name for the drink
-          SodaUsed: sodaUsed, // Make sure it's an array with at least one item
-          SyrupsUsed: syrupsUsed, // Make sure it's an array
-          AddIns: addIns, // Make sure it's an array
-          Price: 2.00,
-          User_Created: true,
-          Size: drinkDict.Size || "24oz", // Default size
-          Ice: drinkDict.Ice || "regular", // Default ice amount
-        }),
-      });
+       const token = await AsyncStorage.getItem('userToken');
+       // Ensure sodaUsed, syrupsUsed, and addIns are arrays
+       const sodaUsed = Array.isArray(drinkDict.sodaUsed) && drinkDict.sodaUsed.length > 0 ? drinkDict.sodaUsed : [drinkDict.sodaUsed];
+       const syrupsUsed = Array.isArray(drinkDict.syrupsUsed) ? drinkDict.syrupsUsed : [];
+       const addIns = Array.isArray(drinkDict.addIns) ? drinkDict.addIns : [];
+   
+       // If sodaUsed is empty, set it to ["DefaultSoda"] (or any default soda)
+       if (sodaUsed.length === 0) {
+         console.warn('sodaUsed is empty, setting to default soda.');
+       }
+   
+       const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify({
+           name: "AI drink", // Example name for the drink
+           sodaUsed: sodaUsed, // Make sure it's an array with at least one item
+           syrupsUsed: syrupsUsed, // Make sure it's an array
+           addIns: addIns, // Make sure it's an array
+           price: 2.00,
+           userCreated: true,
+           size: drinkDict.size || "24oz", // Default size
+           ice: (drinkDict.ice || "normal").toLowerCase(), // Default ice amount, convert to lowercase
+         }),
+       });
   
       // Check if the response is not OK (status code not in the range 200-299)
       if (!response.ok) {
@@ -47,12 +49,13 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
         throw new Error(`Failed to create drink: ${response.status} - ${errorText}`);
       }
   
-      const data = await response.json();
+      const responseData = await response.json();
+      const data = responseData.data;
       // gets list of out of storage on your phone
       let cartList = await AsyncStorage.getItem("checkoutList");
       const currentList = cartList ? JSON.parse(cartList) : [];
   
-      const drinkID = data.DrinkID; // assuming the response contains DrinkID
+      const drinkID = data.drinkId; // assuming the response contains drinkId
       const updatedList = [...currentList, drinkID];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
 
@@ -115,6 +118,7 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
     });
     return layers;
   };
+
   const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
   const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
   const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
@@ -135,37 +139,39 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
       animationOut="slideOutDown"
     >
       <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>Your Drink is ...</Text>
-        <Text style={styles.modalText}>
-          A {drinkDict.Size} drink with {drinkDict.Ice} Ice
-        </Text>
+        <Text style={styles.eyebrow}>AI Pick</Text>
+        <Text style={styles.modalTitle}>Your drink is ready</Text>
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
-            <View style={styles.ingredientsText}>
+            <View style={styles.ingredientsCard}>
+              <Text style={styles.ingredientsText}>Size: {drinkDict.Size}</Text>
+              <Text style={styles.ingredientsText}>Ice: {drinkDict.Ice}</Text>
               <Text style={styles.ingredientsText}>Soda: {sodaUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Syrups: {syrupsUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Add-ins: {addIns.join(", ")}</Text>
             </View>
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity style={styles.buttons} onPress={() => (edit(), toggleModal())}>
+              <TouchableOpacity style={styles.primaryButton} onPress={() => (AddToCart(), toggleModal())}>
+                <Text style={styles.primaryButtonText}>Add to Cart</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => (edit(), toggleModal())}>
                 <Text style={styles.buttonText}>Edit</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.buttons} onPress={() => (AddToCart(), toggleModal())}>
-                <Text style={styles.buttonText}>Add to Cart</Text>
-              </TouchableOpacity>
+              {onRegenerate && (
+                <TouchableOpacity style={styles.newOptionButton} onPress={onRegenerate}>
+                  <Text style={styles.newOptionButtonText}>New Option</Text>
+                </TouchableOpacity>
+              )}
 
-              <TouchableOpacity style={styles.buttons} onPress={toggleModal}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={toggleModal}>
                 <Text style={styles.buttonText}>Dismiss</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Drink GIF */}
-          <View style={styles.graphicContainer}>
-            <Gif layers={layers} />
-          </View>
         </View>
       </View>
     </Modal>
@@ -175,82 +181,98 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict }) => {
 
 const styles = StyleSheet.create({
   modal: {
-    justifyContent: 'flex-end', // Align modal at the bottom
-    margin: 0, // Remove any margins from the modal
+    justifyContent: 'flex-end',
+    margin: 0,
   },
   modalContent: {
-    backgroundColor: '#C6C8EE',
+    backgroundColor: '#ffffff',
     padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    alignItems: 'center',
   },
   body: {
-    flexDirection: 'row', // Align ingredients and GIF horizontally
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    width: '100%',
+    marginBottom: 10,
   },
   textNbuttons: {
-    flex: 1, // Take up available space
-    paddingRight: 16,
+    width: '100%',
+  },
+  eyebrow: {
+    color: '#BFDBF7',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontSize: 12,
+    alignSelf: 'flex-start',
+  },
+  ingredientsCard: {
+    backgroundColor: '#E1E5F2',
+    borderRadius: 15,
+    padding: 10,
+    marginBottom: 10,
   },
   ingredientsText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 15,
-    backgroundColor: '#D30C7B', // Optional: background color to make it stand out
-    borderRadius: 10,
-    padding: 10,
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '700',
+    marginBottom: 5,
   },
   graphicContainer: {
-    flex: 0, // Allow the GIF container to take up remaining space
+    flex: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonsContainer: {
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    marginTop: 5, // Adds space between buttons and the content above
+    marginTop: 4,
   },
-  buttons: {
-    backgroundColor: '#8DF1D3',
-    paddingVertical: 12, // Adjust padding for better size
+  primaryButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginBottom: 10, // Adds space between buttons
+    borderRadius: 15,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 15,
+    marginBottom: 10,
+  },
+  newOptionButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 15,
+    marginBottom: 10,
+  },
+  newOptionButtonText: {
+    color: '#000000',
+    fontSize: 15,
+    textAlign: 'center',
+    fontWeight: '800',
   },
   buttonText: {
-    color: '#000',
-    fontSize: 16,
+    color: '#000000',
+    fontSize: 15,
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   modalTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-  modalText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginVertical: 20,
-    padding: 10,                // Adds space inside the border
-    borderWidth: 2,             // Thickness of the border
-    borderColor: '#F92758',     // Color of the border
-    borderRadius: 10,           // Rounds the corners
-    backgroundColor: '#F92758', // Optional: background color to make it stand out
-    color: '#fff',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#000000',
+    marginTop: 4,
+    paddingBottom: 10,
+    alignSelf: 'flex-start',
   },
 });
 

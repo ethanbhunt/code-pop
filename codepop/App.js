@@ -3,7 +3,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Font from 'expo-font';
 import React, { useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Text, Alert} from 'react-native';
+import { TouchableOpacity, StyleSheet, Text, Alert, View, ActivityIndicator} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AdminDash from './src/pages/AdminDash';
 import AuthPage from './src/pages/AuthPage';
@@ -26,6 +26,8 @@ const title = 'CodePop'
 
 
 const App = () => {
+  const [initialRoute, setInitialRoute] = React.useState(null);
+
   // initialize cart list 
   const initCart = async () => {
     try{
@@ -38,9 +40,62 @@ const App = () => {
       console.error("error with initializing cart list", error);
     }
   };
+
+  // Check authentication status on app start
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        setInitialRoute('Auth');
+        return;
+      }
+
+      // Validate token by making a test API call with timeout
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        const response = await fetch(`${BASE_URL}/backend/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          // Token is valid
+          setInitialRoute('GeneralHome');
+        } else {
+          // Token is invalid or expired
+          console.warn('Token validation failed. Clearing and redirecting to login.');
+          await AsyncStorage.removeItem('userToken');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('first_name');
+          await AsyncStorage.removeItem('userRole');
+          setInitialRoute('Auth');
+        }
+      } catch (error) {
+        console.error('Error validating token:', error);
+        // Clear invalid token and redirect to login
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userId');
+        await AsyncStorage.removeItem('first_name');
+        await AsyncStorage.removeItem('userRole');
+        setInitialRoute('Auth');
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setInitialRoute('Auth');
+    }
+  };
   
   useEffect(() => {
-    initCart()
+    initCart();
+    checkAuthStatus();
   }, []);
   useEffect(() => {
     const loadFonts = async () => {
@@ -52,107 +107,57 @@ const App = () => {
     loadFonts();
   }, []);
 
+  // Don't render navigation until initial route is determined
+  if (initialRoute === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#D30C7B" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="GeneralHome" screenOptions={{headerStyle: {backgroundColor: '#c8c8ee'}}}>
-        <Stack.Screen 
-          name="Auth" 
-          component={AuthPage} 
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}
-        />
-        <Stack.Screen
-          name="CreateAccount"
-          component={CreateAccountPage}
-          options={{ 
-            title: title,
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}
-        />
-        <Stack.Screen
-          name="Cart"
-          component={CartPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}        
-        />
-        <Stack.Screen
-          name="CreateDrink"
-          component={CreateDrinkPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}  
-                
-        />
-        <Stack.Screen
-          name="ComplaintsPage"
-          component={ComplaintsPage}
-          options={{ title: 'ComplaintsPage' }}
-        />
-        <Stack.Screen
-          name="Preferences"
-          component={PreferencesPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-            },}}        
-        />
-        <Stack.Screen
-          name="GeneralHome"
-          component={GeneralHomePage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-            },
-            headerRight: () => (
-              <ProfileButton />
-            ),}}
-        />
-        <Stack.Screen
-          name="payment"
-          component={PaymentPage}
-          options={{ title: 'Payment' }}
-        />
-        <Stack.Screen
-          name="UpdateDrink"
-          component={UpdateDrink}
-          options={{ title: 'UpdateDrink' }}
-        />
+      <Stack.Navigator
+        initialRouteName="GeneralHome"
+        screenOptions={{
+          headerStyle: { backgroundColor: '#ffffff' },
+          headerTintColor: '#1c334d',
+          headerTitleStyle: {
+            fontWeight: '800',
+            fontSize: 22,
+          },
+          headerShadowVisible: false,
+          headerBackVisible: false,
+          contentStyle: { backgroundColor: '#ffffff' },
+          animation: 'none',
+          headerRight: () => <ProfileButton />,
+          title: title,
+        }}
+      >
+        <Stack.Screen name="Auth" component={AuthPage} />
+        <Stack.Screen name="CreateAccount" component={CreateAccountPage} />
+        <Stack.Screen name="Cart" component={CartPage} />
+        <Stack.Screen name="CreateDrink" component={CreateDrinkPage} />
+        <Stack.Screen name="ComplaintsPage" component={ComplaintsPage} />
+        <Stack.Screen name="Preferences" component={PreferencesPage} />
+        <Stack.Screen name="GeneralHome" component={GeneralHomePage} />
+        <Stack.Screen name="payment" component={PaymentPage} />
+        <Stack.Screen name="UpdateDrink" component={UpdateDrink} />
         <Stack.Screen
           name="ManagerDash"
           component={ManagerDash}
-          options={{ title: 'ManagerDash', headerRight: () => (<LogoutButton />) }}
+          options={{ headerRight: () => (<LogoutButton />) }}
         />
         <Stack.Screen
           name="AdminDash"
           component={AdminDash}
-          options={{ title: 'AdminDash', headerRight: () => (<LogoutButton />) }}
+          options={{ headerRight: () => (<LogoutButton />) }}
         />
-        <Stack.Screen
-          name="Complete"
-          component={CompletePage}
-          options={{ title: 'Complete' }}
-        />
-        <Stack.Screen
-          name="Checkout"
-          component={CheckoutForm}
-          options={{ title: 'Checkout Form' }}
-        />
-        <Stack.Screen
-          name="PostCheckout"
-          component={PostCheckout}
-          options={{ title: 'PostCheckout' , headerBackVisible: false,}}
-        />
+        <Stack.Screen name="Complete" component={CompletePage} />
+        <Stack.Screen name="Checkout" component={CheckoutForm} />
+        <Stack.Screen name="PostCheckout" component={PostCheckout} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -163,7 +168,7 @@ const ProfileButton = () => {
 
   return (
     <TouchableOpacity onPress={() => navigation.navigate('Preferences')}>
-      <Icon name="person-circle-outline" size={30} color="#000" />
+      <Icon name="person-circle-outline" size={30} color="#1c334d" />
     </TouchableOpacity>
     
   );
@@ -171,28 +176,10 @@ const ProfileButton = () => {
 
 const LogoutButton = () => {
   const navigation = useNavigation();
-  const styles = StyleSheet.create({
-    mediumButton: {
-      margin: 10,
-      padding: 15,
-      backgroundColor: '#D30C7B',
-      borderRadius: 10,
-      alignItems: 'center',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 2, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3,
-    },
-    buttonText: {
-      fontSize: 16,
-      color: 'white',
-    },
-  });
 
   return(
-    <TouchableOpacity onPress={() => (handleLogout(navigation))} style={styles.mediumButton}>
-      <Text style={styles.buttonText}>Logout</Text>
+    <TouchableOpacity onPress={() => (handleLogout(navigation))} style={{ paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#1F7A8C', borderRadius: 15 }}>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>Logout</Text>
     </TouchableOpacity>
   );
 }
@@ -237,5 +224,19 @@ const handleLogout = async (navigation) => {
     Alert.alert('Logout failed, please try again later.');
   }
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#D30C7B',
+  },
+});
 
 export default App;

@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from backend.models import Inventory, Drink, Preference
+from backend.models import Inventory, Drink, Preference, Store, SupplyHub
 from django.contrib.auth.models import User
 import random
 
@@ -7,6 +7,37 @@ class Command(BaseCommand):
     help = 'Populates the database with initial data'
 
     def handle(self, *args, **kwargs):
+        # Seed stores and hubs first so inventory can be associated with a hub.
+        region_c_hub = SupplyHub.objects.create(
+            Name='Region C Hub',
+            Region='Region C',
+            Latitude=41.736980,
+            Longitude=-111.833836,
+        )
+        SupplyHub.objects.create(
+            Name='North Hub',
+            Region='Region North',
+            Latitude=41.223000,
+            Longitude=-111.973000,
+        )
+
+        Store.objects.create(
+            Name='CodePop Logan Main',
+            Region='Region C',
+            City='Logan',
+            State='UT',
+            Latitude=41.736980,
+            Longitude=-111.833836,
+        )
+        Store.objects.create(
+            Name='CodePop Smithfield',
+            Region='Region C',
+            City='Smithfield',
+            State='UT',
+            Latitude=41.838000,
+            Longitude=-111.832000,
+        )
+
         # Creating some users
         super_user = User.objects.create_superuser(
             username='super',
@@ -67,6 +98,7 @@ class Command(BaseCommand):
             quantity = random.randint(50, 100)  # Random quantity between 50 and 500
             threshold = quantity - random.randint(1, 10)  # Threshold slightly below quantity
             return {
+                'HubID': region_c_hub,
                 'ItemName': item_name,
                 'ItemType': item_type,
                 'Quantity': quantity,
@@ -87,7 +119,7 @@ class Command(BaseCommand):
             Inventory.objects.create(**generate_inventory_data(add_in, 'Add In'))
 
         for physical_item in physical_items:
-            Inventory.objects.create(**generate_inventory_data(physical_item, 'Physical Item'))
+            Inventory.objects.create(**generate_inventory_data(physical_item, 'Physical'))
 
         
 
