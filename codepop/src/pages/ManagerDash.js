@@ -71,27 +71,35 @@ const ManagerDash = () => {
   };
 
   // Fetching revenue, inventory, and orders data
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        // Fetch revenue data
-        const revenueResponse = await fetch(`${BASE_URL}/backend/revenues/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const revenueData = await revenueResponse.json();
-        setRevenue(revenueData);
+   useEffect(() => {
+     const fetchMetrics = async () => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         
+          // Fetch revenue data
+          const revenueResponse = await fetch(`${BASE_URL}/backend/revenues/`, {
+            method: 'GET',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+          });
+          const revenueResponseData = await revenueResponse.json();
+          setRevenue(revenueResponseData.data);
 
-        // Fetch inventory data (from /report endpoint)
-        const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventoryData = await inventoryResponse.json();
+          // Fetch inventory data (from /report endpoint)
+          const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
+            method: 'GET',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+          });
+          const inventoryResponseData = await inventoryResponse.json();
 
-        // Sort inventory by Threshold Level (ascending order)
-        const sortedInventory = inventoryData.inventory_items.sort((a, b) => a.ThresholdLevel - b.ThresholdLevel);
-        setInventory(sortedInventory);
+          // Sort inventory by Threshold Level (ascending order)
+          const sortedInventory = inventoryResponseData.data.inventory_items.sort((a, b) => a.thresholdLevel - b.thresholdLevel);
+          setInventory(sortedInventory);
 
         // Fetch orders count
         await fetchOrders();
@@ -112,24 +120,28 @@ const ManagerDash = () => {
     return date.toLocaleString();
   };
 
-  // Function to handle resetting the inventory to the threshold level
-  const resetInventory = async (itemId, thresholdLevel) => {
-    try {
-      // Send a PATCH request to the backend to reset the quantity to the threshold level
-      const data = { reset: true }; // Indicating that the inventory should be reset
-      const response = await fetch(`${BASE_URL}/backend/inventory/${itemId}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+   // Function to handle resetting the inventory to the threshold level
+   const resetInventory = async (itemId, thresholdLevel) => {
+     try {
+       const token = await AsyncStorage.getItem('userToken');
+       // Send a PATCH request to the backend to reset the quantity to the threshold level
+       const data = { reset: true }; // Indicating that the inventory should be reset
+       const response = await fetch(`${BASE_URL}/backend/inventory/${itemId}/`, {
+         method: 'PATCH',
+         headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify(data),
+       });
 
       if (response.ok) {
-        // Update the local inventory state after successful reset
-        setInventory((prevInventory) =>
-          prevInventory.map((item) =>
-            item.InventoryID === itemId ? { ...item, Quantity: thresholdLevel } : item
-          )
-        );
+         // Update the local inventory state after successful reset
+         setInventory((prevInventory) =>
+           prevInventory.map((item) =>
+             item.inventoryId === itemId ? { ...item, quantity: thresholdLevel } : item
+           )
+         );
         alert('Inventory reset successfully');
       } else {
         const errorData = await response.json();
@@ -152,11 +164,11 @@ const ManagerDash = () => {
       <Text style={styles.title}>Manager Dashboard</Text>
 
       {/* Revenue Section */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Total Revenue</Text>
-        <Text style={styles.cardContent}>
-          ${revenue.reduce((sum, rev) => sum + rev.TotalAmount, 0).toFixed(2)}
-        </Text>
+       <View style={styles.card}>
+         <Text style={styles.cardTitle}>Total Revenue</Text>
+         <Text style={styles.cardContent}>
+           ${revenue.reduce((sum, rev) => sum + rev.totalAmount, 0).toFixed(2)}
+         </Text>
         <TouchableOpacity
           style={styles.button}
           onPress={() => setRevenueModalVisible(true)}>
@@ -201,20 +213,20 @@ const ManagerDash = () => {
             ) : error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : (
-              <ScrollView style={styles.scrollableList}>
-                {inventory.map((item) => (
-                  <View key={item.InventoryID} style={styles.inventoryItem}>
-                    <Text style={styles.itemName}>{item.ItemName}</Text>
-                    <Text>Quantity: {item.Quantity}</Text>
-                    <Text>Threshold Level: {item.ThresholdLevel}</Text>
-                    <TouchableOpacity
-                      style={styles.button}
-                      onPress={() => resetInventory(item.InventoryID, item.ThresholdLevel)}>
-                      <Text style={styles.buttonText}>Replace Item</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </ScrollView>
+               <ScrollView style={styles.scrollableList}>
+                 {inventory.map((item) => (
+                   <View key={item.inventoryId} style={styles.inventoryItem}>
+                     <Text style={styles.itemName}>{item.itemName}</Text>
+                     <Text>Quantity: {item.quantity}</Text>
+                     <Text>Threshold Level: {item.thresholdLevel}</Text>
+                     <TouchableOpacity
+                       style={styles.button}
+                       onPress={() => resetInventory(item.inventoryId, item.thresholdLevel)}>
+                       <Text style={styles.buttonText}>Replace Item</Text>
+                     </TouchableOpacity>
+                   </View>
+                 ))}
+               </ScrollView>
             )}
 
             <TouchableOpacity
@@ -240,15 +252,15 @@ const ManagerDash = () => {
             ) : error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : revenue.length > 0 ? (
-              <ScrollView style={styles.scrollableList}>
-                {revenue.map((rev) => (
-                  <View key={rev.RevenueID} style={styles.revenueCard}>
-                    <Text style={styles.revenueText}>Sale Date: {formatDate(rev.SaleDate)}</Text>
-                    <Text style={styles.revenueText}>Order ID: {rev.OrderID}</Text>
-                    <Text style={styles.revenueText}>Amount: ${rev.TotalAmount.toFixed(2)}</Text>
-                  </View>
-                ))}
-              </ScrollView>
+               <ScrollView style={styles.scrollableList}>
+                 {revenue.map((rev) => (
+                   <View key={rev.revenueId} style={styles.revenueCard}>
+                     <Text style={styles.revenueText}>Sale Date: {formatDate(rev.saleDate)}</Text>
+                     <Text style={styles.revenueText}>Order ID: {rev.orderId}</Text>
+                     <Text style={styles.revenueText}>Amount: ${rev.totalAmount.toFixed(2)}</Text>
+                   </View>
+                 ))}
+               </ScrollView>
             ) : (
               <Text>No revenue found.</Text>
             )}

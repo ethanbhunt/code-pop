@@ -1,0 +1,23 @@
+{
+  "dbAddresses": {
+    "users": "/orbitdb/zdpuAzFqYXQhSnmZB1ur9GbyDWwLZSuTawP27XydotMVc9sM9",
+    "tokens": "/orbitdb/zdpuAzJvGDd5vFpPVayxodpwoXEiPncf9pE8H2qeK8cZyYvE2",
+    "preferences": "/orbitdb/zdpuB17rWFqd6YFqfuwaNtodyFYc76SuNq9z3keqerWhBykx2",
+    "drinks": "/orbitdb/zdpuApfkSi9L9CF2E8TZDHewpr5g2uUs9fkrSGhcdfc5GFvCJ",
+    "inventory": "/orbitdb/zdpuAppGMb6BoRPBppqa7EM3aCsjnMTUe465qrjcSZuY5o2oc",
+    "orders": "/orbitdb/zdpuAwYxBu8fnSyfgrMJCNrRwdbbojEpcBgCBJRj4hQx1pqWi",
+    "notifications": "/orbitdb/zdpuAtwbHWqSEzEfb6Fw1mSq2s8VZPRBy8mnFAiskkj2HCXJE",
+    "revenues": "/orbitdb/zdpuAtvPgq28r2KWkpAHWDJdhFGnJbJgex9aSV9VLNURYjmGp",
+    "payments": "/orbitdb/zdpuAsenCBsAfgFoZzWfayo2L9BoyjF9CqBZdbd6d3xVpdjPS",
+    "qrcodes": "/orbitdb/zdpuAy4xogptVRVNLfSHinzzgSEcgXXUbukDmNyXgXHjRhgnX",
+    "stores": "/orbitdb/zdpuAmeRid5xXzFuxKtMR8pwx8uHpD8rVXU4neFhmiS2i1aFE",
+    "maintenance": "/orbitdb/zdpuAthTfFMPZGPMryWV6icE6GNteVXxVvidXL8sVghCR6mkk",
+    "logistics": "/orbitdb/zdpuApdjtyqwTVGJxGYLvphH52rZtoJqYHsY7aEPUbpRJA61E"
+  },
+  "multiaddrs": [
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWCjh58aSvYa7DDj7wCKNFa4pkrEdPRyvRyg8GWEWDiCJf",
+    "/ip4/100.64.23.230/tcp/4000/p2p/12D3KooWCjh58aSvYa7DDj7wCKNFa4pkrEdPRyvRyg8GWEWDiCJf"
+  ],
+  "peerId": "12D3KooWCjh58aSvYa7DDj7wCKNFa4pkrEdPRyvRyg8GWEWDiCJf",
+  "timestamp": "2026-03-28T17:43:28.546Z"
+}

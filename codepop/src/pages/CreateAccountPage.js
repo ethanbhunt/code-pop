@@ -28,7 +28,7 @@ const CreateAccountPage = ({ navigation }) => {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ first_name, username, password, email })
+        body: JSON.stringify({ firstName: first_name, username, password, email })
       });
       navigation.navigate('Auth');
     } catch (error) {

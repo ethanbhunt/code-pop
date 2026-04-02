@@ -161,21 +161,21 @@ const PreferencesPage = () => {
       }
     };
   
-    const savePreferences = async (pref, type) => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const userId = await AsyncStorage.getItem('userId');
-        const response = await fetch(`${BASE_URL}/backend/preferences/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-          body: JSON.stringify({
-            UserID: userId,
-            Preference: pref,
-          }),
-        });
+     const savePreferences = async (pref, type) => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const userId = await AsyncStorage.getItem('userId');
+         const response = await fetch(`${BASE_URL}/backend/preferences/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify({
+             userId: userId,
+             preference: pref,
+           }),
+         });
         if (!response.ok) {
           throw new Error(`Failed to save ${type} preference`);
         }
@@ -184,28 +184,37 @@ const PreferencesPage = () => {
       }
     };
   
-    const removePreferences = async (pref) => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const userId = await AsyncStorage.getItem('userId');
-        
-        const getResponse = await fetch(`${BASE_URL}/backend/preferences/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-        });
-    
-        const preferences = await getResponse.json();
-    
-        // Filter out preferences that belong to the current user and match the preference to be removed
-        const filteredPreferences = preferences.filter(
-          (item) => String(item.UserID) === String(userId) && item.Preference.toLowerCase() === pref.toLowerCase()
-        );
-    
-        for (let preference of filteredPreferences) {
-          const deleteResponse = await fetch(`${BASE_URL}/backend/preferences/${preference.PreferenceID}/`, {
+     const removePreferences = async (pref) => {
+       try {
+         const token = await AsyncStorage.getItem('userToken');
+         const userId = await AsyncStorage.getItem('userId');
+         
+         const getResponse = await fetch(`${BASE_URL}/backend/preferences/`, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+         });
+     
+         if (!getResponse.ok) {
+           console.error(`Failed to fetch preferences with status ${getResponse.status}`);
+           return;
+         }
+     
+         const preferencesResponse = await getResponse.json();
+         const preferences = preferencesResponse.data || preferencesResponse;
+         if (!preferences || !Array.isArray(preferences)) {
+           return;
+         }
+     
+         // Filter out preferences that belong to the current user and match the preference to be removed
+         const filteredPreferences = preferences.filter(
+           (item) => String(item.userId) === String(userId) && item.preference.toLowerCase() === pref.toLowerCase()
+         );
+     
+         for (let preference of filteredPreferences) {
+           const deleteResponse = await fetch(`${BASE_URL}/backend/preferences/${preference.preferenceId}/`, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',

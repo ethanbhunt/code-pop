@@ -601,6 +601,7 @@ The following items are required by the OrbitDB design but are not fully represe
 - production pinning strategy and retention policy
 
 Treat this guide as the deployment target and implementation checklist for Task-001, Task-002, Task-007, Task-008, and Task-010.# CodePop Distributed Database Setup Guide
+# CodePop Distributed Database Setup Guide
 
 ## 1. Purpose and Scope
 

@@ -132,16 +132,18 @@ export default function CheckoutForm(totalPrice) {
     try {
       const orderNum = await AsyncStorage.getItem("orderNum");
     
-      const response = await fetch(`${BASE_URL}/backend/revenues/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          OrderID: orderNum,
-          TotalAmount: totalPrice,
-        }),
-      });
+       const token = await AsyncStorage.getItem('userToken');
+       const response = await fetch(`${BASE_URL}/backend/revenues/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+          body: JSON.stringify({
+            OrderID: Number(orderNum),
+            TotalAmount: Number(totalPrice),
+          }),
+       });
     
       if (response.ok) {
         const data = await response.json(); // Parse the response if needed

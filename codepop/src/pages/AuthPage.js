@@ -38,26 +38,27 @@ const AuthPage = ({ navigation }) => {
       });
 
       if (response.status === 200) {
-          const data = await response.json();
-          const token = data.token; // Get token from response
+           const response_data = await response.json();
+           const userData = response_data.data; // Extract nested data object
+           const token = userData.token; // Get token from response
 
-          // Store the token, username, and user ID in AsyncStorage
-          await AsyncStorage.setItem('userToken', data.token);
-          await AsyncStorage.setItem('userId', data.user_id.toString());  // Store user ID as string
-          await AsyncStorage.setItem('first_name', data.first_name);
-           if(data.is_admin){
-            await AsyncStorage.setItem('userRole', 'admin');
-            Alert.alert('Login successful!');
-            navigation.navigate('AdminDash');
-          }else if(data.is_manager){
-            await AsyncStorage.setItem('userRole', 'manager');
-            Alert.alert('Login successful!');
-            navigation.navigate('ManagerDash');
-          } else{
-            await AsyncStorage.setItem('userRole', 'user');
-            Alert.alert('Login successful!');
-            navigation.navigate('GeneralHome');
-          }
+           // Store the token, username, and user ID in AsyncStorage
+           await AsyncStorage.setItem('userToken', userData.token);
+           await AsyncStorage.setItem('userId', userData.userId.toString());  // Store user ID as string
+           await AsyncStorage.setItem('first_name', userData.firstName || '');
+            if(userData.isSuperuser){
+             await AsyncStorage.setItem('userRole', 'admin');
+             Alert.alert('Login successful!');
+             navigation.navigate('AdminDash');
+           }else if(userData.isStaff){
+             await AsyncStorage.setItem('userRole', 'manager');
+             Alert.alert('Login successful!');
+             navigation.navigate('ManagerDash');
+           } else{
+             await AsyncStorage.setItem('userRole', 'user');
+             Alert.alert('Login successful!');
+             navigation.navigate('GeneralHome');
+           }
         
            // Navigate to Home screen on success
       } else {

@@ -18,15 +18,15 @@ const UpdateDrink = ({route, navigation}) => {
   const [selectedSize, setSize] = useState(null);
   const [selectedIce, setIce] = useState(null);
 
-  console.log(drink)
-  console.log(drink.SodaUsed)
+   console.log(drink)
+   console.log(drink.sodaUsed)
 
-  // State for dropdown open status
-  const [openDropdown, setOpenDropdown] = useState({
-    sodas: false,
-    syrups: false,
-    juices: false,
-  });
+   // State for dropdown open status
+   const [openDropdown, setOpenDropdown] = useState({
+     sodas: false,
+     syrups: false,
+     juices: false,
+   });
 
   const iceLabels = ['No Ice', 'Light', 'Regular', 'Extra'];
 
@@ -129,20 +129,21 @@ const UpdateDrink = ({route, navigation}) => {
       }else{
         const token = await AsyncStorage.getItem('userToken');
     
-        const response = await fetch(`${BASE_URL}/backend/drinks/${drink.DrinkID}/`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            Name: "Updated Drink",
-            SodaUsed,
-            SyrupsUsed,
-            AddIns,
-            Price: 2.00, // Adjust price as needed
-            User_Created: true,
-            Size: selectedSize,
-            Ice: selectedIce,
+         const response = await fetch(`${BASE_URL}/backend/drinks/${drink.drinkId}/`, {
+           method: 'PUT',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
+           body: JSON.stringify({
+             name: "Updated Drink",
+             sodaUsed: SodaUsed,
+             syrupsUsed: SyrupsUsed,
+             addIns: AddIns,
+             price: 2.00, // Adjust price as needed
+             userCreated: true,
+            size: selectedSize,
+            ice: selectedIce,
           }),
         });
     

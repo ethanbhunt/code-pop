@@ -11,8 +11,30 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
-from .models import Preference, Drink, Inventory, Notification, Order, Revenue
-from .serializers import CreateUserSerializer, GetUserSerializer, PreferenceSerializer, DrinkSerializer, InventorySerializer, NotificationSerializer, OrderSerializer, RevenueSerializer
+from .models import (
+    Preference,
+    Drink,
+    Inventory,
+    Notification,
+    Order,
+    Revenue,
+    SupplyHub,
+    StockTransfer,
+    AuditLog,
+)
+from .serializers import (
+    CreateUserSerializer,
+    GetUserSerializer,
+    PreferenceSerializer,
+    DrinkSerializer,
+    InventorySerializer,
+    NotificationSerializer,
+    OrderSerializer,
+    RevenueSerializer,
+    SupplyHubSerializer,
+    StockTransferSerializer,
+    AuditLogSerializer,
+)
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
 import random
@@ -27,6 +49,8 @@ from rest_framework.decorators import action
 from django.utils.dateparse import parse_datetime
 from .drinkAI import generate_soda, parse_prompt
 from rest_framework.permissions import BasePermission
+from .supply_services import SupplyHubService
+from .order_completion_service import OrderCompletionService
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -38,6 +62,15 @@ class IsSuperUser(BasePermission):
     def has_permission(self, request, view):
         # Check if the user is authenticated and a superuser
         return request.user and request.user.is_authenticated and request.user.is_superuser
+
+
+class IsStoreManager(BasePermission):
+    """Allow inventory mutation and audit views for managers/admins."""
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and (
+            request.user.is_staff or request.user.is_superuser
+        )
     
 #Custom login to so that it get's a token but also the user's first name and the user id
 class CustomAuthToken(ObtainAuthToken):
@@ -193,9 +226,12 @@ class InventoryListAPIView(ListAPIView):
     """List all items that are not out of stock."""
     queryset = Inventory.objects.filter(Quantity__gt=0)
     serializer_class = InventorySerializer
+    permission_classes = [IsAuthenticated]
 
 class InventoryReportAPIView(APIView):
     """Generate an inventory report."""
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         inventory = Inventory.objects.all()
         report_data = {
@@ -218,6 +254,7 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
     """Update inventory based on what was ordered, with warnings for empty or low stock."""
     queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
+    permission_classes = [IsAuthenticated, IsStoreManager]
 
     def patch(self, request, *args, **kwargs):
         item = self.get_object()  # Retrieve the specific item based on ID
@@ -227,9 +264,21 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
 
         # Handle inventory reset
         if reset_quantity:
+            before_qty = item.Quantity
             # Reset the quantity to the threshold level (or a specific value)
             item.Quantity = item.ThresholdLevel  # Or you could use a custom value
             item.save()
+
+            AuditLog.objects.create(
+                UserID=request.user,
+                StoreID=item.StoreID,
+                HubID=item.HubID,
+                Action='reset',
+                ItemName=item.ItemName,
+                ItemType=item.ItemType,
+                QuantityBefore=before_qty,
+                QuantityAfter=item.Quantity,
+            )
 
             # Return the updated item details in the response
             return Response(self.get_serializer(item).data, status=status.HTTP_200_OK)
@@ -239,6 +288,12 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             return Response(
                 {"detail": "Invalid used quantity."}, 
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if int(used_quantity) > 1000:
+            return Response(
+                {"detail": "Used quantity exceeds allowed limit (1000)."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Check if the item is already out of stock
@@ -256,8 +311,20 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             )
 
         # Subtract the used quantity from the current stock
+        before_qty = item.Quantity
         item.Quantity -= int(used_quantity)
         item.save()
+
+        AuditLog.objects.create(
+            UserID=request.user,
+            StoreID=item.StoreID,
+            HubID=item.HubID,
+            Action='deduct',
+            ItemName=item.ItemName,
+            ItemType=item.ItemType,
+            QuantityBefore=before_qty,
+            QuantityAfter=item.Quantity,
+        )
 
         # Generate a warning if stock falls below the threshold level
         warning = None
@@ -270,6 +337,56 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
             response_data['warning'] = warning
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class AuditLogListAPIView(ListAPIView):
+    queryset = AuditLog.objects.all().order_by('-Timestamp')
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated, IsStoreManager]
+
+
+class SupplyHubOperations(viewsets.ReadOnlyModelViewSet):
+    queryset = SupplyHub.objects.filter(Active=True)
+    serializer_class = SupplyHubSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['get'])
+    def inventory(self, request, pk=None):
+        hub = self.get_object()
+        items = Inventory.objects.filter(HubID=hub)
+        serializer = InventorySerializer(items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StockTransferOperations(viewsets.ModelViewSet):
+    queryset = StockTransfer.objects.all().order_by('-RequestedAt')
+    serializer_class = StockTransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        item_name = request.data.get('ItemName')
+        item_type = request.data.get('ItemType')
+        quantity = int(request.data.get('Quantity', 0))
+        store_id = request.data.get('StoreID')
+
+        if not all([item_name, item_type, quantity > 0, store_id]):
+            return Response(
+                {'detail': 'ItemName, ItemType, Quantity > 0, and StoreID are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            transfer = SupplyHubService.requestSupply(
+                item_name=item_name,
+                item_type=item_type,
+                quantity=quantity,
+                store_id=store_id,
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(transfer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class NotificationOperations(viewsets.ModelViewSet):
