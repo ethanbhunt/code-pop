@@ -1,3 +1,11 @@
 # Todos
 
-- [ ] Update the user to have enum of their role type instead of `isAdmin` and `isStaff`. Return that and the token on the login endpoint
+- [ X ] Update the user to have enum of their role type instead of `isAdmin` and `isStaff`. Return that and the token on the login endpoint
+- [ ] Add missing endpoints (Look at discord for missing endpoints)
+- [ ] Double check databases are setup for multi store
+- [ ] Assign database addresses to specific stores (As discussed)
+  - Node n's address assigned to store n
+  - Node 2's address assigned to store 2
+- [ ] Look into  python script for testing the backend
+- [ ] Loading data from CSV into database's
+

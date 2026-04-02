@@ -118,6 +118,106 @@ export function requireAdmin(req, res, next) {
 }
 
 /**
+ * Require super admin permission
+ */
+export function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "super_admin") {
+    return res.status(403).json({
+      error: "Super admin privileges required",
+      code: "NOT_SUPER_ADMIN"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require manager or admin permission
+ */
+export function requireManager(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "manager" && req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
+    return res.status(403).json({
+      error: "Manager privileges required",
+      code: "NOT_MANAGER"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require repair user permission
+ */
+export function requireRepair(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (req.user.userRole !== "repair") {
+    return res.status(403).json({
+      error: "Repair user privileges required",
+      code: "NOT_REPAIR"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Require store access (manager/admin must have store in assignedStores)
+ */
+export function requireStoreAccess(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  // Super admin can access all stores
+  if (req.user.userRole === "super_admin") {
+    return next()
+  }
+
+  // Manager/admin must have store in assignedStores
+  if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    const storeId = parseInt(req.params.storeId || req.query.storeId)
+    if (!storeId) {
+      return res.status(400).json({
+        error: "storeId parameter required",
+        code: "MISSING_STORE_ID"
+      })
+    }
+
+    if (!req.user.assignedStores.includes(storeId)) {
+      return res.status(403).json({
+        error: "Access denied to this store",
+        code: "STORE_ACCESS_DENIED"
+      })
+    }
+  }
+
+  next()
+}
+
+/**
  * Require staff/manager permission
  */
 export function requireStaff(req, res, next) {

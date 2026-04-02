@@ -38,7 +38,10 @@ const DB_NAMES = {
   notifications: "notifications-db",
   revenues: "revenues-db",
   payments: "payments-db",
-  qrcodes: "qrcodes-db"
+  qrcodes: "qrcodes-db",
+  stores: "stores-db",
+  maintenance: "maintenance-db",
+  logistics: "logistics-db"
 }
 
 // Store database references
@@ -110,6 +113,90 @@ async function start() {
         }
       }
     }
+    console.log()
+
+    // Seed initial stores
+    console.log("[ ^ ] Seeding initial stores...")
+    const storesDb = databases.stores
+    const initialStores = [
+      {
+        storeId: 1,
+        name: "Downtown Café",
+        address: "123 Main Street, New York, NY",
+        city: "New York",
+        region: "Northeast",
+        timezone: "America/New_York",
+        coordinates: { lat: 40.7128, lng: -74.0060 },
+        manager: null,
+        staffCount: 12,
+        status: "operational",
+        operatingHours: {
+          monday: { open: "06:00", close: "22:00" },
+          tuesday: { open: "06:00", close: "22:00" },
+          wednesday: { open: "06:00", close: "22:00" },
+          thursday: { open: "06:00", close: "22:00" },
+          friday: { open: "06:00", close: "23:00" },
+          saturday: { open: "07:00", close: "23:00" },
+          sunday: { open: "07:00", close: "22:00" }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        storeId: 2,
+        name: "Uptown Hub",
+        address: "456 Park Avenue, New York, NY",
+        city: "New York",
+        region: "Northeast",
+        timezone: "America/New_York",
+        coordinates: { lat: 40.7614, lng: -73.9776 },
+        manager: null,
+        staffCount: 8,
+        status: "operational",
+        operatingHours: {
+          monday: { open: "07:00", close: "20:00" },
+          tuesday: { open: "07:00", close: "20:00" },
+          wednesday: { open: "07:00", close: "20:00" },
+          thursday: { open: "07:00", close: "20:00" },
+          friday: { open: "07:00", close: "21:00" },
+          saturday: { open: "08:00", close: "21:00" },
+          sunday: { open: "08:00", close: "20:00" }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        storeId: 3,
+        name: "Westside Lounge",
+        address: "789 West Street, New York, NY",
+        city: "New York",
+        region: "Northeast",
+        timezone: "America/New_York",
+        coordinates: { lat: 40.7505, lng: -74.0000 },
+        manager: null,
+        staffCount: 10,
+        status: "operational",
+        operatingHours: {
+          monday: { open: "06:00", close: "22:00" },
+          tuesday: { open: "06:00", close: "22:00" },
+          wednesday: { open: "06:00", close: "22:00" },
+          thursday: { open: "06:00", close: "22:00" },
+          friday: { open: "06:00", close: "23:30" },
+          saturday: { open: "08:00", close: "23:30" },
+          sunday: { open: "08:00", close: "22:00" }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ]
+
+    for (const store of initialStores) {
+      await storesDb.put(`store:${store.storeId}`, store)
+      console.log(`  [ ^ ] Seeded store ${store.storeId}: ${store.name}`)
+    }
+
+    // Initialize counter for next store ID
+    await storesDb.put("counter:store", 3)
     console.log()
 
     // Write peer info to file
@@ -223,6 +310,7 @@ async function start() {
       console.log(`   POST /:dbName/set        - Set key/value in database`)
       console.log(`   GET  /:dbName/all        - List all entries in database`)
       console.log(`\n[ ^ ]  Database names: ${Object.values(DB_NAMES).join(", ")}\n`)
+      console.log(`[ ^ ]  Initial stores seeded: Downtown Café (1), Uptown Hub (2), Westside Lounge (3)\n`)
     })
 
   } catch (err) {
