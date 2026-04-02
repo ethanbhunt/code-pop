@@ -15,6 +15,7 @@ from .models import Preference, Drink, Inventory, Notification, Order, Revenue
 from .serializers import CreateUserSerializer, GetUserSerializer, PreferenceSerializer, DrinkSerializer, InventorySerializer, NotificationSerializer, OrderSerializer, RevenueSerializer
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
+import random
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -669,17 +670,35 @@ class GenerateAIDrink(APIView):
             return Response({'error': str(e)}, status=400)
     
     def generate_account_user(self, user_id):
-        """Generate AI drink for a registered user using their preferences."""
+        """Generate AI drink for a registered user, blending their preferences with discovery items."""
+        from .drinkAI import create_list, syrup_file_path, soda_file_path, addin_file_path
+
         user = get_object_or_404(User, pk=user_id)
         preferences = Preference.objects.filter(UserID=user)
-        preferences_list = []
+
+        discovery_pool = ["mango", "peach", "vanilla", "salted caramel", "orange",
+                          "lavender", "peppermint", "blue raspberry", "strawberry",
+                          "coconut", "watermelon", "cherry", "grape", "kiwi",
+                          "hazelnut", "cinnamon", "guava", "passion fruit"]
 
         if preferences.exists():
-            for pref in preferences:
-                preferences_list.append(pref.Preference)
+            user_prefs = [pref.Preference for pref in preferences]
+
+            all_syrups = create_list(syrup_file_path)
+            has_syrup = any(p.lower() in all_syrups for p in user_prefs)
+            if not has_syrup:
+                syrup_discovery = [s for s in discovery_pool if s.lower() in all_syrups]
+                user_prefs.extend(random.sample(syrup_discovery, min(3, len(syrup_discovery))))
+
+            non_user = [item for item in discovery_pool if item.lower() not in [p.lower() for p in user_prefs]]
+            discovery_count = min(random.randint(2, 4), len(non_user))
+            discovery_items = random.sample(non_user, discovery_count)
+
+            preferences_list = user_prefs + discovery_items
         else:
-            preferences_list = ["mango", "peach", "vanilla", "salted caramel", "orange", "lavender", "peppermint", "blue raspberry"]
-        print("User") # Test code
+            preferences_list = ["mango", "peach", "vanilla", "salted caramel", "orange",
+                                "lavender", "peppermint", "blue raspberry"]
+
         return self.generate_response_data(preferences_list, user_created=True)
 
     def generate_general_user(self):

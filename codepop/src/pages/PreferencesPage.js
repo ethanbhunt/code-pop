@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BASE_URL } from '../../ip_address';
 import DropDown from '../components/DropDown';
+import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
+import NavBar from '../components/NavBar';
 import React from 'react';
 
 const PreferencesPage = () => {
@@ -17,8 +19,7 @@ const PreferencesPage = () => {
     const [SodaUsed, setSoda] = useState([]);
     const [SyrupsUsed, setSyrups] = useState([]);
     const [AddIns, setAddIns] = useState([]);
-    const [inventoryData, setInventoryData] = useState([]);
-    const [userPreferences, setUserPreferences] = useState([]); // To store fetched preferences
+    const [userPreferences, setUserPreferences] = useState([]);
     const [isLoading, setIsLoading] = useState(true); // Add loading state
     const navigation = useNavigation();
   
@@ -38,23 +39,6 @@ const PreferencesPage = () => {
       }
     };
   
-    const fetchInventory = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/backend/inventory/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventory = await response.json();
-        const items = inventory.map(item => ({
-          value: item.ItemName,
-          ItemType: item.ItemType,
-        }));
-        setInventoryData(items);
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-      }
-    };
-  
     const fetchUserPreferences = async (token, userId) => {
       try {
         const response = await fetch(`${BASE_URL}/backend/preferences/`, {
@@ -67,20 +51,21 @@ const PreferencesPage = () => {
         const preferences = await response.json();
         setUserPreferences(preferences); // Store the preferences in state
   
-        // Preselect preferences based on the user's saved preferences
-        const filteredSoda = preferences
-          .filter(item => filterInventory("Soda").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
+        const userPrefs = preferences.filter(item => String(item.UserID) === String(userId));
+
+        const filteredSoda = userPrefs
+          .filter(item => sodaOptions.some(opt => opt.value.toLowerCase() === item.Preference.toLowerCase()))
+          .map(item => item.Preference.toLowerCase());
         setSoda(filteredSoda);
-  
-        const filteredSyrups = preferences
-          .filter(item => filterInventory("Syrup").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
+
+        const filteredSyrups = userPrefs
+          .filter(item => syrupOptions.some(opt => opt.value.toLowerCase() === item.Preference.toLowerCase()))
+          .map(item => item.Preference.toLowerCase());
         setSyrups(filteredSyrups);
-  
-        const filteredAddIns = preferences
-          .filter(item => filterInventory("Add In").some(inventoryItem => inventoryItem.value.toLowerCase() === item.Preference.toLowerCase() && String(item.UserID) === String(userId)))
-          .map(item => item.Preference);
+
+        const filteredAddIns = userPrefs
+          .filter(item => AddInOptions.some(opt => opt.value.toLowerCase() === item.Preference.toLowerCase()))
+          .map(item => item.Preference.toLowerCase());
         setAddIns(filteredAddIns);
   
         setIsLoading(false); // Set loading to false once preferences are fetched
@@ -93,14 +78,15 @@ const PreferencesPage = () => {
       React.useCallback(() => {
         let isMounted = true;
         const loadData = async () => {
-          await checkLoginStatus(); // Check login status
-  
+          await checkLoginStatus();
+
           const token = await AsyncStorage.getItem('userToken');
           const userId = await AsyncStorage.getItem('userId');
-  
+
           if (isMounted && token && userId) {
-            fetchInventory(); // Fetch inventory once login is successful
-            fetchUserPreferences(isMounted && token, userId); // Fetch preferences for the user
+            fetchUserPreferences(token, userId);
+          } else if (isMounted) {
+            setIsLoading(false);
           }
         };
         loadData();
@@ -109,14 +95,6 @@ const PreferencesPage = () => {
         };
       }, []) // Empty dependency array ensures this only runs once when the screen is focused
     );
-  
-    const filterInventory = (type) => {
-      const filteredItems = inventoryData.filter(item => item.ItemType === type);
-      return filteredItems.map(item => ({
-        label: item.value,
-        value: item.value,
-      }));
-    };
   
     const handleSelection = (item, type) => {
       switch (type) {
@@ -252,11 +230,6 @@ const PreferencesPage = () => {
 
   return (
     <View style={styles.container}>
-      <Image 
-                source={require('../../assets/PinkBubbles.png')}
-                style={styles.image}
-                resizeMode="cover"
-            />
       <ScrollView contentContainerStyle={styles.contentContainer}>
         {isLoading ? (  // Conditionally render the content based on loading state
           <Text>Loading...</Text> // You can display a loading spinner or message here
@@ -266,40 +239,40 @@ const PreferencesPage = () => {
             {isLoggedIn ? (
               <>
                 {/* Conditionally render the "Hello <username>" if username exists */}
-                {name ? <Text style={styles.greeting}>{name}'s Drinks</Text> : null}
+                {name ? <Text style={styles.greeting}>{name}'s Preferences</Text> : null}
                 <View style={styles.navBarSpace}>
-                  {/* <Text style={styles.subtitleText}>Saved Drinks (can be created on ratings page)</Text> */}
-                  <Text style={styles.subtitleText}>Preferences</Text>
-                  {/* <Text>{SodaUsed}</Text> */}
                   <DropDown
                     title='Sodas'
-                    options={filterInventory("Soda")}
+                    options={sodaOptions}
                     onSelect={(soda) => handleSelection(soda, 'Soda')} 
                     isOpen={openDropdown.sodas}
                     setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
-                    selectedValues={SodaUsed} // Pass selected values for prepopulation
+                    selectedValues={SodaUsed}
                   />
                   <DropDown 
                     title='Syrups' 
-                    options={filterInventory("Syrup")} 
+                    options={syrupOptions}
                     onSelect={(syrup) => handleSelection(syrup, 'Syrup')} 
                     isOpen={openDropdown.syrups}
                     setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
-                    selectedValues={SyrupsUsed} // Pass selected values for prepopulation
+                    selectedValues={SyrupsUsed}
+                    tintByFlavor
                   />
                   <DropDown 
-                    title='Add ins' 
-                    options={filterInventory("Add In")} 
-                    onSelect={(addIns) => handleSelection(addIns, 'Add In')} 
+                    title='Add Ins' 
+                    options={AddInOptions}
+                    onSelect={(addIn) => handleSelection(addIn, 'Add In')} 
                     isOpen={openDropdown.addIns}
                     setOpen={() => setOpenDropdown(prev => ({ ...prev, addIns: !prev.addIns }))}
-                    selectedValues={AddIns} // Pass selected values for prepopulation
+                    selectedValues={AddIns}
+                    tintByFlavor
                   />
                 </View>
                 
               </>
             ) : (
               <>
+                <Text style={styles.greeting}>Login to create drink preferences</Text>
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity onPress={goToLoginPage} style={styles.mediumButton}>
                     <Text style={styles.buttonText}>Login</Text>
@@ -310,61 +283,43 @@ const PreferencesPage = () => {
           </>
         )}
       </ScrollView>
+      <NavBar />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  image: {
-    width: '100%',
-    height: '150%',
-    ...StyleSheet.absoluteFillObject,
-  },
   container: {
     flex: 1,
-    padding: 0,
-    backgroundColor: '#C6C8EE',
+    backgroundColor: '#ffffff',
   },
   contentContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 120,
   },
   mediumButton: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#D30C7B',
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 15,
     alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    marginTop: 10,
   },
   buttonText: {
     fontSize: 16,
-    color: 'white',
+    fontWeight: '800',
+    color: '#fff',
   },
   greeting: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#1c334d',
     marginBottom: 10,
   },
-  carousel: {
-    margin: 0,
-    padding: 0,
-  },
-  title: {
-    fontSize: 22,
-  },
-  subtitleText: {
-    margin: 10,
-    fontSize: 20,
-    backgroundColor: '#F92758',
-    color: '#fff',
-    padding: 10,
-    textAlign: 'center',
+  navBarSpace: {
+    marginTop: 6,
   }
 });
 

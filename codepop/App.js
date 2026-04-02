@@ -57,114 +57,42 @@ const App = () => {
       <Stack.Navigator
         initialRouteName="GeneralHome"
         screenOptions={{
-          headerStyle: { backgroundColor: '#fffaf5' },
-          headerTintColor: '#13293d',
+          headerStyle: { backgroundColor: '#ffffff' },
+          headerTintColor: '#1c334d',
           headerTitleStyle: {
             fontWeight: '800',
             fontSize: 22,
           },
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: '#fffaf5' },
+          headerBackVisible: false,
+          contentStyle: { backgroundColor: '#ffffff' },
+          animation: 'none',
+          headerRight: () => <ProfileButton />,
+          title: title,
         }}
       >
-        <Stack.Screen 
-          name="Auth" 
-          component={AuthPage} 
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}
-        />
-        <Stack.Screen
-          name="CreateAccount"
-          component={CreateAccountPage}
-          options={{ 
-            title: title,
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}
-        />
-        <Stack.Screen
-          name="Cart"
-          component={CartPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}        
-        />
-        <Stack.Screen
-          name="CreateDrink"
-          component={CreateDrinkPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-          },}}  
-                
-        />
-        <Stack.Screen
-          name="ComplaintsPage"
-          component={ComplaintsPage}
-          options={{ title: 'ComplaintsPage' }}
-        />
-        <Stack.Screen
-          name="Preferences"
-          component={PreferencesPage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-            },}}        
-        />
-        <Stack.Screen
-          name="GeneralHome"
-          component={GeneralHomePage}
-          options={{ 
-            title: title, 
-            headerTitleStyle: {
-              // fontFamily: 'CherryBombOne',
-            },
-            headerRight: () => (
-              <ProfileButton />
-            ),}}
-        />
-        <Stack.Screen
-          name="payment"
-          component={PaymentPage}
-          options={{ title: 'Payment' }}
-        />
-        <Stack.Screen
-          name="UpdateDrink"
-          component={UpdateDrink}
-          options={{ title: 'UpdateDrink' }}
-        />
+        <Stack.Screen name="Auth" component={AuthPage} />
+        <Stack.Screen name="CreateAccount" component={CreateAccountPage} />
+        <Stack.Screen name="Cart" component={CartPage} />
+        <Stack.Screen name="CreateDrink" component={CreateDrinkPage} />
+        <Stack.Screen name="ComplaintsPage" component={ComplaintsPage} />
+        <Stack.Screen name="Preferences" component={PreferencesPage} />
+        <Stack.Screen name="GeneralHome" component={GeneralHomePage} />
+        <Stack.Screen name="payment" component={PaymentPage} />
+        <Stack.Screen name="UpdateDrink" component={UpdateDrink} />
         <Stack.Screen
           name="ManagerDash"
           component={ManagerDash}
-          options={{ title: 'ManagerDash', headerRight: () => (<LogoutButton />) }}
+          options={{ headerRight: () => (<LogoutButton />) }}
         />
         <Stack.Screen
           name="AdminDash"
           component={AdminDash}
-          options={{ title: 'AdminDash', headerRight: () => (<LogoutButton />) }}
+          options={{ headerRight: () => (<LogoutButton />) }}
         />
-        <Stack.Screen
-          name="Complete"
-          component={CompletePage}
-          options={{ title: 'Complete' }}
-        />
-        <Stack.Screen
-          name="Checkout"
-          component={CheckoutForm}
-          options={{ title: 'Checkout Form' }}
-        />
-        <Stack.Screen
-          name="PostCheckout"
-          component={PostCheckout}
-          options={{ title: 'PostCheckout' , headerBackVisible: false,}}
-        />
+        <Stack.Screen name="Complete" component={CompletePage} />
+        <Stack.Screen name="Checkout" component={CheckoutForm} />
+        <Stack.Screen name="PostCheckout" component={PostCheckout} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -175,7 +103,7 @@ const ProfileButton = () => {
 
   return (
     <TouchableOpacity onPress={() => navigation.navigate('Preferences')}>
-      <Icon name="person-circle-outline" size={30} color="#13293d" />
+      <Icon name="person-circle-outline" size={30} color="#1c334d" />
     </TouchableOpacity>
     
   );
@@ -183,28 +111,10 @@ const ProfileButton = () => {
 
 const LogoutButton = () => {
   const navigation = useNavigation();
-  const styles = StyleSheet.create({
-    mediumButton: {
-      margin: 10,
-      padding: 15,
-      backgroundColor: '#D30C7B',
-      borderRadius: 10,
-      alignItems: 'center',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 2, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 3,
-    },
-    buttonText: {
-      fontSize: 16,
-      color: 'white',
-    },
-  });
 
   return(
-    <TouchableOpacity onPress={() => (handleLogout(navigation))} style={styles.mediumButton}>
-      <Text style={styles.buttonText}>Logout</Text>
+    <TouchableOpacity onPress={() => (handleLogout(navigation))} style={{ paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#1F7A8C', borderRadius: 15 }}>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: '#fff' }}>Logout</Text>
     </TouchableOpacity>
   );
 }

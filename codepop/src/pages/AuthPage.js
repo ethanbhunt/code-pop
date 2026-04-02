@@ -72,7 +72,7 @@ const AuthPage = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Image
-        source={require('../../assets/robot-with-soda.png')}
+        source={require('../../assets/codepop_ai_logo.png')}
         style={styles.image}
       />
       <Text style={styles.title}>CodePop</Text>
@@ -109,43 +109,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#C6C8EE',
+    backgroundColor: '#ffffff',
   },
   title: {
-    fontFamily: 'CherryBombOne',
-    fontSize: 52,
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#1c334d',
     paddingBottom: 30,
   },
   input: {
     marginBottom: 10,
     borderWidth: 1,
-    padding: 5,
+    borderColor: '#d6e5f3',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     width: '100%',
-    borderRadius: 10,
-    backgroundColor: '#FFA686',
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    color: '#243b52',
+    fontSize: 14,
   },
   buttonContainer: {
     flexDirection: 'row',
+    marginTop: 6,
   },
   mediumButton: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#8df1d3',
-    borderRadius: 10,
+    margin: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 15,
     alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
   },
   buttonText: {
     fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
   },
   image: {
     width: 150,
     height: 150,
-    borderRadius: 10,
+    borderRadius: 15,
+    marginBottom: 16,
   },
 });
 

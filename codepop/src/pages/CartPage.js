@@ -8,9 +8,6 @@ import CheckoutForm from './CheckoutForm';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// to do:
-// fix wording for drinks in the cart - "none ice" doesn't make sense
-
 const CartPage = () => {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
@@ -134,20 +131,26 @@ const CartPage = () => {
 
   const renderDrinkItem = (drink) => (
     <View style={styles.drinkContainer}>
-      <Text style={styles.drinkText}>{drink.Size} Drink: {drink.SodaUsed.join(', ')} with {drink.Ice} Ice</Text>
-      <Text style={styles.ingredientsText}>
-        Syrups: {drink.SyrupsUsed ? drink.SyrupsUsed.join(', ') : ''}{'\n\n'}
-        Add Ins: {drink.AddIns ? drink.AddIns.join(', ') : ''}
-      </Text>
-      <Text style={styles.priceText}>Price: ${calculatePrice(drink).toFixed(2)}</Text>
+      <Text style={styles.drinkTitle}>{drink.Size} Drink</Text>
+      <Text style={styles.drinkDetail}>Soda: {drink.SodaUsed.join(', ')}</Text>
+      <Text style={styles.drinkDetail}>Ice: {drink.Ice}</Text>
+      {drink.SyrupsUsed && drink.SyrupsUsed.length > 0 && (
+        <Text style={styles.drinkDetail}>Syrups: {drink.SyrupsUsed.join(', ')}</Text>
+      )}
+      {drink.AddIns && drink.AddIns.length > 0 && (
+        <Text style={styles.drinkDetail}>Add-ins: {drink.AddIns.join(', ')}</Text>
+      )}
+      <Text style={styles.priceText}>${calculatePrice(drink).toFixed(2)}</Text>
 
       <View style={styles.buttonRow}>
-        <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.button}>
-          <Icon name="create-outline" size={24} color="#000" />
+        <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.iconButton}>
+          <Icon name="create-outline" size={20} color="#1F7A8C" />
+          <Text style={styles.iconButtonText}>Edit</Text>
         </TouchableOpacity>
-  
-        <TouchableOpacity onPress={() => removeDrink(drink.DrinkID)} style={styles.button}>
-          <Icon name="close-circle-outline" size={24} color="#000" />
+
+        <TouchableOpacity onPress={() => removeDrink(drink.DrinkID)} style={styles.iconButton}>
+          <Icon name="close-circle-outline" size={20} color="#c0392b" />
+          <Text style={styles.removeButtonText}>Remove</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -196,71 +199,95 @@ const CartPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFA686',
+    backgroundColor: '#ffffff',
   },
   padding: {
-    padding: 16,
+    paddingHorizontal: 12,
   },
   headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 10,
+    fontSize: 27,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginBottom: 4,
     textAlign: 'center',
-    padding: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   drinkContainer: {
-    backgroundColor: '#C8E6C9',
-    padding: 16,
-    marginVertical: 8,
-    borderRadius: 8,
-    elevation: 2,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    marginVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
   },
-  drinkText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  ingredientsText: {
+  drinkTitle: {
     fontSize: 16,
-    marginTop: 5,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginBottom: 4,
+  },
+  drinkDetail: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#49627d',
+    marginBottom: 3,
   },
   priceText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 5,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginTop: 6,
   },
   emptyCartText: {
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
-    color: '#000',
+    color: '#49627d',
+    fontWeight: '600',
     marginTop: 20,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 10,
+    gap: 16,
   },
-  button: {
-    padding: 10,
+  iconButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#E1E5F2',
+  },
+  iconButtonText: {
+    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F7A8C',
+  },
+  removeButtonText: {
+    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#c0392b',
   },
   totalText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '800',
     textAlign: 'center',
-    marginVertical: 20,
-    padding: 10,                // Adds space inside the border
-    borderWidth: 2,             // Thickness of the border
-    borderColor: '#F92758',     // Color of the border
-    borderRadius: 10,           // Rounds the corners
-    backgroundColor: '#F92758', // Optional: background color to make it stand out
-    color: '#fff',            // Text color to match or contrast with border
+    marginVertical: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#022B3A',
+    color: '#fff',
+    overflow: 'hidden',
   },
   payButton: {
-    backgroundColor: '#D30C7B',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginBottom: 80,
-    borderRadius: 8,
+    backgroundColor: '#1F7A8C',
+    paddingVertical: 14,
+    marginBottom: 120,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -268,11 +295,12 @@ const styles = StyleSheet.create({
   payButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '800',
     marginLeft: 8,
   },
   listContainer: {
-    paddingBottom: 20,
+    paddingBottom: 10,
   },
 });
-
 export default CartPage;
+

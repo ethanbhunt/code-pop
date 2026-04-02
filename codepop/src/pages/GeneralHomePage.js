@@ -2,11 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BASE_URL } from '../../ip_address';
 import NavBar from '../components/NavBar';
-import SeasonalCarousel from '../components/SeasonalCarousel';
 
 const GeneralHomePage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -14,6 +13,8 @@ const GeneralHomePage = () => {
   const [isManager, setIsManager] = useState(false);
   const [name, setName] = useState(null);
   const [activeOrderNum, setActiveOrderNum] = useState(null);
+  const [dailyDrinks, setDailyDrinks] = useState([]);
+  const [drinksLoading, setDrinksLoading] = useState(true);
   const navigation = useNavigation();
 
   // Check login status when the screen gains focus
@@ -26,10 +27,10 @@ const GeneralHomePage = () => {
           const userRole = await AsyncStorage.getItem('userRole');
           const orderNum = await AsyncStorage.getItem('orderNum');
           if (token && storedName) {
-            setIsLoggedIn(true);  // User is logged in
-            setName(storedName);  // Set username for display
+            setIsLoggedIn(true);
+            setName(storedName);
           } else {
-            setIsLoggedIn(false);  // No user is logged in
+            setIsLoggedIn(false);
           }
           if (userRole == 'admin'){
             setIsAdmin(true);
@@ -44,9 +45,30 @@ const GeneralHomePage = () => {
           console.error('Error checking login status:', error);
         }
       };
-  
+
+      const fetchOneDrink = async () => {
+        const res = await fetch(`${BASE_URL}/backend/generate/`);
+        if (!res.ok) return null;
+        return res.json();
+      };
+
+      const fetchDailyDrinks = async () => {
+        setDrinksLoading(true);
+        try {
+          const drink1 = await fetchOneDrink();
+          const drink2 = await fetchOneDrink();
+          const drink3 = await fetchOneDrink();
+          setDailyDrinks([drink1, drink2, drink3].filter(Boolean));
+        } catch (error) {
+          console.error('Error fetching daily drinks:', error);
+        } finally {
+          setDrinksLoading(false);
+        }
+      };
+
       checkLoginStatus();
-    }, [])  // The empty array ensures this only runs when the screen is focused
+      fetchDailyDrinks();
+    }, [])
   );
 
   useEffect(() => {
@@ -121,6 +143,11 @@ const GeneralHomePage = () => {
     navigation.navigate('ManagerDash');  // Navigate to the login page
   };
 
+  const formatDrinkField = (value) => {
+    if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
+    return value || 'None';
+  };
+
   // Generate drinks button press
   const generateDrinks = () => {
     navigation.navigate('CreateDrink', { fromGenerateButton: true });
@@ -136,11 +163,6 @@ const GeneralHomePage = () => {
 
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../../assets/PinkBubbles.png')}
-        style={styles.image}
-        resizeMode="cover"
-      />
       <ScrollView contentContainerStyle={styles.contentContainer}>
         <View style={styles.heroCard}>
           <Text style={styles.heroEyebrow}>CodePop AI</Text>
@@ -156,14 +178,14 @@ const GeneralHomePage = () => {
 
         <View style={styles.quickActionsRow}>
           <TouchableOpacity style={styles.quickActionCard} onPress={goToTrackOrder}>
-            <Icon name="locate" size={22} color="#0e5f8a" />
+            <Icon name="location" size={22} color="#1F7A8C" />
             <Text style={styles.quickActionTitle}>Track Order</Text>
             <Text style={styles.quickActionBody}>
               {activeOrderNum ? `Order #${activeOrderNum}` : 'No active order'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Cart')}>
-            <Icon name="cart" size={22} color="#0e5f8a" />
+            <Icon name="cart" size={22} color="#1F7A8C" />
             <Text style={styles.quickActionTitle}>Cart</Text>
             <Text style={styles.quickActionBody}>Review drinks before checkout</Text>
           </TouchableOpacity>
@@ -195,69 +217,77 @@ const GeneralHomePage = () => {
           </View>
         )}
 
-        <View style={styles.carouselShell}>
-          <Text style={styles.carouselTitle}>Seasonal favorites</Text>
-          <SeasonalCarousel style={styles.carousel} />
-        </View>
-        <NavBar />
+        <Text style={styles.dailyDrinksTitle}>Drinks of The Day</Text>
+
+        {drinksLoading ? (
+          <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 16 }} />
+        ) : (
+          dailyDrinks.map((drink, index) => {
+            const soda = Array.isArray(drink.SodaUsed) ? drink.SodaUsed : [drink.SodaUsed];
+            const syrups = Array.isArray(drink.SyrupsUsed) ? drink.SyrupsUsed : [];
+            const addIns = Array.isArray(drink.AddIns) ? drink.AddIns : [];
+
+            return (
+              <View key={index} style={styles.dailyDrinkCard}>
+                <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
+                <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(soda)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrups)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addIns)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Size: {drink.Size || '24oz'}</Text>
+                <Text style={styles.dailyDrinkDetail}>Ice: {drink.Ice || 'regular'}</Text>
+              </View>
+            );
+          })
+        )}
+
       </ScrollView>
+      <NavBar />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  image: {
-    width: '100%',
-    height: '150%',
-    ...StyleSheet.absoluteFillObject,
-  },
   container: {
     flex: 1,
-    padding: 0,
-    backgroundColor: '#fffaf5',
-    zIndex: 2,
+    backgroundColor: '#ffffff',
   },
   contentContainer: {
     flexGrow: 1,
     alignItems: 'center',
-    paddingTop: 14,
-    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingHorizontal: 12,
     paddingBottom: 120,
   },
   heroCard: {
     width: '100%',
-    borderRadius: 24,
-    backgroundColor: 'rgba(19, 41, 61, 0.9)',
-    padding: 18,
-    shadowColor: '#0f2538',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    elevation: 8,
+    borderRadius: 22,
+    backgroundColor: '#022B3A',
+    padding: 16,
   },
   heroEyebrow: {
-    color: '#89d6ff',
-    fontWeight: '700',
+    color: '#BFDBF7',
+    fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
+    fontSize: 12,
     marginBottom: 6,
   },
   heroTitle: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 27,
     fontWeight: '800',
-    lineHeight: 34,
+    lineHeight: 31,
   },
   heroDescription: {
-    color: '#d8efff',
-    marginTop: 10,
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#dcefff',
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
   },
   primaryAction: {
-    marginTop: 16,
-    backgroundColor: '#ff6a3d',
-    borderRadius: 14,
+    marginTop: 14,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -272,42 +302,42 @@ const styles = StyleSheet.create({
   },
   quickActionsRow: {
     width: '100%',
-    marginTop: 14,
+    marginTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   quickActionCard: {
     width: '48.5%',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#d6e8f5',
+    borderColor: '#E1E5F2',
   },
   quickActionTitle: {
     marginTop: 10,
     fontSize: 16,
     fontWeight: '800',
-    color: '#1b2f45',
+    color: '#1c334d',
   },
   quickActionBody: {
     marginTop: 4,
     fontSize: 13,
-    color: '#47627d',
+    color: '#49627d',
     fontWeight: '600',
   },
   accountCard: {
     width: '100%',
-    marginTop: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 245, 237, 0.96)',
+    marginTop: 12,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
     padding: 14,
     borderWidth: 1,
-    borderColor: '#ffd8c9',
+    borderColor: '#E1E5F2',
   },
   greeting: {
     fontSize: 16,
-    color: '#1b2f45',
+    color: '#1c334d',
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -315,7 +345,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#0e5f8a',
+    backgroundColor: '#1F7A8C',
     alignItems: 'center',
   },
   secondaryButtonText: {
@@ -323,23 +353,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
-  carouselShell: {
+  dailyDrinksTitle: {
     width: '100%',
-    marginTop: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingBottom: 8,
-  },
-  carousel: {
-    margin: 0,
-    padding: 0,
-  },
-  carouselTitle: {
-    paddingTop: 14,
-    paddingHorizontal: 14,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#1b2f45',
+    color: '#1c334d',
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  dailyDrinkCard: {
+    width: '100%',
+    marginTop: 10,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
+  },
+  dailyDrinkNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F7A8C',
+    marginBottom: 6,
+  },
+  dailyDrinkDetail: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#49627d',
+    marginBottom: 3,
   },
 });
 

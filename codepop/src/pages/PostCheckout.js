@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import RatingCarosel from '../components/RatingCarosel';
+import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
@@ -13,12 +12,12 @@ const PostCheckout = () => {
   const [lockerCombo, setLockerCombo] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [orderNum, setOrderNum] = useState(null);
+  const [orderLoaded, setOrderLoaded] = useState(false);
   const [orderStatus, setOrderStatus] = useState('pending');
   const [estimatedReadyTime, setEstimatedReadyTime] = useState(null);
   const [lastUpdateText, setLastUpdateText] = useState('Waiting for first update...');
   const [isDemoFallback, setIsDemoFallback] = useState(false);
   const [failedPollCount, setFailedPollCount] = useState(0);
-  const [purchasedDrinks, setPurchasedDrinks] = useState([]);
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
@@ -106,92 +105,87 @@ const PostCheckout = () => {
 
 
 
-  // get the list of drinks from the cartlist
   useEffect(() => {
-    const fetchPurchasedDrinks = async () => {
+    const updateInventory = async () => {
       try {
         const storedDrinks = await AsyncStorage.getItem("purchasedDrinks");
         const parsedDrinks = storedDrinks ? JSON.parse(storedDrinks) : [];
-        setPurchasedDrinks(parsedDrinks);
 
-        // Loop through the drinks and log details
-        // Create a list to store all the items
         const allUsedItems = [];
 
         parsedDrinks.forEach((drink) => {
-
-          // Add SyrupsUsed to the list
           if (drink.SyrupsUsed && drink.SyrupsUsed.length > 0) {
-            allUsedItems.push(...drink.SyrupsUsed); // Spread operator to merge arrays
+            allUsedItems.push(...drink.SyrupsUsed);
           }
-
-          // Add SodaUsed to the list
           if (drink.SodaUsed && drink.SodaUsed.length > 0) {
             allUsedItems.push(...drink.SodaUsed);
           }
-
-        // Add AddIns to the list
           if (drink.AddIns && drink.AddIns.length > 0) {
             allUsedItems.push(...drink.AddIns);
           }
-    });
-
-    // Fetch revenue data
-    const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const inventoryData = await inventoryResponse.json();
-
-    // Extract matching InventoryIDs
-    const matchingInventoryIDs = inventoryData.inventory_items.filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase())).map(item => item.InventoryID); // Extract the InventoryID
-
-    for (const id of matchingInventoryIDs)
-    {
-      try{
-        const data = {'used_quantity': 1};
-        const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to update Inventory')
+        const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const inventoryData = await inventoryResponse.json();
+
+        const matchingInventoryIDs = inventoryData.inventory_items
+          .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
+          .map(item => item.InventoryID);
+
+        for (const id of matchingInventoryIDs) {
+          try {
+            const data = { 'used_quantity': 1 };
+            const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to update Inventory');
+            }
+          } catch (error) {
+            console.error('Error resetting inventory:', error);
+          }
         }
       } catch (error) {
-        console.error('Error resetting incentory:', error)
-      }
-    }
-      } catch (error) {
-        console.error("Error fetching purchased drinks:", error);
+        console.error("Error updating inventory:", error);
       }
     };
-  
-    fetchPurchasedDrinks();
+
+    updateInventory();
   }, []);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      (async () => {
+        const storedOrderNum = await AsyncStorage.getItem('orderNum');
+        if (!active) return;
+        setOrderNum(storedOrderNum || null);
+        if (!storedOrderNum) {
+          setLockerCombo('');
+        }
+        setOrderLoaded(true);
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
   useEffect(() => {
-    // Generate locker combo only when the component mounts
+    if (!orderNum) return;
     handleLockerCombo();
-  }, []); // Empty dependency array ensures it runs only once
+  }, [orderNum]);
 
   useEffect(() => {
-    const loadOrderNum = async () => {
-      const storedOrderNum = await AsyncStorage.getItem('orderNum');
-      if (storedOrderNum) {
-        setOrderNum(storedOrderNum);
-      }
-    };
-
-    loadOrderNum();
-  }, []);
-
-  useEffect(() => {
-    if(lockerCombo !== ''){
-      updateLockerCombo();
-    }
-  }, [lockerCombo]);
+    if (!orderNum || lockerCombo === '') return;
+    updateLockerCombo();
+  }, [lockerCombo, orderNum]);
 
   useEffect(() => {
     if (!estimatedReadyTime) return;
@@ -257,7 +251,7 @@ const PostCheckout = () => {
   };
 
   const updateLockerCombo = async () => {
-    const orderNum = await AsyncStorage.getItem("orderNum");
+    if (!orderNum) return;
     await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
       method: 'PATCH',
       headers: {
@@ -282,10 +276,6 @@ const PostCheckout = () => {
     navigation.navigate('GeneralHome');  // Navigate to the login page
   };
 
-  const makeDrink= () => {
-    setIsNearby(true);
-  }
-
   const getStatusLabel = (status) => {
     if (status === 'pending') return 'Queued';
     if (status === 'processing') return 'Mixing';
@@ -295,6 +285,28 @@ const PostCheckout = () => {
 
   const currentStatusIndex = Math.max(0, statusTimeline.indexOf(orderStatus));
   const progressPercent = `${((currentStatusIndex + 1) / statusTimeline.length) * 100}%`;
+
+  if (!orderLoaded) {
+    return (
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollViewContainer}>
+          <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 24 }} />
+        </ScrollView>
+        <NavBar />
+      </View>
+    );
+  }
+
+  if (!orderNum) {
+    return (
+      <View style={styles.container}>
+        <ScrollView style={styles.flexFill} contentContainerStyle={styles.emptyStateContent}>
+          <Text style={styles.emptyStateText}>Create an order to track it</Text>
+        </ScrollView>
+        <NavBar />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -347,16 +359,25 @@ const PostCheckout = () => {
 
         <View style={styles.mapSection}>
           <Text style={styles.mapTitle}>Arrival map</Text>
-          {location ? (
-            <MapView
-              style={styles.map}
-              region={{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+          <MapView
+            style={styles.map}
+            region={{
+              latitude: location ? location.coords.latitude : storeLocation.latitude,
+              longitude: location ? location.coords.longitude : storeLocation.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            <Marker
+              coordinate={{
+                latitude: storeLocation.latitude,
+                longitude: storeLocation.longitude,
               }}
-            >
+              title="Code Pop"
+              description="Store location"
+              pinColor="#1F7A8C"
+            />
+            {location && (
               <Marker
                 coordinate={{
                   latitude: location.coords.latitude,
@@ -365,37 +386,19 @@ const PostCheckout = () => {
                 title="You are here"
                 description="Current location"
               />
-            </MapView>
-          ) : (
-            <View style={styles.arrivalButtonContainer}>
-              <Text style={styles.loadingText}>Map unavailable in demo mode.</Text>
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleUserArrived}
-              >
-                <Text style={styles.actionButtonText}>I've Arrived</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.ratingSection}>
-          <Text style={styles.ratingLabel}>Rate your drinks</Text>
-          <RatingCarosel purchasedDrinks={purchasedDrinks} />
+            )}
+          </MapView>
         </View>
 
         {orderStatus === 'completed' ? (
-          <TouchableOpacity onPress={goHomePage} style={styles.actionButtonLarge}>
-            <Text style={styles.actionButtonText}>Back To Home Page</Text>
+          <TouchableOpacity onPress={goHomePage} style={styles.button}>
+            <Text style={styles.buttonText}>Back To Home Page</Text>
           </TouchableOpacity>
-        ) : isNearby ? (
-          <></>
-        ) : (
-          <TouchableOpacity onPress={makeDrink} style={styles.actionButtonLarge}>
-            <Text style={styles.actionButtonText}>Location Not Working</Text>
-            <Text style={styles.actionButtonText}>Tap To Start Drink</Text>
+        ) : !isNearby ? (
+          <TouchableOpacity onPress={handleUserArrived} style={styles.button}>
+            <Text style={styles.buttonText}>I've Arrived</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </ScrollView>
       <NavBar />
     </View>
@@ -405,7 +408,7 @@ const PostCheckout = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#ffffff',
   },
   scrollViewContainer: {
     flexGrow: 1,
@@ -413,19 +416,29 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 120,
   },
+  flexFill: {
+    flex: 1,
+  },
+  emptyStateContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 120,
+  },
   headerCard: {
     width: '100%',
-    borderRadius: 22,
+    borderRadius: 15,
     padding: 16,
-    backgroundColor: '#133a57',
+    backgroundColor: '#022B3A',
     shadowColor: '#0f2538',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.24,
     shadowRadius: 14,
-    elevation: 8,
+    elevation: 7,
   },
   headerEyebrow: {
-    color: '#98dcff',
+    color: '#BFDBF7',
     fontSize: 12,
     textTransform: 'uppercase',
     fontWeight: '800',
@@ -433,9 +446,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 27,
     fontWeight: '800',
-    marginTop: 4,
+    marginTop: 6,
+    lineHeight: 31,
   },
   headerStatus: {
     color: '#dcefff',
@@ -453,13 +467,13 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 999,
     marginTop: 12,
-    backgroundColor: '#2f5672',
+    backgroundColor: '#0f4a5e',
     overflow: 'hidden',
   },
   progressFill: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: '#ffb347',
+    backgroundColor: '#BFDBF7',
   },
   summaryRow: {
     marginTop: 12,
@@ -469,10 +483,10 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: '48.5%',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 15,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#dfe9f2',
+    borderColor: '#ffffff',
   },
   mapSection: {
     marginTop: 12,
@@ -481,28 +495,18 @@ const styles = StyleSheet.create({
     minHeight: 280,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#dfe9f2',
+    borderColor: '#ffffff',
     padding: 12,
   },
-  ratingSection: {
-    marginTop: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#dfe9f2',
-    paddingBottom: 20,
-    paddingHorizontal: 10,
-    paddingTop: 8,
-  },
   summaryLabel: {
-    color: '#37526d',
+    color: '#49627d',
     fontSize: 13,
     fontWeight: '700',
   },
   summaryValue: {
-    color: '#1b2f45',
+    color: '#1c334d',
     fontSize: 28,
     fontWeight: '800',
     marginTop: 6,
@@ -510,61 +514,47 @@ const styles = StyleSheet.create({
   successMessage: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0e5f8a',
+    color: '#1F7A8C',
     marginTop: 6,
   },
-  ratingLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1b2f45',
-    margin: 10,
-  },
-  actionButton: {
-    backgroundColor: '#ff6a3d',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonLarge: {
-    marginTop: 12,
-    backgroundColor: '#ff6a3d',
+  button: {
+    backgroundColor: '#1F7A8C',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 10,
   },
-  actionButtonText: {
+  buttonText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
   },
   map: {
     width: '100%',
     height: 210,
-    borderRadius: 12,
+    borderRadius: 15,
   },
   nearbySection: {
     marginTop: 12,
-    backgroundColor: '#fff2df',
-    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#ffd6a6',
+    borderColor: '#ffffff',
     padding: 12,
   },
   lastUpdate: {
-    color: '#bfe8ff',
+    color: '#dcefff',
     marginTop: 6,
     marginBottom: 8,
     fontWeight: '600',
   },
   fallbackBadge: {
-    color: '#133a57',
-    backgroundColor: '#f9e76d',
+    color: '#022B3A',
+    backgroundColor: '#BFDBF7',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 15,
     fontWeight: 'bold',
     marginBottom: 8,
   },
@@ -586,10 +576,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   timelineDotActive: {
-    backgroundColor: '#ffb347',
+    backgroundColor: '#1F7A8C',
   },
   timelineLabel: {
-    color: '#b8d7ed',
+    color: '#dcefff',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -598,17 +588,11 @@ const styles = StyleSheet.create({
   },
   nearbyText: {
     fontWeight: '700',
-    color: '#7a4700',
-  },
-  arrivalButtonContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    minHeight: 190,
+    color: '#49627d',
   },
   errorMessage: {
     fontWeight: '700',
-    color: '#264059',
+    color: '#49627d',
     marginBottom: 10,
     textAlign: 'center',
   },
@@ -616,12 +600,18 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     fontSize: 16,
     fontWeight: '800',
-    color: '#1b2f45',
+    color: '#1c334d',
     marginBottom: 10,
   },
   loadingText: {
-    color: '#264059',
+    color: '#49627d',
     fontWeight: '600',
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1c334d',
+    textAlign: 'center',
   },
 });
 

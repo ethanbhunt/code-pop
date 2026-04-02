@@ -18,10 +18,11 @@ const NavBar = () => {
   const route = useRoute();
 
   const navItems = [
-    { screen: 'GeneralHome', icon: 'home-outline', activeIcon: 'home' },
-    { screen: 'CreateDrink', icon: 'sparkles-outline', activeIcon: 'sparkles' },
-    { screen: 'Cart', icon: 'cart-outline', activeIcon: 'cart' },
-    { screen: 'ComplaintsPage', icon: 'chatbubbles-outline', activeIcon: 'chatbubbles' },
+    { screen: 'GeneralHome', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
+    { screen: 'CreateDrink', label: 'Order', icon: 'cafe-outline', activeIcon: 'cafe' },
+    { screen: 'Cart', label: 'Cart', icon: 'cart-outline', activeIcon: 'cart' },
+    { screen: 'PostCheckout', label: 'Tracking', icon: 'location-outline', activeIcon: 'location' },
+    { screen: 'ComplaintsPage', label: 'Support', icon: 'chatbubbles-outline', activeIcon: 'chatbubbles' },
   ];
 
   return (
@@ -40,7 +41,7 @@ const NavBar = () => {
               color={isActive ? '#ffffff' : '#2b4865'}
             />
             <Text style={[styles.navItemLabel, isActive && styles.navItemLabelActive]}>
-              {item.screen === 'CreateDrink' ? 'AI' : item.screen === 'GeneralHome' ? 'Home' : item.screen === 'ComplaintsPage' ? 'Support' : item.screen}
+              {item.label}
             </Text>
           </TouchableOpacity>
         );
@@ -54,8 +55,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f0f6ff',
-    borderRadius: 22,
+    backgroundColor: 'rgba(174, 179, 197, 0.85)',
+    borderRadius: 15,
     paddingVertical: 10,
     paddingHorizontal: 10,
     width: '94%',
@@ -68,23 +69,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 14,
-    elevation: 8,
+    elevation: 0,
   },
   navItemButton: {
-    width: '24%',
+    width: '19%',
     height: 58,
-    borderRadius: 16,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   navItemButtonActive: {
-    backgroundColor: '#ff6a3d',
+    backgroundColor: '#022B3A',
   },
   navItemLabel: {
     marginTop: 2,
     fontSize: 11,
     fontWeight: '700',
-    color: '#2b4865',
+    color: '#022B3A',
   },
   navItemLabelActive: {
     color: '#ffffff',

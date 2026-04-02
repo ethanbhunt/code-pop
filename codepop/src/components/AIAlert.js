@@ -115,6 +115,7 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     });
     return layers;
   };
+
   const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
   const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
   const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
@@ -137,13 +138,12 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
       <View style={styles.modalContent}>
         <Text style={styles.eyebrow}>AI Pick</Text>
         <Text style={styles.modalTitle}>Your drink is ready</Text>
-        <Text style={styles.modalText}>
-          A {drinkDict.Size} drink with {drinkDict.Ice} Ice
-        </Text>
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
             <View style={styles.ingredientsCard}>
+              <Text style={styles.ingredientsText}>Size: {drinkDict.Size}</Text>
+              <Text style={styles.ingredientsText}>Ice: {drinkDict.Ice}</Text>
               <Text style={styles.ingredientsText}>Soda: {sodaUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Syrups: {syrupsUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Add-ins: {addIns.join(", ")}</Text>
@@ -169,10 +169,6 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
             </View>
           </View>
 
-          {/* Drink GIF */}
-          <View style={styles.graphicContainer}>
-            <Gif layers={layers} />
-          </View>
         </View>
       </View>
     </Modal>
@@ -186,41 +182,36 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   modalContent: {
-    backgroundColor: '#f7fbff',
+    backgroundColor: '#ffffff',
     padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    alignItems: 'center',
   },
   body: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    width: '100%',
     marginBottom: 10,
   },
   textNbuttons: {
-    flex: 1,
-    paddingRight: 12,
+    width: '100%',
   },
   eyebrow: {
-    color: '#0e5f8a',
+    color: '#BFDBF7',
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontSize: 12,
+    alignSelf: 'flex-start',
   },
   ingredientsCard: {
-    backgroundColor: '#15364f',
-    borderRadius: 12,
+    backgroundColor: '#E1E5F2',
+    borderRadius: 15,
     padding: 10,
     marginBottom: 10,
   },
   ingredientsText: {
     fontSize: 14,
-    color: '#e5f4ff',
+    color: '#000000',
     fontWeight: '700',
     marginBottom: 5,
   },
@@ -231,44 +222,43 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'column',
-    justifyContent: 'space-between',
     marginTop: 4,
   },
   primaryButton: {
-    backgroundColor: '#ff6a3d',
+    backgroundColor: '#BFDBF7',
     paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 10,
+    borderRadius: 15,
     marginBottom: 10,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 15,
     fontWeight: '800',
   },
   secondaryButton: {
-    backgroundColor: '#e9f3fd',
+    backgroundColor: '#BFDBF7',
     paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 10,
+    borderRadius: 15,
     marginBottom: 10,
   },
   newOptionButton: {
-    backgroundColor: '#0e5f8a',
+    backgroundColor: '#BFDBF7',
     paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 10,
+    borderRadius: 15,
     marginBottom: 10,
   },
   newOptionButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 15,
     textAlign: 'center',
     fontWeight: '800',
   },
   buttonText: {
-    color: '#1d3a54',
+    color: '#000000',
     fontSize: 15,
     textAlign: 'center',
     fontWeight: '800',
@@ -276,20 +266,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#10283d',
+    color: '#000000',
     marginTop: 4,
-  },
-  modalText: {
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginVertical: 14,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ffd8c9',
-    borderRadius: 10,
-    backgroundColor: '#fff5ef',
-    color: '#8a3a1f',
+    paddingBottom: 10,
+    alignSelf: 'flex-start',
   },
 });
 

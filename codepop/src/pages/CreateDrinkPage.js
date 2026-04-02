@@ -274,15 +274,15 @@ const CreateDrinkPage = () => {
     <View style={styles.wholePage}>
       <ScrollView style={styles.padding} contentContainerStyle={styles.contentContainer}>
         <View style={styles.aiHeroCard}>
-          <Text style={styles.heroLabel}>AI Concierge</Text>
-          <Text style={styles.heroTitle}>Create a drink from your prompt</Text>
+          <Text style={styles.heroLabel}>AI Mixologist</Text>
+          <Text style={styles.heroTitle}>Randomize your drink!</Text>
           <Text style={styles.heroBody}>
-            Example: "Light citrus with vanilla and no caffeine"
+            Enter what drink, syrups, or add-ins you want included.
           </Text>
 
           <View style={styles.aiPromptContainer}>
             <TextInput
-              placeholder="Describe your ideal drink"
+              placeholder="Enter your drink keywords"
               placeholderTextColor="#7b8da1"
               style={styles.aiPromptInput}
               value={aiPromptText}
@@ -341,21 +341,7 @@ const CreateDrinkPage = () => {
             </View>
           </View>
 
-          <View style={styles.graphicContainer}>
-            <View style={styles.straw}></View>
-            <Gif layers={layers} />
-          </View>
-
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryHeading}>Current Build</Text>
-            <Text style={styles.summaryText}>Soda: {formatSelection(SodaUsed)}</Text>
-            <Text style={styles.summaryText}>Syrups: {formatSelection(SyrupsUsed)}</Text>
-            <Text style={styles.summaryText}>Add-ins: {formatSelection(AddIns)}</Text>
-          </View>
-
-          <TouchableOpacity onPress={addToCart} style={styles.button}>
-            <Text style={styles.buttonText}>Add to Cart</Text>
-          </TouchableOpacity>
+          
         </View>
 
         {drinkDict && (
@@ -374,7 +360,6 @@ const CreateDrinkPage = () => {
         )}
 
         <View style={styles.ingredientsCard}>
-          <Text style={styles.ingredientsTitle}>Fine tune ingredients</Text>
           <TextInput
             placeholder="Search ingredients"
             style={styles.searchInput}
@@ -398,6 +383,7 @@ const CreateDrinkPage = () => {
             isOpen={openDropdown.syrups}
             setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
             selectedValues={SyrupsUsed}
+            tintByFlavor
           />
           <DropDown
             title="AddIns"
@@ -406,8 +392,23 @@ const CreateDrinkPage = () => {
             isOpen={openDropdown.addins}
             setOpen={() => setOpenDropdown(prev => ({ ...prev, addins: !prev.addins }))}
             selectedValues={AddIns}
+            tintByFlavor
           />
         </View>
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryHeading}>Current Drink</Text>
+          <Text style={styles.summaryText}>Size: {selectedSize || 'None'}</Text>
+          <Text style={styles.summaryText}>Ice: {selectedIce || 'None'}</Text>
+          <Text style={styles.summaryText}>Soda: {formatSelection(SodaUsed)}</Text>
+          <Text style={styles.summaryText}>Syrups: {formatSelection(SyrupsUsed)}</Text>
+          <Text style={styles.summaryText}>Add-ins: {formatSelection(AddIns)}</Text>
+        </View>
+
+        <TouchableOpacity onPress={addToCart} style={styles.button}>
+            <Text style={styles.buttonText}>Add to Cart</Text>
+          </TouchableOpacity>
+
       </ScrollView>
       <NavBar/>
     </View>
@@ -417,7 +418,7 @@ const CreateDrinkPage = () => {
 const styles = StyleSheet.create({
   wholePage: {
     flex: 1,
-    backgroundColor: '#fffaf5',
+    backgroundColor: '#ffffff',
   },
   padding: {
     paddingHorizontal: 12,
@@ -427,8 +428,8 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   aiHeroCard: {
-    borderRadius: 22,
-    backgroundColor: '#15364f',
+    borderRadius: 15,
+    backgroundColor: '#022B3A',
     padding: 16,
     shadowColor: '#0f2538',
     shadowOffset: { width: 0, height: 8 },
@@ -437,7 +438,7 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   heroLabel: {
-    color: '#98dcff',
+    color: '#BFDBF7',
     fontSize: 12,
     textTransform: 'uppercase',
     fontWeight: '800',
@@ -458,11 +459,11 @@ const styles = StyleSheet.create({
   },
   previewCard: {
     marginTop: 12,
-    borderRadius: 20,
-    backgroundColor: '#f2f8ff',
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
     padding: 12,
     borderWidth: 1,
-    borderColor: '#d6e8f5',
+    borderColor: '#ffffff',
   },
   selectionRow: {
     flexDirection: 'row',
@@ -471,10 +472,10 @@ const styles = StyleSheet.create({
   selectionCard: {
     width: '48.5%',
     backgroundColor: '#ffffff',
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#e4edf5',
+    borderColor: '#ffffff',
   },
   selectionTitle: {
     color: '#1c334d',
@@ -494,11 +495,11 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginTop: 6,
-    borderRadius: 14,
+    borderRadius: 15,
     backgroundColor: '#fff',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#e4edf5',
+    borderColor: '#ffffff',
   },
   summaryHeading: {
     fontSize: 15,
@@ -513,9 +514,9 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   button: {
-    backgroundColor: '#ff6a3d',
+    backgroundColor: '#1F7A8C',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
@@ -526,18 +527,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   pillButton: {
-    backgroundColor: '#f6f9fd',
+    backgroundColor: '#E1E5F2',
     borderWidth: 1,
-    borderColor: '#d9e5f0',
+    borderColor: '#E1E5F2',
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    marginRight: 6,
-    marginBottom: 6,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginRight: 9,
+    marginBottom: 9,
   },
   pillButtonSelected: {
-    backgroundColor: '#ff6a3d',
-    borderColor: '#ff6a3d',
+    backgroundColor: '#1F7A8C',
+    borderColor: '#1F7A8C',
   },
   pillText: {
     color: '#2f4a66',
@@ -552,21 +553,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 15,
     backgroundColor: '#fff',
     color: '#243b52',
     marginVertical: 10,
-  },
-  straw: {
-    position: 'absolute',
-    top: 10,
-    left: '50%',
-    width: 10,
-    height: 230,
-    backgroundColor: '#ff6a3d',
-    borderRadius: 6,
-    transform: [{ translateX: -5 }],
-    zIndex: 1,
   },
   aiPromptContainer: {
     flexDirection: 'row',
@@ -577,7 +567,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#d6e5f3',
-    borderRadius: 12,
+    borderRadius: 15,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
@@ -586,8 +576,8 @@ const styles = StyleSheet.create({
   },
   aiSendButton: {
     marginLeft: 6,
-    backgroundColor: '#ff6a3d',
-    borderRadius: 12,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 15,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
@@ -596,25 +586,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   randomDrinkButton: {
-    backgroundColor: '#0e5f8a',
+    backgroundColor: '#BFDBF7',
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
   },
   randomDrinkButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 15,
     fontWeight: '700',
   },
   ingredientsCard: {
     marginTop: 12,
     marginBottom: 10,
-    borderRadius: 20,
-    backgroundColor: '#f2f8ff',
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#d6e8f5',
+    borderColor: '#ffffff',
     padding: 12,
   },
   ingredientsTitle: {

@@ -4,13 +4,8 @@ import NavBar from '../components/NavBar';
 import DropDown from '../components/DropDown';
 import { useNavigation } from '@react-navigation/native';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
-import Gif from '../components/Gif';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// todo:
-  // the options in the drop downs still dont preselect like the drink size and ice ammount do
-    // probably something to do with the lowercase/spelling
 
 const UpdateDrink = ({route, navigation}) => {
   
@@ -33,13 +28,22 @@ const UpdateDrink = ({route, navigation}) => {
     juices: false,
   });
 
+  const iceLabels = ['No Ice', 'Light', 'Regular', 'Extra'];
+
+  const normalizeIce = (value) => {
+    if (!value) return null;
+    const lower = value.toLowerCase();
+    if (lower === 'none' || lower === 'no ice') return 'No Ice';
+    return iceLabels.find(l => l.toLowerCase() === lower) || value;
+  };
+
   useEffect(() => {
     if (drink) {
       setSoda(drink.SodaUsed || []);
       setSyrups(drink.SyrupsUsed || []);
       setAddIns(drink.AddIns || []);
       setSize(drink.Size || null);
-      setIce(drink.Ice || null);
+      setIce(normalizeIce(drink.Ice));
     }
   }, [drink]);
 
@@ -153,133 +157,96 @@ const UpdateDrink = ({route, navigation}) => {
     }
   };
 
-  // reactive gif stuff
-  const getLayers = (soda, syrups, addins) => {
-    const layers = [];
-    const totalItems = soda.length + syrups.length + addins.length;
-  
-    soda.forEach((sodaName) => {
-      const sodaOption = sodaOptions.find((opt) => opt.label === sodaName);
-      if (sodaOption) {
-        layers.push({ color: sodaOption.color, height: 100 / totalItems });
-      } else {
-      }
-    });
-  
-    syrups.forEach((syrupName) => {
-      const syrupOption = syrupOptions.find((opt) => opt.label === syrupName);
-      if (syrupOption) {
-        layers.push({ color: syrupOption.color, height: 100 / totalItems });
-      } else {
-      }
-    });
-  
-    addins.forEach((addinName) => {
-      const addInOption = AddInOptions.find((opt) => opt.label === addinName); 
-      if (addInOption) {
-        layers.push({ color: addInOption.color, height: 100 / totalItems });
-      } else {
-      }
-    });
-    return layers;
-  };  
-  
-  const layers = getLayers(SodaUsed, SyrupsUsed, AddIns);
-  
   return (
     <View style={styles.wholePage}>
+      <ScrollView style={styles.padding} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.previewCard}>
+          <View style={styles.selectionRow}>
+            <View style={styles.selectionCard}>
+              <Text style={styles.selectionTitle}>Size</Text>
+              <View style={styles.selectionPillsWrap}>
+                {['16oz', '24oz', '32oz'].map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    onPress={() => handleSizeSelection(size)}
+                    style={[
+                      styles.pillButton,
+                      selectedSize === size && styles.pillButtonSelected,
+                    ]}
+                  >
+                    <Text style={[styles.pillText, selectedSize === size && styles.pillTextSelected]}>{size}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
-      <ScrollView style={styles.padding}>
-      <View style={styles.rowContainer}>
-        {/* Size buttons on the left */}
-        <View style={styles.buttonContainerLeft}>
-          {['16oz', '24oz', '32oz'].map((size) => (
-            <TouchableOpacity
-              key={size}
-              onPress={() => handleSizeSelection(size)}
-              style={[
-                styles.circularButton,
-                selectedSize === size && styles.circularButtonSelected,
-              ]}
-            >
-              <Text style={[styles.buttonText, selectedSize === size && styles.selectedButtonText]}>
-                {size}
-              </Text>
-            </TouchableOpacity>
-          ))}
+            <View style={styles.selectionCard}>
+              <Text style={styles.selectionTitle}>Ice</Text>
+              <View style={styles.selectionPillsWrap}>
+                {['No Ice', 'Light', 'Regular', 'Extra'].map((ice) => (
+                  <TouchableOpacity
+                    key={ice}
+                    onPress={() => handleIceSelection(ice)}
+                    style={[
+                      styles.pillButton,
+                      selectedIce === ice && styles.pillButtonSelected,
+                    ]}
+                  >
+                    <Text style={[styles.pillText, selectedIce === ice && styles.pillTextSelected]}>{ice}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
         </View>
 
-        
-        <View style={styles.graphicContainer}>
-          <Gif layers={layers}/>
+        <View style={styles.ingredientsCard}>
+          <TextInput
+            placeholder="Search ingredients"
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={handleSearch}
+            placeholderTextColor="#6f7f91"
+          />
+
+          <DropDown
+            title="Sodas"
+            options={filterOptions(sodaOptions, SodaUsed)}
+            onSelect={handleSodaSelection}
+            isOpen={openDropdown.sodas}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
+            selectedValues={SodaUsed}
+          />
+          <DropDown
+            title="Syrups"
+            options={filterOptions(syrupOptions, SyrupsUsed)}
+            onSelect={handleSyrupSelection}
+            isOpen={openDropdown.syrups}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
+            selectedValues={SyrupsUsed}
+          />
+          <DropDown
+            title="AddIns"
+            options={filterOptions(AddInOptions, AddIns)}
+            onSelect={handleAddInSelection}
+            isOpen={openDropdown.juices}
+            setOpen={() => setOpenDropdown(prev => ({ ...prev, juices: !prev.juices }))}
+            selectedValues={AddIns}
+          />
         </View>
 
-        {/* Ice buttons on the right */}
-        <View style={styles.buttonContainerRight}>
-          {['none', 'light', 'regular', 'extra'].map((ice) => (
-            <TouchableOpacity
-              key={ice}
-              onPress={() => handleIceSelection(ice)}
-              style={[
-                styles.circularButton,
-                selectedIce === ice && styles.circularButtonSelected,
-              ]}
-            >
-              <Text style={[styles.buttonText, selectedIce === ice && styles.selectedButtonText]}>{ice}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryHeading}>Current Drink</Text>
+          <Text style={styles.summaryText}>Size: {selectedSize || 'None'}</Text>
+          <Text style={styles.summaryText}>Ice: {selectedIce || 'None'}</Text>
+          <Text style={styles.summaryText}>Soda: {SodaUsed.length ? SodaUsed.join(', ') : 'None'}</Text>
+          <Text style={styles.summaryText}>Syrups: {SyrupsUsed.length ? SyrupsUsed.join(', ') : 'None'}</Text>
+          <Text style={styles.summaryText}>Add-ins: {AddIns.length ? AddIns.join(', ') : 'None'}</Text>
         </View>
-      </View>
 
-      {/* Button to add to cart */}
-      <TouchableOpacity onPress={updateDrink} style={styles.button}>
-        <Text style={styles.buttonText}>Update</Text>
-      </TouchableOpacity>
-
-      {/* Search Input */}
-      <TextInput
-        placeholder="Search ingredients"
-        style={styles.searchInput}
-        value={searchText}
-        onChangeText={handleSearch}
-      />
-
-      {/* Dropdowns */}
-      <View style={styles.navBarSpace}>
-      {/* <DropDown 
-        title="Sodas" 
-        options={filterOptions(sodaOptions, SodaUsed)} 
-        onSelect={handleSodaSelection} 
-        isOpen={openDropdown.sodas}
-        setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
-        selectedValues={SodaUsed} // Pass the updated state
-      /> */}
-      <DropDown
-        title="Sodas"
-        options={filterOptions(sodaOptions, SodaUsed)} 
-        onSelect={handleSodaSelection}
-        isOpen={openDropdown.sodas}
-        setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
-        selectedValues={SodaUsed}
-      />
-      <DropDown 
-        title="Syrups" 
-        options={filterOptions(syrupOptions, SyrupsUsed)} 
-        onSelect={handleSyrupSelection} 
-        isOpen={openDropdown.syrups}
-        setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
-        selectedValues={SyrupsUsed}
-      />
-      <DropDown 
-        title="AddIns" 
-        options={filterOptions(AddInOptions, AddIns)} 
-        onSelect={handleAddInSelection} 
-        isOpen={openDropdown.juices}
-        setOpen={() => setOpenDropdown(prev => ({ ...prev, juices: !prev.juices }))}
-        selectedValues={AddIns}
-      />
-
-      </View>
+        <TouchableOpacity onPress={updateDrink} style={styles.button}>
+          <Text style={styles.buttonText}>Update</Text>
+        </TouchableOpacity>
       </ScrollView>
       <NavBar/>
     </View>
@@ -289,89 +256,118 @@ const UpdateDrink = ({route, navigation}) => {
 const styles = StyleSheet.create({
   wholePage: {
     flex: 1,
-    backgroundColor: '#FFA686',
-    // padding: 10,
+    backgroundColor: '#ffffff',
   },
   padding: {
-    padding: 10,
+    paddingHorizontal: 12,
   },
-  navBarSpace: {
-    marginBottom: 80,
+  contentContainer: {
+    paddingTop: 12,
+    paddingBottom: 120,
   },
-  rowContainer: {
+  previewCard: {
+    marginTop: 12,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  selectionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10, // Add padding on sides
-    flex: 1,
   },
-  buttonContainerLeft: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'space-around',
-    width: '30%', // Adjust width as needed
+  selectionCard: {
+    width: '48.5%',
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff',
   },
-  buttonContainerRight: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    width: '30%', // Adjust width as needed
+  selectionTitle: {
+    color: '#1c334d',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  graphicContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1, // Center the graphic
+  selectionPillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  drinkGraphicText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  pillButton: {
+    backgroundColor: '#E1E5F2',
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
+    borderRadius: 999,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginRight: 9,
+    marginBottom: 9,
+  },
+  pillButtonSelected: {
+    backgroundColor: '#1F7A8C',
+    borderColor: '#1F7A8C',
+  },
+  pillText: {
+    color: '#2f4a66',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  pillTextSelected: {
+    color: '#fff',
+  },
+  ingredientsCard: {
+    marginTop: 12,
+    marginBottom: 10,
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    padding: 12,
+  },
+  searchInput: {
+    borderColor: '#d6e5f3',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    color: '#243b52',
+    marginVertical: 10,
+  },
+  summaryCard: {
+    marginTop: 6,
+    borderRadius: 15,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+  },
+  summaryHeading: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginBottom: 4,
+  },
+  summaryText: {
+    color: '#49627d',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   button: {
-    backgroundColor: '#D30C7B',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    backgroundColor: '#1F7A8C',
+    paddingVertical: 14,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginVertical: 5,
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-  },
-  circularButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#D30C7B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F92758',
-    margin: 5,
-  },
-  circularButtonSelected: {
-    borderColor: '#8DF1D3',
-    backgroundColor: '#E8F5E9',
-  },
-  selectedButtonText: {
-    color: '#000', // Black color for selected text
-  },
-  searchInput: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 3,
-    paddingHorizontal: 10,
-    width: '80%',
-    marginVertical: 15,
-    borderRadius: 5,
-    alignSelf: 'center', // Center the search input
+    fontWeight: '800',
   },
 });
 
