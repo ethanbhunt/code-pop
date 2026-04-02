@@ -65,13 +65,14 @@ router.put(
       throw new ApiError("Invalid user ID", 400)
     }
 
-    const { firstName, lastName, email, userRole } = req.body
+    const { firstName, lastName, email, role } = req.body
+    console.log(req.body)
     const updates = {}
 
     if (firstName !== undefined) updates.firstName = firstName
     if (lastName !== undefined) updates.lastName = lastName
     if (email !== undefined) updates.email = email
-    if (userRole !== undefined) updates.userRole = userRole
+    if (role !== undefined) updates.role = role
     const user = await updateUser(userId, updates)
 
     res.json({

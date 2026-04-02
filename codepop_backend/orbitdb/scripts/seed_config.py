@@ -8,29 +8,29 @@ Used by seed_data.py to populate the OrbitDB backend.
 # Test Users - 3 accounts with different roles
 SEED_USERS = [
     {
-        "username": "customer_jane",
-        "email": "jane@example.com",
-        "password": "Customer123!",
-        "firstName": "Jane",
-        "lastName": "Smith",
-        "role": "customer"
+        "username": "superadmin",
+        "email": "superadmin@example.com",
+        "password": "superadmin",
+        "firstName": "Superadmin",
+        "lastName": "Superadmin",
+        "role": "superadmin"
     },
     {
-        "username": "staff_bob",
-        "email": "bob@example.com",
-        "password": "Staff123!",
-        "firstName": "Bob",
-        "lastName": "Johnson",
-        "role": "staff"
+        "username": "manager",
+        "email": "manager@example.com",
+        "password": "manager",
+        "firstName": "Manager",
+        "lastName": "Manager",
+        "role": "manager"
     },
     {
-        "username": "admin_alex",
-        "email": "alex@example.com",
-        "password": "Admin123!",
-        "firstName": "Alex",
-        "lastName": "Davis",
+        "username": "admin",
+        "email": "admin@example.com",
+        "password": "admin",
+        "firstName": "Admin",
+        "lastName": "Admin",
         "role": "admin"
-    }
+    },
 ]
 
 # Drinks Menu - 8 drinks covering major categories

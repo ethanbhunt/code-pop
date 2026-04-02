@@ -3,6 +3,18 @@
 
 import { getTokensDb, getUsersDb } from "../utils/db.js"
 
+/** DB / seed may use legacy names; admin routes accept these. */
+function hasAdminPrivileges(role) {
+  const r = String(role ?? "").toLowerCase()
+  return r === "admin" || r === "superadmin"
+}
+
+/** Staff-tier and above (legacy `manager` = store manager). */
+function hasStaffPrivileges(role) {
+  const r = String(role ?? "").toLowerCase()
+  return ["staff", "manager", "admin", "superadmin"].includes(r)
+}
+
 /**
  * Authenticate request using token from Authorization header
  * Expects: Authorization: Token {tokenKey}
@@ -69,8 +81,7 @@ export async function authenticate(req, res, next) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      userRole: user.userRole,
-      assignedStores: user.assignedStores || []
+      role: user.role
     }
     req.token = tokenKey
 
@@ -96,7 +107,7 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
+  if (!hasAdminPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
@@ -217,7 +228,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (req.user.userRole !== "staff" && req.user.userRole !== "manager" && req.user.userRole !== "admin") {
+  if (!hasStaffPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"
@@ -267,17 +278,16 @@ export async function optionalAuth(req, res, next) {
     const usersDb = getUsersDb()
     const user = await usersDb.get(`user:${tokenEntry.userId}`)
 
-     if (user) {
-       req.user = {
-         userId: user.userId,
-         username: user.username,
-         email: user.email,
-         firstName: user.firstName,
-         lastName: user.lastName,
-         userRole: user.userRole,
-         assignedStores: user.assignedStores || []
-       }
-       req.token = tokenKey
+    if (user) {
+      req.user = {
+        userId: user.userId,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+      }
+      req.token = tokenKey
     } else {
       req.user = null
     }

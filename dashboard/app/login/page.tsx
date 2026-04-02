@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { ALL_ROLES, Role } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,12 +21,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const devBypassEnabled =
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "true" ||
+    process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
+  const [devRole, setDevRole] = useState<Role>(Role.Customer);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
@@ -46,10 +50,12 @@ export default function LoginPage() {
             const formData = new FormData(form);
             const username = formData.get("username") as string;
             const password = formData.get("password") as string;
+            const role = (formData.get("role") as string | null) ?? undefined;
 
             const result = await signIn("credentials", {
               username,
               password,
+              role,
               redirect: false,
             });
 
@@ -79,7 +85,7 @@ export default function LoginPage() {
                   type="text"
                   placeholder="username"
                   autoComplete="username"
-                  required
+                  required={!devBypassEnabled}
                 />
               </FieldContent>
             </Field>
@@ -94,10 +100,35 @@ export default function LoginPage() {
                   type="password"
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  required
+                  required={!devBypassEnabled}
                 />
               </FieldContent>
             </Field>
+
+            {devBypassEnabled && (
+              <Field>
+                <FieldLabel>
+                  <Label htmlFor="role">Dev Role</Label>
+                </FieldLabel>
+                <FieldContent>
+                  <select
+                    id="role"
+                    name="role"
+                    value={devRole}
+                    onChange={(e) =>
+                      setDevRole(e.target.value as unknown as Role)
+                    }
+                    className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none"
+                  >
+                    {ALL_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </FieldContent>
+              </Field>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button
@@ -112,5 +143,19 @@ export default function LoginPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 text-sm text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

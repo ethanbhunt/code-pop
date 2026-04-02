@@ -5,17 +5,27 @@ import { getUsersDb, getTokensDb, getNextId, getTimestamp } from "../utils/db.js
 import { hashPassword, comparePassword, generateToken } from "../utils/crypto.js"
 import { validateEmail, validateUsername, validatePassword } from "../utils/validation.js"
 
+/** Persist only customer | staff | admin; map seed/legacy names. */
+function normalizeOrbitRoleForStorage(role) {
+  const r = String(role ?? "customer").trim().toLowerCase()
+  if (!r) return "customer"
+  if (r === "superadmin" || r === "admin") return "admin"
+  if (r === "manager" || r === "staff") return "staff"
+  if (r === "customer" || r === "user") return "customer"
+  return null
+}
+
 /**
  * Register a new user
  * @param {string} username - Username
  * @param {string} password - Plain text password
  * @param {string} email - Email address
- * @param {string} userRole - User's role default is 'customer'
+ * @param {string} role - User's role default is 'customer'
  * @param {string} firstName - First name (optional)
  * @param {string} lastName - Last name (optional)
  * @returns {Object} User data without password + token
  */
-export async function registerUser(username, password, email, userRole = "customer",  firstName = "", lastName = "") {
+export async function registerUser(username, password, email, role = "customer",  firstName = "", lastName = "") {
   // Validate inputs
   if (!validateUsername(username)) {
     throw new Error("Invalid username. Must be 3-50 characters, alphanumeric and underscores only")
@@ -50,6 +60,11 @@ export async function registerUser(username, password, email, userRole = "custom
     throw new Error("Email already exists")
   }
 
+  const normalizedRole = normalizeOrbitRoleForStorage(role)
+  if (normalizedRole === null) {
+    throw new Error("Invalid role. Use customer, staff, or admin")
+  }
+
   // Hash password
   const passwordHash = await hashPassword(password)
 
@@ -64,7 +79,7 @@ export async function registerUser(username, password, email, userRole = "custom
     email,
     firstName,
     lastName,
-    userRole,
+    role: normalizedRole,
     dateJoined: getTimestamp(),
     lastLogin: null
   }
@@ -91,7 +106,7 @@ export async function registerUser(username, password, email, userRole = "custom
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    enum: user.enum,
+    role: user.role,
     token: tokenKey
   }
 }
@@ -161,7 +176,7 @@ export async function loginUser(username, password) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    userRole: user.userRole,
+    role: user.role,
     token: tokenKey
   }
 }
@@ -210,7 +225,7 @@ export async function getUserById(userId) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    userRole: user.userRole,
+    role: user.role,
     dateJoined: user.dateJoined,
     lastLogin: user.lastLogin
   }
@@ -231,9 +246,21 @@ export async function updateUser(userId, updates) {
   }
 
   // Only allow certain fields to be updated
-  if (updates.firstName) user.firstName = updates.firstName
-  if (updates.lastName) user.lastName = updates.lastName
-  if (updates.userRole) user.userRole = updates.userRole
+  if (updates.firstName !== undefined) user.firstName = updates.firstName
+  if (updates.lastName !== undefined) user.lastName = updates.lastName
+
+  if (updates.role !== undefined) {
+    const raw = String(updates.role).trim().toLowerCase()
+    if (raw === "" || raw === "unchanged") {
+      // no-op (Django-style sentinel or empty)
+    } else {
+      const normalized = normalizeOrbitRoleForStorage(updates.role)
+      if (normalized === null) {
+        throw new Error("Invalid role")
+      }
+      user.role = normalized
+    }
+  }
 
   // Email can be updated but must be unique
   if (updates.email) {
@@ -263,7 +290,7 @@ export async function updateUser(userId, updates) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    userRole: user.userRole
+    role: user.role
   }
 }
 
@@ -315,7 +342,7 @@ export async function listUsers(limit = 100) {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        userRole: user.userRole,
+        role: user.role,
         dateJoined: user.dateJoined,
         lastLogin: user.lastLogin
       })
