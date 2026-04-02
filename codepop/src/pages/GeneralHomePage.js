@@ -2,16 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { BASE_URL } from '../../ip_address';
 import NavBar from '../components/NavBar';
-import SeasonalCarousel from '../components/SeasonalCarousel';
 
 const GeneralHomePage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isManager, setIsManager] = useState(false);
   const [name, setName] = useState(null);
+  const [activeOrderNum, setActiveOrderNum] = useState(null);
+  const [dailyDrinks, setDailyDrinks] = useState([]);
+  const [drinksLoading, setDrinksLoading] = useState(true);
   const navigation = useNavigation();
 
   // Check login status when the screen gains focus
@@ -22,11 +25,12 @@ const GeneralHomePage = () => {
           const storedName = await AsyncStorage.getItem('first_name');
           const token = await AsyncStorage.getItem('userToken');
           const userRole = await AsyncStorage.getItem('userRole');
+          const orderNum = await AsyncStorage.getItem('orderNum');
           if (token && storedName) {
-            setIsLoggedIn(true);  // User is logged in
-            setName(storedName);  // Set username for display
+            setIsLoggedIn(true);
+            setName(storedName);
           } else {
-            setIsLoggedIn(false);  // No user is logged in
+            setIsLoggedIn(false);
           }
           if (userRole == 'admin'){
             setIsAdmin(true);
@@ -36,13 +40,35 @@ const GeneralHomePage = () => {
             setIsAdmin(false);
             setIsManager(false);
           }
+          setActiveOrderNum(orderNum);
         } catch (error) {
           console.error('Error checking login status:', error);
         }
       };
-  
+
+      const fetchOneDrink = async () => {
+        const res = await fetch(`${BASE_URL}/backend/generate/`);
+        if (!res.ok) return null;
+        return res.json();
+      };
+
+      const fetchDailyDrinks = async () => {
+        setDrinksLoading(true);
+        try {
+          const drink1 = await fetchOneDrink();
+          const drink2 = await fetchOneDrink();
+          const drink3 = await fetchOneDrink();
+          setDailyDrinks([drink1, drink2, drink3].filter(Boolean));
+        } catch (error) {
+          console.error('Error fetching daily drinks:', error);
+        } finally {
+          setDrinksLoading(false);
+        }
+      };
+
       checkLoginStatus();
-    }, [])  // The empty array ensures this only runs when the screen is focused
+      fetchDailyDrinks();
+    }, [])
   );
 
   useEffect(() => {
@@ -117,119 +143,245 @@ const GeneralHomePage = () => {
     navigation.navigate('ManagerDash');  // Navigate to the login page
   };
 
+  const formatDrinkField = (value) => {
+    if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
+    return value || 'None';
+  };
+
   // Generate drinks button press
   const generateDrinks = () => {
-    console.log('generating drinks...');
-    navigation.navigate('CreateDrink', {fromGenerateButton: true} );
+    navigation.navigate('CreateDrink', { fromGenerateButton: true });
+  }
+
+  const goToTrackOrder = () => {
+    if (!activeOrderNum) {
+      Alert.alert('No active order yet', 'Place an order first, then track your progress in real time.');
+      return;
+    }
+    navigation.navigate('PostCheckout');
   }
 
   return (
     <View style={styles.container}>
-      <Image 
-                source={require('../../assets/PinkBubbles.png')}
-                style={styles.image}
-                resizeMode="cover"
-            />
       <ScrollView contentContainerStyle={styles.contentContainer}>
-        {/* If logged in, display the username and Logout button, otherwise display Login button */}
-        {isLoggedIn ? (
-          <>
-            {/* Conditionally render the "Hello <username>" if username exists */}
-            {name ? <Text style={styles.greeting}>Hello {name}!</Text> : null}
+        <View style={styles.heroCard}>
+          <Text style={styles.heroEyebrow}>CodePop AI</Text>
+          <Text style={styles.heroTitle}>Build your next drink from a prompt</Text>
+          <Text style={styles.heroDescription}>
+            Describe your mood and let the AI generate a custom soda blend with ingredients, size, and ice presets.
+          </Text>
+          <TouchableOpacity onPress={generateDrinks} style={styles.primaryAction}>
+            <Icon name="sparkles" size={20} color="#fff" />
+            <Text style={styles.primaryActionText}>Start AI Drink Builder</Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* The main title */}
-            <Text style={styles.title}>Welcome to the CodePop App!</Text>
-            <SeasonalCarousel style={styles.carousel}/>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={generateDrinks} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Generate Drinks</Text>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={goToTrackOrder}>
+            <Icon name="location" size={22} color="#1F7A8C" />
+            <Text style={styles.quickActionTitle}>Track Order</Text>
+            <Text style={styles.quickActionBody}>
+              {activeOrderNum ? `Order #${activeOrderNum}` : 'No active order'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigation.navigate('Cart')}>
+            <Icon name="cart" size={22} color="#1F7A8C" />
+            <Text style={styles.quickActionTitle}>Cart</Text>
+            <Text style={styles.quickActionBody}>Review drinks before checkout</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isLoggedIn ? (
+          <View style={styles.accountCard}>
+            {name ? <Text style={styles.greeting}>Welcome back, {name}</Text> : null}
+            <TouchableOpacity onPress={handleLogout} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Logout</Text>
+            </TouchableOpacity>
+            {isAdmin && (
+              <TouchableOpacity onPress={goToAdminDash} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Admin Dashboard</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleLogout} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Logout</Text>
+            )}
+            {isManager && (
+              <TouchableOpacity onPress={goToManDash} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Manager Dashboard</Text>
               </TouchableOpacity>
-              {/*If the user is an admin display a button for navigation to the admin dash*/}
-              {isAdmin ? (
-                <>
-                <TouchableOpacity onPress={goToAdminDash} style={styles.mediumButton}>
-                  <Text style={styles.buttonText}>Admin Dash</Text>
-                </TouchableOpacity>
-                </>
-              ): (<></>)}
-              {/*If the user is an admin display a button for navigation to the admin dash*/}
-              {isManager ? (
-                <>
-                <TouchableOpacity onPress={goToManDash} style={styles.mediumButton}>
-                  <Text style={styles.buttonText}>Manager Dash</Text>
-                </TouchableOpacity>
-                </>
-              ): (<></>)}  
-            </View>
-          </>
+            )}
+          </View>
         ) : (
-          <>
-            <SeasonalCarousel style={styles.carousel}/>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={generateDrinks} style={styles.mediumButton}>
-              <Text style={styles.buttonText}>Generate Drinks</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={goToLoginPage} style={styles.mediumButton}>
-                <Text style={styles.buttonText}>Login</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+          <View style={styles.accountCard}>
+            <Text style={styles.greeting}>Sign in to save preferences and reorder faster.</Text>
+            <TouchableOpacity onPress={goToLoginPage} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Login</Text>
+            </TouchableOpacity>
+          </View>
         )}
-        <NavBar />
+
+        <Text style={styles.dailyDrinksTitle}>Drinks of The Day</Text>
+
+        {drinksLoading ? (
+          <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 16 }} />
+        ) : (
+          dailyDrinks.map((drink, index) => {
+            const soda = Array.isArray(drink.SodaUsed) ? drink.SodaUsed : [drink.SodaUsed];
+            const syrups = Array.isArray(drink.SyrupsUsed) ? drink.SyrupsUsed : [];
+            const addIns = Array.isArray(drink.AddIns) ? drink.AddIns : [];
+
+            return (
+              <View key={index} style={styles.dailyDrinkCard}>
+                <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
+                <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(soda)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrups)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addIns)}</Text>
+                <Text style={styles.dailyDrinkDetail}>Size: {drink.Size || '24oz'}</Text>
+                <Text style={styles.dailyDrinkDetail}>Ice: {drink.Ice || 'regular'}</Text>
+              </View>
+            );
+          })
+        )}
+
       </ScrollView>
+      <NavBar />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  image: {
-    width: '100%',
-    height: '150%',
-    ...StyleSheet.absoluteFillObject,
-  },
   container: {
     flex: 1,
-    padding: 0,
-    backgroundColor: '#D30C7B',
-    zIndex: 2, // Ensure it's above the image
-
+    backgroundColor: '#ffffff',
   },
   contentContainer: {
     flexGrow: 1,
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingHorizontal: 12,
+    paddingBottom: 120,
+  },
+  heroCard: {
+    width: '100%',
+    borderRadius: 22,
+    backgroundColor: '#022B3A',
+    padding: 16,
+  },
+  heroEyebrow: {
+    color: '#BFDBF7',
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  heroTitle: {
+    color: '#fff',
+    fontSize: 27,
+    fontWeight: '800',
+    lineHeight: 31,
+  },
+  heroDescription: {
+    color: '#dcefff',
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  primaryAction: {
+    marginTop: 14,
+    backgroundColor: '#1F7A8C',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  mediumButton: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#8DF1D3',
-    borderRadius: 10,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  buttonText: {
+  primaryActionText: {
+    marginLeft: 8,
+    color: '#fff',
+    fontWeight: '800',
     fontSize: 16,
-    color: '#000',
+  },
+  quickActionsRow: {
+    width: '100%',
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    width: '48.5%',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
+  },
+  quickActionTitle: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1c334d',
+  },
+  quickActionBody: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#49627d',
+    fontWeight: '600',
+  },
+  accountCard: {
+    width: '100%',
+    marginTop: 12,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
   },
   greeting: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 16,
+    color: '#1c334d',
+    fontWeight: '700',
+    marginBottom: 8,
   },
-  carousel: {
-    margin: 0,
-    padding: 0,
+  secondaryButton: {
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#1F7A8C',
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 25,
-  }
+  secondaryButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  dailyDrinksTitle: {
+    width: '100%',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  dailyDrinkCard: {
+    width: '100%',
+    marginTop: 10,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E1E5F2',
+  },
+  dailyDrinkNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F7A8C',
+    marginBottom: 6,
+  },
+  dailyDrinkDetail: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#49627d',
+    marginBottom: 3,
+  },
 });
 
 export default GeneralHomePage;

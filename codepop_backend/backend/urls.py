@@ -59,35 +59,12 @@ order_list = OrderOperations.as_view({
 order_detail = OrderOperations.as_view({
     'get': 'retrieve',
     'put': 'update',
+    'patch': 'patch',
     'delete': 'destroy'
 })
 
-order_fulfill = OrderOperations.as_view({
-    'post': 'fulfill'
-})
-
-supply_hub_list = SupplyHubOperations.as_view({
-    'get': 'list'
-})
-
-supply_hub_detail = SupplyHubOperations.as_view({
-    'get': 'retrieve'
-})
-
-supply_hub_inventory = SupplyHubOperations.as_view({
-    'get': 'inventory'
-})
-
-stock_transfer_list = StockTransferOperations.as_view({
-    'get': 'list',
-    'post': 'create'
-})
-
-stock_transfer_detail = StockTransferOperations.as_view({
-    'get': 'retrieve',
-    'put': 'update',
-    'patch': 'partial_update',
-    'delete': 'destroy'
+order_live_status = OrderOperations.as_view({
+    'post': 'live_status'
 })
 
 revenue_list = RevenueViewSet.as_view({'get': 'list', 'post': 'create'})
@@ -207,6 +184,10 @@ urlpatterns = [
     # - DELETE: Remove the specific order from the database.
     path('orders/<int:pk>/', order_detail, name='order_detail'),
     path('orders/<int:pk>/fulfill/', order_fulfill, name='order_fulfill'),
+
+    # Demo/live-order control endpoint
+    # - POST: Advance status and/or shift ETA minutes for manager-led demos.
+    path('orders/<int:pk>/live-status/', order_live_status, name='order_live_status'),
 
     # Retrieve Orders by UserID
 

@@ -118,9 +118,10 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     });
     return layers;
   };
-  const sodaUsed = Array.isArray(drinkDict.sodaUsed) && drinkDict.sodaUsed.length > 0 ? drinkDict.sodaUsed : [drinkDict.sodaUsed];
-  const syrupsUsed = Array.isArray(drinkDict.syrupsUsed) ? drinkDict.syrupsUsed : [];
-  const addIns = Array.isArray(drinkDict.addIns) ? drinkDict.addIns : [];
+
+  const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
+  const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
+  const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
 
   
 
@@ -138,43 +139,39 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
       animationOut="slideOutDown"
     >
       <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>Your Drink is ...</Text>
-         <Text style={styles.modalText}>
-           A {drinkDict.size} drink with {drinkDict.ice} Ice
-         </Text>
+        <Text style={styles.eyebrow}>AI Pick</Text>
+        <Text style={styles.modalTitle}>Your drink is ready</Text>
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
-            <View style={styles.ingredientsText}>
+            <View style={styles.ingredientsCard}>
+              <Text style={styles.ingredientsText}>Size: {drinkDict.Size}</Text>
+              <Text style={styles.ingredientsText}>Ice: {drinkDict.Ice}</Text>
               <Text style={styles.ingredientsText}>Soda: {sodaUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Syrups: {syrupsUsed.join(", ")}</Text>
               <Text style={styles.ingredientsText}>Add-ins: {addIns.join(", ")}</Text>
             </View>
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity style={styles.buttons} onPress={() => (edit(), toggleModal())}>
-                <Text style={styles.buttonText}>Edit</Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={() => (AddToCart(), toggleModal())}>
+                <Text style={styles.primaryButtonText}>Add to Cart</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.buttons} onPress={() => (AddToCart(), toggleModal())}>
-                <Text style={styles.buttonText}>Add to Cart</Text>
+              <TouchableOpacity style={styles.secondaryButton} onPress={() => (edit(), toggleModal())}>
+                <Text style={styles.buttonText}>Edit</Text>
               </TouchableOpacity>
 
               {onRegenerate && (
                 <TouchableOpacity style={styles.newOptionButton} onPress={onRegenerate}>
-                  <Text style={styles.buttonText}>New Option</Text>
+                  <Text style={styles.newOptionButtonText}>New Option</Text>
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity style={styles.buttons} onPress={toggleModal}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={toggleModal}>
                 <Text style={styles.buttonText}>Dismiss</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Drink GIF */}
-          <View style={styles.graphicContainer}>
-            <Gif layers={layers} />
-          </View>
         </View>
       </View>
     </Modal>
@@ -184,94 +181,98 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
 
 const styles = StyleSheet.create({
   modal: {
-    justifyContent: 'flex-end', // Align modal at the bottom
-    margin: 0, // Remove any margins from the modal
+    justifyContent: 'flex-end',
+    margin: 0,
   },
   modalContent: {
-    backgroundColor: '#C6C8EE',
+    backgroundColor: '#ffffff',
     padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    alignItems: 'center',
   },
   body: {
-    flexDirection: 'row', // Align ingredients and GIF horizontally
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    width: '100%',
+    marginBottom: 10,
   },
   textNbuttons: {
-    flex: 1, // Take up available space
-    paddingRight: 16,
+    width: '100%',
+  },
+  eyebrow: {
+    color: '#BFDBF7',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontSize: 12,
+    alignSelf: 'flex-start',
+  },
+  ingredientsCard: {
+    backgroundColor: '#E1E5F2',
+    borderRadius: 15,
+    padding: 10,
+    marginBottom: 10,
   },
   ingredientsText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 15,
-    backgroundColor: '#D30C7B', // Optional: background color to make it stand out
-    borderRadius: 10,
-    padding: 10,
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '700',
+    marginBottom: 5,
   },
   graphicContainer: {
-    flex: 0, // Allow the GIF container to take up remaining space
+    flex: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonsContainer: {
     flexDirection: 'column',
-    justifyContent: 'space-between',
-    marginTop: 5, // Adds space between buttons and the content above
+    marginTop: 4,
   },
-  buttons: {
-    backgroundColor: '#8DF1D3',
-    paddingVertical: 12, // Adjust padding for better size
-    paddingHorizontal: 25,
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    marginBottom: 10, // Adds space between buttons
-  },
-  newOptionButton: {
-    backgroundColor: '#8DF1D3',
+  primaryButton: {
+    backgroundColor: '#BFDBF7',
     paddingVertical: 12,
     paddingHorizontal: 25,
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
+    borderRadius: 15,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 15,
     marginBottom: 10,
   },
-  buttonText: {
-    color: '#000',
-    fontSize: 16,
+  newOptionButton: {
+    backgroundColor: '#BFDBF7',
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 15,
+    marginBottom: 10,
+  },
+  newOptionButtonText: {
+    color: '#000000',
+    fontSize: 15,
     textAlign: 'center',
-    fontWeight: 'bold',
+    fontWeight: '800',
+  },
+  buttonText: {
+    color: '#000000',
+    fontSize: 15,
+    textAlign: 'center',
+    fontWeight: '800',
   },
   modalTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-  modalText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginVertical: 20,
-    padding: 10,                // Adds space inside the border
-    borderWidth: 2,             // Thickness of the border
-    borderColor: '#F92758',     // Color of the border
-    borderRadius: 10,           // Rounds the corners
-    backgroundColor: '#F92758', // Optional: background color to make it stand out
-    color: '#fff',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#000000',
+    marginTop: 4,
+    paddingBottom: 10,
+    alignSelf: 'flex-start',
   },
 });
 

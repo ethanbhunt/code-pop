@@ -320,54 +320,47 @@ def generate_soda(user_preferences):
         elif item.lower() in validAddIns:
             addinPrefs.append(item.lower())
 
-    if len(syrupPrefs) == 0: # user_preferences somehow had no valid syrups -- the AI does not believe in syrup-less drinks
-        return drink # empty
+    if len(syrupPrefs) == 0:
+        syrupPrefs = random.sample(validSyrups, min(4, len(validSyrups)))
+
+    chosenSyrupPrefs = []
+    rand_pref_1 = random.randint(0, len(syrupPrefs) - 1)
+    rand_pref_2 = random.randint(0, len(syrupPrefs) - 1)
+    chosenSyrupPrefs.append(syrupPrefs[rand_pref_1])
+    if not rand_pref_1 == rand_pref_2:
+        chosenSyrupPrefs.append(syrupPrefs[rand_pref_2])
+
+    syrupsToUse = []
+    for pref in chosenSyrupPrefs:
+        top5 = generate_similar_syrup_preferences(pref)
+        rand_top5_1 = random.randint(0, len(top5) - 1)
+        rand_top5_2 = random.randint(0, len(top5) - 1)
+        syrupsToUse.append(top5[rand_top5_1])
+        syrupsToUse.append(top5[rand_top5_2])
+
+    drink["syrups"] = syrupsToUse
+
+    # If the prompt (or profile) names a soda, always honor it. Discovery only when none given.
+    if len(sodaPrefs) == 0:
+        drink["soda"] = [generate_best_soda(syrupsToUse, [])]
+    elif len(sodaPrefs) == 1:
+        drink["soda"] = [sodaPrefs[0]]
     else:
-        # Randomly picking 1-2 of the syrup preferences to create a drink with
-        chosenSyrupPrefs = []
-        rand_pref_1 = random.randint(0, len(syrupPrefs) - 1)
-        rand_pref_2 = random.randint(0, len(syrupPrefs) - 1)
-        chosenSyrupPrefs.append(syrupPrefs[rand_pref_1])
-        if not rand_pref_1 == rand_pref_2:
-            chosenSyrupPrefs.append(syrupPrefs[rand_pref_2])
+        drink["soda"] = [generate_best_soda(syrupsToUse, sodaPrefs)]
 
-        syrupsToUse = []
-        # Send chosen preferences to Syrup AI
-        for pref in chosenSyrupPrefs:
-            top5 = generate_similar_syrup_preferences(pref)
-
-            # Can have duplicate syrups the way this is coded right now
-            # Pick 1-2 random flavors from the top 5
-            rand_top5_1 = random.randint(0, len(top5) - 1)
-            rand_top5_2 = random.randint(0, len(top5) - 1)
-            syrupsToUse.append(top5[rand_top5_1])
-            syrupsToUse.append(top5[rand_top5_2])
-
-        drink["syrups"] = syrupsToUse
-
-        # Pick a preffered soda that best matches the generated syrups
-        # Auto pick soda if there is only 1 soda in preferences
-        if len(sodaPrefs) == 1:
-            drink["soda"] = [sodaPrefs[0]]
+    sodaToUse = drink['soda'][0]
+    numAddIn = random.randint(0, 2)
+    if numAddIn > 0:
+        if len(addinPrefs) == 0:
+            drink['addins'] = generate_best_addins(syrupsToUse, sodaToUse, [], numAddIn)
+        elif len(addinPrefs) == 1:
+            drink['addins'] = [addinPrefs[0]]
         else:
-            drink["soda"] = [generate_best_soda(syrupsToUse, sodaPrefs)]
+            drink['addins'] = generate_best_addins(syrupsToUse, sodaToUse, addinPrefs, numAddIn)
+    else:
+        drink['addins'] = []
 
-        sodaToUse = drink['soda'][0]
-        # Pick a preffered add-in that best matches the generated syrups and soda
-        # Can pick 0-2 add-ins
-        numAddIn = random.randint(0, 2)
-        if numAddIn > 0:
-            # Auto pick addin if there is only 1 in preferences
-            if len(addinPrefs) == 1:
-                drink['addins'] = [addinPrefs[0]]
-
-            # 0 or 2+ addins in pref
-            else:
-                drink['addins'] = generate_best_addins(syrupsToUse, sodaToUse, addinPrefs, numAddIn)
-        else:
-            drink['addins'] = []
-
-        return drink
+    return drink
 
 # Generate drinks based on user prompt
 DESCRIPTOR_MAP = {
@@ -386,12 +379,26 @@ DESCRIPTOR_MAP = {
     "chocolate": ["chocolate milano", "choc chip cookie dough", "white chocolate", "hazelnut"],
 }
 
+# Map common user phrases to names in Sodas.csv / ingredient lists (longest first).
+_PROMPT_PHRASE_FIXUPS = (
+    ("coca-cola", "coke"),
+    ("coca cola", "coke"),
+    ("mountain dew", "mtn. dew"),
+    ("mtn dew", "mtn. dew"),
+    ("diet mountain dew", "diet mtn. dew"),
+    ("doctor pepper", "dr. pepper"),
+)
+
+
 def parse_prompt(prompt):
     """
     parse a user's natural langauge prompt into a list of ingredients preferences
     that generate_soda() can understand.
     """
-    prompt_lower = prompt.lower()
+    prompt_lower = prompt.lower().strip()
+    for alias, canonical in _PROMPT_PHRASE_FIXUPS:
+        if alias in prompt_lower:
+            prompt_lower = prompt_lower.replace(alias, canonical)
     preferences = []
 
     all_syrups = create_list(syrup_file_path)

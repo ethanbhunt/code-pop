@@ -37,12 +37,14 @@ from .serializers import (
 )
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 import stripe
+import random
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View #maybe delete these three?
 from django.utils.decorators import method_decorator
 import json
+from datetime import timedelta
 from rest_framework.decorators import action
 from django.utils.dateparse import parse_datetime
 from .drinkAI import generate_soda, parse_prompt
@@ -469,10 +471,36 @@ class OrderOperations(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [AllowAny]
 
+    STATUS_TRANSITIONS = {
+        'pending': ['processing', 'cancelled'],
+        'processing': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': [],
+    }
+
+    def _estimate_ready_time(self, drink_count):
+        active_orders = Order.objects.filter(OrderStatus__in=['pending', 'processing']).count()
+        minutes = 3 + max(1, int(drink_count)) * 2 + max(0, active_orders - 1)
+        return timezone.now() + timedelta(minutes=minutes)
+
+    def _is_transition_valid(self, current_status, next_status):
+        if not next_status or next_status == current_status:
+            return True
+        return next_status in self.STATUS_TRANSITIONS.get(current_status, [])
+
     def patch(self, request, *args, **kwargs):
         order = self.get_object()
         drinks_to_add = request.data.get("AddDrinks", [])
         drinks_to_remove = request.data.get("RemoveDrinks", [])
+        requested_status = request.data.get("OrderStatus")
+
+        if not self._is_transition_valid(order.OrderStatus, requested_status):
+            return Response(
+                {
+                    "error": f"Invalid status transition from '{order.OrderStatus}' to '{requested_status}'."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         
         # Adding drinks
         if drinks_to_add:
@@ -481,11 +509,22 @@ class OrderOperations(viewsets.ModelViewSet):
         # Removing drinks
         if drinks_to_remove:
             order.remove_drinks(drinks_to_remove)
+
+        # If status changes to processing and PickupTime is missing, initialize ETA.
+        if requested_status == 'processing' and not order.PickupTime:
+            order.PickupTime = self._estimate_ready_time(order.Drinks.count())
+            order.save(update_fields=['PickupTime'])
+
+        # If status changes to completed, set pickup time to now for better tracking fidelity.
+        if requested_status == 'completed':
+            order.PickupTime = timezone.now()
+            order.save(update_fields=['PickupTime'])
         
         serializer = self.get_serializer(order, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     # def get_permissions(self):
     #     """Only authenticated users can create, update, or delete orders."""
@@ -495,14 +534,21 @@ class OrderOperations(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         # Extract data from the request
-        user_id = request.data.get("UserID", request.data.get("userId", None))
-        drinks = request.data.get("Drinks", request.data.get("drinks", []))
-        order_status = request.data.get("OrderStatus", request.data.get("orderStatus", "processing"))
-        payment_status = request.data.get("PaymentStatus", request.data.get("paymentStatus", "pending"))
-        stripe_id = request.data.get("StripeID", request.data.get("stripeId", None))
+        user_id = request.data.get("UserID", None)
+        drinks = request.data.get("Drinks", [])
+        order_status = request.data.get("OrderStatus", "pending")
+        payment_status = request.data.get("PaymentStatus", "pending")
+        stripe_id = request.data.get("StripeID", None)
+        pickup_time = request.data.get("PickupTime", None)
 
          # Log extracted values
         print(f"UserID: {user_id}, Drinks: {drinks}, OrderStatus: {order_status}, PaymentStatus: {payment_status}, StripeID: {stripe_id}")
+
+        if order_status not in self.STATUS_TRANSITIONS:
+            return Response({"error": f"Invalid initial OrderStatus '{order_status}'"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pickup_time is None and order_status in ['pending', 'processing']:
+            pickup_time = self._estimate_ready_time(len(drinks))
 
         # Create a new order
         order_data = {
@@ -511,6 +557,7 @@ class OrderOperations(viewsets.ModelViewSet):
             "Drinks": drinks,
             "PaymentStatus": payment_status,
             "StripeID": stripe_id,
+            "PickupTime": pickup_time,
         }
 
         serializer = self.get_serializer(data=order_data)
@@ -535,25 +582,32 @@ class OrderOperations(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'])
-    def fulfill(self, request, pk=None):
-        if not request.user or not request.user.is_authenticated:
-            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
-
+    def live_status(self, request, pk=None):
         order = self.get_object()
+        requested_status = request.data.get('status')
+        delay_minutes = int(request.data.get('delay_minutes', 0))
 
-        try:
-            fulfilled_order = OrderCompletionService.fulfill_order(order.OrderID)
-            serializer = self.get_serializer(fulfilled_order)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except ValueError as exc:
-            if order.UserID:
-                Notification.objects.create(
-                    UserID=order.UserID,
-                    Message=f"Order {order.OrderID} fulfillment failed: {str(exc)}",
-                    Type='order_error',
-                    Global=False,
-                )
-            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if requested_status and not self._is_transition_valid(order.OrderStatus, requested_status):
+            return Response(
+                {
+                    "error": f"Invalid status transition from '{order.OrderStatus}' to '{requested_status}'."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if requested_status:
+            order.OrderStatus = requested_status
+
+        # Delay is demo-friendly: adjust ETA up/down without changing lifecycle.
+        if delay_minutes != 0:
+            base_eta = order.PickupTime or self._estimate_ready_time(order.Drinks.count())
+            order.PickupTime = base_eta + timedelta(minutes=delay_minutes)
+
+        if requested_status == 'completed':
+            order.PickupTime = timezone.now()
+
+        order.save()
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
 class UserOrdersLookup(ListCreateAPIView):
     serializer_class = OrderSerializer
@@ -733,17 +787,35 @@ class GenerateAIDrink(APIView):
             return Response({'error': str(e)}, status=400)
     
     def generate_account_user(self, user_id):
-        """Generate AI drink for a registered user using their preferences."""
+        """Generate AI drink for a registered user, blending their preferences with discovery items."""
+        from .drinkAI import create_list, syrup_file_path, soda_file_path, addin_file_path
+
         user = get_object_or_404(User, pk=user_id)
         preferences = Preference.objects.filter(UserID=user)
-        preferences_list = []
+
+        discovery_pool = ["mango", "peach", "vanilla", "salted caramel", "orange",
+                          "lavender", "peppermint", "blue raspberry", "strawberry",
+                          "coconut", "watermelon", "cherry", "grape", "kiwi",
+                          "hazelnut", "cinnamon", "guava", "passion fruit"]
 
         if preferences.exists():
-            for pref in preferences:
-                preferences_list.append(pref.Preference)
+            user_prefs = [pref.Preference for pref in preferences]
+
+            all_syrups = create_list(syrup_file_path)
+            has_syrup = any(p.lower() in all_syrups for p in user_prefs)
+            if not has_syrup:
+                syrup_discovery = [s for s in discovery_pool if s.lower() in all_syrups]
+                user_prefs.extend(random.sample(syrup_discovery, min(3, len(syrup_discovery))))
+
+            non_user = [item for item in discovery_pool if item.lower() not in [p.lower() for p in user_prefs]]
+            discovery_count = min(random.randint(2, 4), len(non_user))
+            discovery_items = random.sample(non_user, discovery_count)
+
+            preferences_list = user_prefs + discovery_items
         else:
-            preferences_list = ["mango", "peach", "vanilla", "salted caramel", "orange", "lavender", "peppermint", "blue raspberry"]
-        print("User") # Test code
+            preferences_list = ["mango", "peach", "vanilla", "salted caramel", "orange",
+                                "lavender", "peppermint", "blue raspberry"]
+
         return self.generate_response_data(preferences_list, user_created=True)
 
     def generate_general_user(self):

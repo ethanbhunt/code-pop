@@ -2,6 +2,37 @@
 
 Follow these instructions to set up the CodePop project on your machine.
 
+## Show-and-Tell Quick Start (Live Order Journey Demo)
+
+Use this flow if you only need to run the live demo quickly.
+
+1. Start backend server
+  - Open terminal in `codepop_backend`
+  - Activate your Python environment
+  - Run `python manage.py migrate`
+  - Run `python manage.py runserver <YOUR IP ADDRESS:8000>`
+
+2. Start frontend app
+  - Open terminal in `codepop`
+  - Confirm `ip_address.js` uses the same backend IP
+  - Run `npm install`
+  - Run `npm run android`
+
+3. Demo accounts (seeded by clean script)
+  - Manager: username `staff`, password `password`
+  - User: username `test`, password `password`
+
+4. Live Order Journey demo script (4-6 min)
+  - User account: create cart and complete checkout
+  - User screen opens PostCheckout and shows live status/ETA timeline
+  - Manager account: open Manager Dashboard and use `Live Order Controls`
+  - Click `Next` to move order `pending -> processing -> completed`
+  - Optionally click `+2 min` to demonstrate ETA delay handling
+
+5. Reliability fallback
+  - If network becomes unstable, PostCheckout automatically enters presentation fallback mode
+  - Continue the demo from manager controls and call out recovery behavior
+
 ## Backend Setup
 
 1. **Install Dependencies**

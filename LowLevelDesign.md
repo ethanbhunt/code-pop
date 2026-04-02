@@ -2458,6 +2458,245 @@ def generateResponse(self, userInput: str):
 - Invalid quantities rejected
 - Audit logs viewable by admins
 
+### 3.8.3 Requirements-Coverage Addendum (Missing Tasks Added)
+
+The following tasks are added to ensure full coverage of the Requirements Document and to close gaps not fully represented in the original 10-task table.
+
+#### Task 8: Decentralized Sync & Conflict Resolution (CRITICAL)
+
+**Assigned to:** Backend Team (Distributed Systems Focus)  
+**Duration:** 2 weeks  
+**Priority:** MUST HAVE
+
+**Subtasks:**
+1. Design store-node sync protocol for store↔store and store↔hub exchanges
+2. Implement local operation queue for offline events (orders, inventory, maintenance)
+3. Implement reconnection sync worker for queued event replay
+4. Implement conflict resolution strategy (timestamp + priority rules)
+5. Add idempotency keys for replay safety
+6. Add failure/retry policy with exponential backoff
+7. Write integration tests for network partition and recovery scenarios
+8. Document sync contract and reconciliation rules
+
+**Acceptance Criteria:**
+- Stores continue local operations while disconnected
+- Queued events synchronize automatically after reconnect
+- Conflicts are deterministically resolved per documented rules
+- Duplicate event replay does not corrupt data
+
+#### Task 9: Service Discovery & Peer Handshake (CRITICAL)
+
+**Assigned to:** Backend Team  
+**Duration:** 1 week  
+**Priority:** MUST HAVE
+
+**Subtasks:**
+1. Implement node registration payload schema (store metadata, region, capabilities)
+2. Implement discovery broadcast/announce endpoint flow
+3. Implement peer handshake validation (challenge-response)
+4. Persist regional peer directory with heartbeat timestamps
+5. Implement stale-peer eviction policy
+6. Write tests for node join/leave/rejoin behavior
+7. Document onboarding flow for new stores
+
+**Acceptance Criteria:**
+- New stores auto-discover and handshake with regional peers
+- Peer list updates without manual intervention
+- Stale/offline peers are removed according to policy
+
+#### Task 10: Maintenance Tracking & Repair Staff Workflow (CRITICAL)
+
+**Assigned to:** Backend + Frontend Teams  
+**Duration:** 2 weeks  
+**Priority:** MUST HAVE
+
+**Subtasks:**
+1. Create machine/maintenance models with full status enum support
+2. Implement status transition logging with user and timestamp
+3. Implement repair schedule CSV import endpoint
+4. Implement repair staff views for assigned stores only
+5. Implement machine history retrieval APIs
+6. Add permission enforcement for `repair_staff`, `manager`, `admin`, `super_admin`
+7. Write unit/integration tests for transitions and access control
+8. Seed maintenance schedules and machine status histories for test data requirements
+
+**Acceptance Criteria:**
+- All required machine statuses are supported and transition logs are persisted
+- Repair staff can import schedules and update machine statuses
+- Historical maintenance records are queryable by authorized roles
+
+#### Task 11: Inter-Store Security (PKI Signatures) (CRITICAL)
+
+**Assigned to:** Backend Team (Security Focus)  
+**Duration:** 1 week  
+**Priority:** MUST HAVE
+
+**Subtasks:**
+1. Define signed message envelope for inter-node updates
+2. Implement signature verification middleware
+3. Implement sender identity validation against trusted key registry
+4. Reject unsigned or invalidly signed synchronization payloads
+5. Add audit logs for accepted/rejected sync messages
+6. Write security tests for tampered/replayed payloads
+
+**Acceptance Criteria:**
+- All inter-store sync messages are signed and verified
+- Invalid signatures are rejected and logged
+- Replay/tamper attempts are detected in tests
+
+#### Task 12: Fault Tolerance & Immutable Auditability (SHOULD)
+
+**Assigned to:** Backend Team  
+**Duration:** 1 week  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Implement immutable node transaction log for logistics/repair actions
+2. Add append-only write controls for audit records
+3. Add checksum/hash chain field for tamper-evidence
+4. Add automated resync job after connectivity restoration
+5. Add observability metrics for reconnect lag and replay backlog
+6. Write recovery tests for disconnected node scenarios
+
+**Acceptance Criteria:**
+- Audit trail is append-only and tamper-evident
+- Node resumes and reconciles after disconnection
+- Recovery and lag metrics are visible for operations
+
+#### Task 13: Repair Schedule Optimization Constraints (SHOULD)
+
+**Assigned to:** Backend Team (ML/Optimization Focus)  
+**Duration:** 1 week  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Implement optimization input schema (location, severity, max-interval constraints)
+2. Implement route optimization objective (minimize travel time)
+3. Add hard constraints for warning-state maximum runtime
+4. Add hard constraints for maximum service interval per machine type
+5. Expose optimization results via API endpoint
+6. Add test fixtures for edge-case schedules
+
+**Acceptance Criteria:**
+- Generated schedules satisfy service-interval and warning constraints
+- Travel time objective improves baseline schedule
+- Results are reproducible for fixed input
+
+#### Task 14: Cross-Browser + WCAG Compliance Hardening (SHOULD)
+
+**Assigned to:** Frontend Team  
+**Duration:** 1 week  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Create browser test matrix (Chrome, Firefox, Safari, Edge)
+2. Run compatibility pass on all customer/admin/logistics flows
+3. Run WCAG checks for contrast, keyboard access, and labels
+4. Fix responsive and accessibility defects
+5. Record compliance checklist and signoff report
+
+**Acceptance Criteria:**
+- Critical flows work across target browsers
+- WCAG issues found in baseline audit are resolved
+- Compliance report is published for release readiness
+
+#### Task 15: Test Data Completion & Seeder Automation (CRITICAL)
+
+**Assigned to:** Database + Backend Teams  
+**Duration:** 3 days  
+**Priority:** MUST HAVE
+
+**Subtasks:**
+1. Extend seed scripts for 7 supply hubs and required stores by region
+2. Seed one `logistics_manager` per hub and one `repair_staff` for Region C
+3. Seed supply inventories per store/hub
+4. Seed maintenance schedules and machine status histories
+5. Add data validation command to verify cardinalities/constraints
+
+**Acceptance Criteria:**
+- All required entities and role assignments are seeded
+- Seeder can be run repeatedly without duplication issues
+- Validation command passes in development and CI environments
+
+### 3.8.4 Detailed Breakdown for Previously Underspecified SHOULD Tasks
+
+#### Task 16: Bulk Drink Fetch Endpoint (SHOULD)
+
+**Assigned to:** Backend Team  
+**Duration:** 2 days  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Implement `GET /api/drinks/bulk/` endpoint with pagination + filtering
+2. Add query params for category/search/user-created flags
+3. Add serializer optimization (`select_related`/`prefetch_related`)
+4. Add caching headers and optional Redis cache keying
+5. Add API tests for pagination/filter correctness
+
+**Acceptance Criteria:**
+- Endpoint returns paginated drink catalog efficiently
+- Filtering and search behavior are correct and documented
+- p95 latency meets target under expected load
+
+#### Task 17: Manager Low-Stock Alerts (SHOULD)
+
+**Assigned to:** Frontend + Backend Teams  
+**Duration:** 1 week  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Implement low-stock threshold evaluation job in backend
+2. Create manager alert endpoint (`GET /api/alerts/low-stock/`)
+3. Add manager dashboard alert panel and badge count
+4. Add acknowledge/snooze action for repeated alerts
+5. Add notification tests and UI behavior tests
+
+**Acceptance Criteria:**
+- Managers are notified when inventory drops below threshold
+- Alert state (new/acknowledged/snoozed) is persisted
+- Alert panel reflects real-time or near-real-time inventory status
+
+#### Task 18: Response Filtering for Chatbot (SHOULD)
+
+**Assigned to:** Backend Team  
+**Duration:** 1 week  
+**Priority:** SHOULD HAVE
+
+**Subtasks:**
+1. Implement response sanitization pipeline for unsafe content/patterns
+2. Add injection/prompt-abuse pattern detection and fallback behavior
+3. Enforce max response length and timeout fallback policy
+4. Add test suite for blocked terms and malicious payload attempts
+5. Document filter rules and escalation behavior
+
+**Acceptance Criteria:**
+- Unsafe or malicious chatbot output is blocked or replaced by fallback
+- Filters prevent obvious script/injection responses
+- Behavior is deterministic and covered by automated tests
+
+### 3.8.5 Sprint-Ready Ticket Backlog (Prioritized)
+
+| Ticket ID | Task | Priority | Team | Estimate | Dependencies |
+|-----------|------|----------|------|----------|--------------|
+| Task-001 | Multi-store database schema | MUST | Database | 1 week | None |
+| Task-002 | Supply hub network implementation | MUST | Backend | 3 weeks | Task-001 |
+| Task-003 | Automated inventory deduction | MUST | Backend | 1 week | Order completion |
+| Task-004 | AI demand prediction service | MUST | Backend | 2 weeks | Historical data |
+| Task-005 | Inventory permissions & audit logging | MUST | Backend | 1 week | Auth system |
+| Task-006 | Logistics Manager dashboard | MUST | Frontend | 2 weeks | Task-002, Task-004 |
+| Task-007 | Decentralized sync & conflict resolution | MUST | Backend | 2 weeks | Task-001 |
+| Task-008 | Service discovery & peer handshake | MUST | Backend | 1 week | Task-001 |
+| Task-009 | Maintenance tracking & repair workflow | MUST | Backend+Frontend | 2 weeks | Task-001 |
+| Task-010 | Inter-store PKI signature verification | MUST | Backend | 1 week | Task-007, Task-008 |
+| Task-011 | Test data completion & seeder automation | MUST | Database+Backend | 3 days | Task-001, Task-009 |
+| Task-012 | Redis caching for CSV data | SHOULD | Backend | 1 week | Redis setup |
+| Task-013 | Bulk drink fetch endpoint | SHOULD | Backend | 2 days | None |
+| Task-014 | Manager low-stock alerts | SHOULD | Backend+Frontend | 1 week | Notification system |
+| Task-015 | Response filtering for chatbot | SHOULD | Backend | 1 week | Chatbot system |
+| Task-016 | Fault tolerance + immutable auditability | SHOULD | Backend | 1 week | Task-007 |
+| Task-017 | Repair schedule optimization constraints | SHOULD | Backend | 1 week | Task-009 |
+| Task-018 | Cross-browser + WCAG hardening | SHOULD | Frontend | 1 week | Core UI complete |
+
 ---
 
 ## 3.9 Design Decision Summary
