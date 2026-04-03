@@ -8,12 +8,33 @@ import numpy as n
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import os
-from django.conf import settings
 
-# Required for django
-syrup_file_path = os.path.join(settings.BASE_DIR, 'backend/Syrups.csv')
-soda_file_path = os.path.join(settings.BASE_DIR, 'backend/Sodas.csv')
-addin_file_path = os.path.join(settings.BASE_DIR, 'backend/AddIns.csv')
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _backend_data_dir():
+    """Directory containing Syrups.csv / Sodas.csv / AddIns.csv."""
+    override = os.environ.get("CODEPOP_DRINK_AI_BACKEND_DIR")
+    if override:
+        return os.path.abspath(override)
+    try:
+        from django.conf import settings
+        if getattr(settings, "configured", False):
+            return os.path.join(settings.BASE_DIR, "backend")
+    except Exception:
+        pass
+    return _BACKEND_DIR
+
+
+def _refresh_csv_paths():
+    global syrup_file_path, soda_file_path, addin_file_path
+    d = _backend_data_dir()
+    syrup_file_path = os.path.join(d, "Syrups.csv")
+    soda_file_path = os.path.join(d, "Sodas.csv")
+    addin_file_path = os.path.join(d, "AddIns.csv")
+
+
+_refresh_csv_paths()
 
 # CSV related functions
 def get_name_from_index(file, index):
@@ -304,6 +325,7 @@ def create_list(csv_file_name):
 # a) list of the user's preferences
 # b) list of (syrup) flavors, sodas, and add-ins from popular / highly rated drinks
 def generate_soda(user_preferences):
+    _refresh_csv_paths()
     drink = {}
     validSyrups = create_list(syrup_file_path)
     validSodas = create_list(soda_file_path)
@@ -395,6 +417,7 @@ def parse_prompt(prompt):
     parse a user's natural langauge prompt into a list of ingredients preferences
     that generate_soda() can understand.
     """
+    _refresh_csv_paths()
     prompt_lower = prompt.lower().strip()
     for alias, canonical in _PROMPT_PHRASE_FIXUPS:
         if alias in prompt_lower:

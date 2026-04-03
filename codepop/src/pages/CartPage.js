@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import NavBar from '../components/NavBar';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useNavigation, useFocusEffect, NavigationContainer } from '@react-navigation/native';
-import { useStripe, StripeProvider } from '@stripe/stripe-react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import CheckoutForm from './CheckoutForm';
-import {BASE_URL} from '../../ip_address'
+import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ingredientList } from '../utils/drinkCart';
 
 const CartPage = () => {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
-  const { initializePaymentSheet, openPaymentSheet, loading } = CheckoutForm(totalPrice);
+  const { initializePaymentSheet, openPaymentSheet } = CheckoutForm(totalPrice);
 
   useFocusEffect(React.useCallback(() => {
     fetchDrinks();
@@ -20,22 +21,20 @@ const CartPage = () => {
   }, []));
 
   useEffect(() => {
-    initializePaymentSheet(); // Initialize payment sheet on page load
+    initializePaymentSheet();
   }, [totalPrice]);
 
   const normalizeDrink = (rawDrink) => {
-    if (!rawDrink) {
-      return null;
-    }
-
+    if (!rawDrink) return null;
+    const sodaRaw = rawDrink.sodaUsed ?? rawDrink.SodaUsed ?? rawDrink.sodas;
     return {
-      drinkId: rawDrink.DrinkID ?? rawDrink.drinkId,
-      size: rawDrink.Size ?? rawDrink.size,
-      sodaUsed: rawDrink.SodaUsed ?? rawDrink.sodaUsed ?? [],
-      syrupsUsed: rawDrink.SyrupsUsed ?? rawDrink.syrupsUsed ?? [],
-      addIns: rawDrink.AddIns ?? rawDrink.addIns ?? [],
-      ice: rawDrink.Ice ?? rawDrink.ice,
-      price: rawDrink.Price ?? rawDrink.price,
+      drinkId: rawDrink.drinkId ?? rawDrink.DrinkID,
+      size: rawDrink.size ?? rawDrink.Size,
+      sodaUsed: ingredientList(sodaRaw),
+      syrupsUsed: ingredientList(rawDrink.syrupsUsed ?? rawDrink.SyrupsUsed ?? rawDrink.syrups),
+      addIns: ingredientList(rawDrink.addIns ?? rawDrink.AddIns),
+      ice: rawDrink.ice ?? rawDrink.Ice,
+      price: rawDrink.price ?? rawDrink.Price,
     };
   };
 
@@ -45,30 +44,32 @@ const CartPage = () => {
       const currentList = cartList ? JSON.parse(cartList) : [];
       const token = await AsyncStorage.getItem('userToken');
 
-      // Save drinks to a separate AsyncStorage list before removing - so the user can rate them on the post checkout page
-      // await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(currentList));
-
       const fetchedDrinks = [];
        for (let i = 0; i < currentList.length; i++) {
+          const getHeaders = { 'Content-Type': 'application/json' };
+          if (token) {
+            getHeaders.Authorization = `Token ${token}`;
+          }
           const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
             method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Token ${token}`,
-            },
+            headers: getHeaders,
           });
           const responseData = await response.json();
           const drink = normalizeDrink(responseData.data || responseData);
-          if (drink != null && drink.size && drink.sodaUsed && drink.ice) {
-            fetchedDrinks.push(drink); // Add each drink to the temporary array
+          if (
+            drink != null &&
+            drink.size &&
+            drink.sodaUsed.length > 0 &&
+            drink.ice != null &&
+            String(drink.ice).trim() !== ''
+          ) {
+            fetchedDrinks.push(drink);
           }
        }
       
-      setDrinks(fetchedDrinks); // Update state once after all drinks are collected
-      calculateTotalPrice(fetchedDrinks); // Calculate total price after fetching drinks
-
-      // Store the full drink objects in `purchasedDrinks` instead of IDs
-      await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(fetchedDrinks));
+      setDrinks(fetchedDrinks);
+      calculateTotalPrice(fetchedDrinks);
+      await AsyncStorage.setItem('purchasedDrinks', JSON.stringify(fetchedDrinks));
   
     } catch (error) {
       console.error('Failed to get drinks: ', error);
@@ -77,28 +78,20 @@ const CartPage = () => {
   
   
 
-   const calculatePrice = (drink) => {
-     // $2 base price + $0.30 per ingredient
-     if (drink.price == 2) {
-       const syrupsCount = Array.isArray(drink.syrupsUsed) ? drink.syrupsUsed.length : 0;
-       const addInsCount = Array.isArray(drink.addIns) ? drink.addIns.length : 0;
-       return 2 + (syrupsCount + addInsCount) * 0.3;
-       // return 2 + (drink.syrupsUsed.length + drink.addIns.length) * 0.3;
-     } else {
-       // Carousel drink prices
-       return drink.price;
-     }
-
-   };
+  const calculatePrice = (drink) => {
+    if (drink.price == 2) {
+      return 2 + (drink.syrupsUsed.length + drink.addIns.length) * 0.3;
+    }
+    return drink.price;
+  };
 
 
   const calculateTotalPrice = (drinksList) => {
-    let total = 0; // Initialize total here
-
+    let total = 0;
     for (let i = 0; i < drinksList.length; i++) {
-      total += calculatePrice(drinksList[i]);      
+      total += calculatePrice(drinksList[i]);
     }
-    setTotalPrice(total); // Update the total price state
+    setTotalPrice(total);
   };
 
   const removeDrink = async (drinkId) => {
@@ -107,39 +100,22 @@ const CartPage = () => {
       const currentList = cartList ? JSON.parse(cartList) : [];
       const token = await AsyncStorage.getItem('userToken');
   
-      // Don't delete seasonal carousel items (items prepopulated in the database after running clean script)
-      if (drinkId > 6) {
-        // Delete the drink from the backend database
+      if (drinkId > 6 && token) {
         await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
+            Authorization: `Token ${token}`,
           },
         });
-        // // Delete the drink from the backend database
-        // await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
-        //   method: 'DELETE',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        // });
       }
   
-      // Update the local state to remove the drink from the cart page
-      const updatedDrinks = drinks.filter(data => data.drinkId !== drinkId);
+      const updatedDrinks = drinks.filter((data) => data.drinkId !== drinkId);
       setDrinks(updatedDrinks);
-  
-      // Update the AsyncStorage to remove the drink ID from the checkout list
-      const updatedList = currentList.filter(item => item !== drinkId);
-      await AsyncStorage.setItem("checkoutList", JSON.stringify(updatedList));
-      // also update the rating list
-      await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(updatedDrinks));
-  
-      // Recalculate the total price with the updated drinks list
+      const updatedList = currentList.filter((item) => item !== drinkId);
+      await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+      await AsyncStorage.setItem('purchasedDrinks', JSON.stringify(updatedDrinks));
       calculateTotalPrice(updatedDrinks);
-  
-      console.log('Drink removed and total price recalculated successfully');
     } catch (error) {
       console.error('Error removing drink:', error);
     }
@@ -149,14 +125,14 @@ const CartPage = () => {
 
   const renderDrinkItem = (drink) => (
     <View style={styles.drinkContainer}>
-      <Text style={styles.drinkTitle}>{drink.Size} Drink</Text>
-      <Text style={styles.drinkDetail}>Soda: {drink.SodaUsed.join(', ')}</Text>
-      <Text style={styles.drinkDetail}>Ice: {drink.Ice}</Text>
-      {drink.SyrupsUsed && drink.SyrupsUsed.length > 0 && (
-        <Text style={styles.drinkDetail}>Syrups: {drink.SyrupsUsed.join(', ')}</Text>
+      <Text style={styles.drinkTitle}>{drink.size} Drink</Text>
+      <Text style={styles.drinkDetail}>Soda: {drink.sodaUsed.join(', ')}</Text>
+      <Text style={styles.drinkDetail}>Ice: {drink.ice}</Text>
+      {drink.syrupsUsed.length > 0 && (
+        <Text style={styles.drinkDetail}>Syrups: {drink.syrupsUsed.join(', ')}</Text>
       )}
-      {drink.AddIns && drink.AddIns.length > 0 && (
-        <Text style={styles.drinkDetail}>Add-ins: {drink.AddIns.join(', ')}</Text>
+      {drink.addIns.length > 0 && (
+        <Text style={styles.drinkDetail}>Add-ins: {drink.addIns.join(', ')}</Text>
       )}
       <Text style={styles.priceText}>${calculatePrice(drink).toFixed(2)}</Text>
 
@@ -166,18 +142,13 @@ const CartPage = () => {
           <Text style={styles.iconButtonText}>Edit</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => removeDrink(drink.DrinkID)} style={styles.iconButton}>
+        <TouchableOpacity onPress={() => removeDrink(drink.drinkId)} style={styles.iconButton}>
           <Icon name="close-circle-outline" size={20} color="#c0392b" />
           <Text style={styles.removeButtonText}>Remove</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
-
-  const goToCheckout = () => {
-    navigation.navigate('Checkout');
-  };
-  
 
   return (
     <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">

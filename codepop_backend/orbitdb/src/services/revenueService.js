@@ -21,7 +21,8 @@ export async function createRevenue(orderId, amount, description = "") {
     orderId,
     amount: parsedAmount,
     timestamp: getTimestamp(),
-    description
+    description,
+    refunded: false
   }
 
   await revenuesDb.put(`revenue:${revenueId}`, revenue)
@@ -82,8 +83,20 @@ export async function updateRevenue(revenueId, updates) {
     revenue.description = updates.description
   }
 
+  if (updates.refunded !== undefined) {
+    revenue.refunded = Boolean(updates.refunded)
+  }
+
   await revenuesDb.put(`revenue:${revenueId}`, revenue)
   return revenue
+}
+
+export async function updateRevenueForOrder(orderId, updates) {
+  const revenue = await getRevenueByOrderId(orderId)
+  if (!revenue) {
+    throw new Error("Revenue record not found for order")
+  }
+  return updateRevenue(revenue.revenueId, updates)
 }
 
 export async function deleteRevenue(revenueId) {

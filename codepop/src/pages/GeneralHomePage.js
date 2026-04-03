@@ -4,7 +4,7 @@ import * as Font from 'expo-font';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { BASE_URL } from '../../ip_address';
+import { BASE_URL, getAiDrinkUrl } from '../../ip_address';
 import NavBar from '../components/NavBar';
 
 const GeneralHomePage = () => {
@@ -47,7 +47,7 @@ const GeneralHomePage = () => {
       };
 
       const fetchOneDrink = async () => {
-        const res = await fetch(`${BASE_URL}/backend/generate/`);
+        const res = await fetch(getAiDrinkUrl());
         if (!res.ok) return null;
         return res.json();
       };

@@ -15,9 +15,10 @@
     "logistics": "/orbitdb/zdpuApdjtyqwTVGJxGYLvphH52rZtoJqYHsY7aEPUbpRJA61E"
   },
   "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa",
-    "/ip4/100.64.23.230/tcp/4000/p2p/12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa"
+    "/ip4/172.25.128.1/tcp/4000/p2p/12D3KooWHWzcUwjbSELWsiN9adX11YU1UyxRKmMvCLbzYkJW5uau",
+    "/ip4/10.0.0.105/tcp/4000/p2p/12D3KooWHWzcUwjbSELWsiN9adX11YU1UyxRKmMvCLbzYkJW5uau",
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWHWzcUwjbSELWsiN9adX11YU1UyxRKmMvCLbzYkJW5uau"
   ],
-  "peerId": "12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa",
-  "timestamp": "2026-04-02T23:46:16.162Z"
+  "peerId": "12D3KooWHWzcUwjbSELWsiN9adX11YU1UyxRKmMvCLbzYkJW5uau",
+  "timestamp": "2026-04-03T19:17:39.184Z"
 }

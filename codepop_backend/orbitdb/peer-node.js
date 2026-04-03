@@ -1,4 +1,5 @@
-// peer-node.js – Run after bootstrap: PORT=3001 node peer-node.js
+import "dotenv/config"
+// peer-node.js — from this folder: npm run peer (after bootstrap-node). Default port 3001.
 //
 // This peer node:
 //   1. Reads peer-info.json written by the bootstrap node
@@ -20,8 +21,9 @@ import { createOrbitDB } from "@orbitdb/core"
 import { multiaddr } from "@multiformats/multiaddr"
 import fs from "fs"
 import { initializeOrbitDB, getAllDatabaseInfo } from "./src/utils/db.js"
-import { errorHandler } from "./src/middleware/errorHandler.js"
-import { authenticate, requireAdmin, optionalAuth } from "./src/middleware/auth.js"
+import { errorHandler, asyncHandler } from "./src/middleware/errorHandler.js"
+import { authenticate } from "./src/middleware/auth.js"
+import * as drinkService from "./src/services/drinkService.js"
 import authRoutes from "./src/routes/auth.js"
 import userRoutes from "./src/routes/users.js"
 import preferenceRoutes from "./src/routes/preferences.js"
@@ -36,6 +38,8 @@ import storeRoutes from "./src/routes/stores.js"
 import maintenanceRoutes from "./src/routes/maintenance.js"
 import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
+import chatbotRoutes from "./src/routes/chatbot.js"
+import aiDrinkRoutes from "./src/routes/aiDrink.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -44,31 +48,54 @@ const PEER_INFO_FILE = "./peer-info.json"
 
 const app = express()
 
-// ── Middleware Stack ──────────────────────────────────────────────────────────
+function isPostCreateDrinkAtBackendPath(req) {
+  if (req.method !== "POST") return false
+  const pathOnly = String(req.originalUrl || "").split("?")[0].replace(/\/+/g, "/")
+  const base = pathOnly.replace(/\/$/, "") || "/"
+  return base === "/backend/drinks"
+}
 
-// Body parser
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ limit: "10mb", extended: true }))
+// ── Middleware Stack (runs before routes registered in start()) ─────────────
 
-// CORS for mobile app
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*")
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-  
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200)
-  }
-  next()
-})
-
-// Request logging
 app.use((req, res, next) => {
   const startTime = Date.now()
   res.on("finish", () => {
     const duration = Date.now() - startTime
     console.log(`${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`)
   })
+  next()
+})
+
+// Normalize req.url: collapse slashes, optional leading slash, rare absolute-form targets.
+app.use((req, _res, next) => {
+  const full = req.url || ""
+  const q = full.indexOf("?")
+  let pathPart = q === -1 ? full : full.slice(0, q)
+  const query = q === -1 ? "" : full.slice(q)
+  if (/^https?:\/\//i.test(pathPart)) {
+    try {
+      pathPart = new URL(pathPart).pathname
+    } catch {
+      /* keep */
+    }
+  } else if (pathPart && !pathPart.startsWith("/")) {
+    pathPart = `/${pathPart}`
+  }
+  const fixed = pathPart.replace(/\/+/g, "/") || "/"
+  req.url = fixed + query
+  next()
+})
+
+app.use(express.json({ limit: "10mb" }))
+app.use(express.urlencoded({ limit: "10mb", extended: true }))
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*")
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200)
+  }
   next()
 })
 
@@ -176,6 +203,19 @@ async function start() {
       })
     })
 
+    app.get("/__codepop_ping", (_req, res) => {
+      res.json({ ok: true, service: "codepop-orbit-peer" })
+    })
+
+    // POST /backend/drinks (no auth), before app.use("/backend/drinks", …).
+    app.use(
+      asyncHandler(async (req, res, next) => {
+        if (!isPostCreateDrinkAtBackendPath(req)) return next()
+        const drink = await drinkService.createDrink(req.body)
+        res.status(201).json({ status: "created", data: drink })
+      })
+    )
+
     // ── Mount Route Handlers ──────────────────────────────────────────────────
     app.use("/backend/auth", authRoutes)
     app.use("/backend/users", userRoutes)
@@ -191,6 +231,11 @@ async function start() {
     app.use("/backend/maintenance", maintenanceRoutes)
     app.use("/backend/logistics", logisticsRoutes)
     app.use("/backend/admin", adminRoutes)
+    app.use("/backend/chatbot", chatbotRoutes)
+
+    // AI drinks (Python bridge). Mobile uses /peer-ai-drink; /backend/generate is the same router.
+    app.use("/backend/generate", aiDrinkRoutes)
+    app.use("/peer-ai-drink", aiDrinkRoutes)
 
     // ── Test endpoints (direct database access) ────────────────────────────────
     app.get("/test/users/get/:key", authenticate, (req, res) => {
@@ -211,16 +256,27 @@ async function start() {
       })
     })
 
+    // ── 404 JSON (helps debug wrong paths from the app) ───────────────────────
+    app.use((req, res) => {
+      console.warn(`[404] ${req.method} ${req.originalUrl}`)
+      res.status(404).json({
+        error: "Not Found",
+        method: req.method,
+        path: req.originalUrl
+      })
+    })
+
     // ── Error handler (must be last) ──────────────────────────────────────────
     app.use(errorHandler)
 
     // ── Start HTTP server ────────────────────────────────────────────────────
-    app.listen(HTTP_PORT, () => {
+    app.listen(HTTP_PORT, "0.0.0.0", () => {
       console.log(`[ ^ ] Peer node is ready!`)
-      console.log(`   HTTP API: http://localhost:${HTTP_PORT}`)
+      console.log(`   HTTP API: http://localhost:${HTTP_PORT} (all interfaces: 0.0.0.0:${HTTP_PORT})`)
       console.log(`   libp2p: /ip4/0.0.0.0/tcp/${LIBP2P_PORT}`)
       console.log(`\n[ ^ ] API Endpoints:`)
       console.log(`   GET  /health              - Health check`)
+      console.log(`   GET  /__codepop_ping      - Quick check you are on this peer build`)
       console.log(`   GET  /info                - Node info`)
       console.log(`   GET  /                    - Server info`)
       console.log(`\n[ ^ ] Authentication:`)

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import {BASE_URL} from '../../ip_address'
+import { BASE_URL } from '../../ip_address';
+import { ingredientList, iceForCreateApi, optionalAuthJsonHeaders } from '../utils/drinkCart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
@@ -12,59 +13,42 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
 
   const createObj = async () => {
     try {
-       const token = await AsyncStorage.getItem('userToken');
-       // Ensure sodaUsed, syrupsUsed, and addIns are arrays
-       const sodaUsed = Array.isArray(drinkDict.sodaUsed) && drinkDict.sodaUsed.length > 0 ? drinkDict.sodaUsed : [drinkDict.sodaUsed];
-       const syrupsUsed = Array.isArray(drinkDict.syrupsUsed) ? drinkDict.syrupsUsed : [];
-       const addIns = Array.isArray(drinkDict.addIns) ? drinkDict.addIns : [];
-   
-       // If sodaUsed is empty, set it to ["DefaultSoda"] (or any default soda)
-       if (sodaUsed.length === 0) {
-         console.warn('sodaUsed is empty, setting to default soda.');
-       }
-   
-       const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
-         body: JSON.stringify({
-           name: "AI drink", // Example name for the drink
-           sodaUsed: sodaUsed, // Make sure it's an array with at least one item
-           syrupsUsed: syrupsUsed, // Make sure it's an array
-           addIns: addIns, // Make sure it's an array
-           price: 2.00,
-           userCreated: true,
-           size: drinkDict.size || "24oz", // Default size
-           ice: (drinkDict.ice || "normal").toLowerCase(), // Default ice amount, convert to lowercase
-         }),
-       });
-  
-      // Check if the response is not OK (status code not in the range 200-299)
+      const token = await AsyncStorage.getItem('userToken');
+      const d = drinkDict || {};
+      const sodaUsed = ingredientList(d.sodaUsed ?? d.SodaUsed);
+      const syrupsUsed = ingredientList(d.syrupsUsed ?? d.SyrupsUsed);
+      const addIns = ingredientList(d.addIns ?? d.AddIns);
+
+      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+        method: 'POST',
+        headers: optionalAuthJsonHeaders(token),
+        body: JSON.stringify({
+          name: 'AI drink',
+          sodaUsed,
+          syrupsUsed,
+          addIns,
+          price: 2.0,
+          userCreated: true,
+          size: d.size ?? d.Size ?? '24oz',
+          ice: iceForCreateApi(d.ice ?? d.Ice),
+        }),
+      });
+
       if (!response.ok) {
-        const errorText = await response.text(); // Get the error message from the response body
-        console.error('Failed to create drink. Status:', response.status);
-        console.error('Response Text:', errorText);
+        const errorText = await response.text();
         throw new Error(`Failed to create drink: ${response.status} - ${errorText}`);
       }
-  
+
       const responseData = await response.json();
       const data = responseData.data;
-      // gets list of out of storage on your phone
-      let cartList = await AsyncStorage.getItem("checkoutList");
+      const cartList = await AsyncStorage.getItem('checkoutList');
       const currentList = cartList ? JSON.parse(cartList) : [];
-  
-      const drinkID = data.drinkId; // assuming the response contains drinkId
-      const updatedList = [...currentList, drinkID];
+      const updatedList = [...currentList, data.drinkId];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-
-      console.log("created drink obj")
-      return data; // Return the created drink object
-  
+      return data;
     } catch (error) {
-      console.error('Error in createObj:', error); // Log any other errors
-      throw error; // Rethrow error to be handled by the caller
+      console.error('Error in createObj:', error);
+      throw error;
     }
   };
   

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 import { BASE_URL } from '../../ip_address';
+import { optionalAuthJsonHeaders } from '../utils/drinkCart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: windowWidth } = Dimensions.get('window');
@@ -64,8 +65,6 @@ const SeasonalCarousel = () => {
                   // size: drink.size,
                   // ice: drink.ice,
               }));
-              console.log('parsed')
-              console.log(parsedDrinks);
               setData(parsedDrinks);
               } catch (error) {
                   console.error('Error fetching drinks:', error);
@@ -75,66 +74,36 @@ const SeasonalCarousel = () => {
           fetchData();
       }, []);
     
-     const createDrink = async (item) => {
-         console.log('creating drinks...');
-         try {
-             const token = await AsyncStorage.getItem('userToken');
-             // Get the list from AsyncStorage, or initialize as an empty array
-             cartList = await AsyncStorage.getItem("checkoutList");
-             const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
-             const cleanedList = currentList.filter(item => item !== null && item !== undefined);
-
-             // Log the item to ensure it has the correct structure
-             console.log(item);
-
-             const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                 method: 'POST',
-                 headers: {
-                   'Content-Type': 'application/json',
-                   'Authorization': `Token ${token}`,
-                 },
-                body: JSON.stringify({ 
-                  name: item.name,  // Example name for the drink
-                  sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
-                  syrupsUsed: item.syrupsUsed,
-                  addIns: item.addIns,
-                  price: item.price,
-                  userCreated: true,    // Assuming the user is creating the drink
-                  size: '24oz',
-                  ice: 'normal',
-                })
-              });
-            
-              if (!response.ok) {
-                throw new Error(`Failed to add drink. Status: ${response.status}`);
-              }
-              // add drink item (the drinks ID) to the checkout list from App.js
-              try{
-                // gets list of out of storage on your phone
-                cartList = await AsyncStorage.getItem("checkoutList");
-                const currentList = cartList ? JSON.parse(cartList) : [];
-                // takes the response (what we get after we create a drink) and extracts the drinkID
-                const responseData = await response.json();
-                const drinkID = responseData.data.drinkId;
-                // add the drinkID to the checkoutList
-                const updatedList = [...currentList, drinkID]
-                // Saves the checkoutlist back into the storage on the phone
-                await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-                navigation.navigate('Cart');
-              }catch (error){
-                console.log(error)
-              }
-          
-            // Optionally, verify the save operation
-            const savedList = await AsyncStorage.getItem('checkoutList');
-            console.log("Updated Checkout List:", savedList);
-          
-        } catch (error) {
-            console.log("Error:", error);
-        }
-          
-        
+  const createDrink = async (item) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+        method: 'POST',
+        headers: optionalAuthJsonHeaders(token),
+        body: JSON.stringify({
+          name: item.name,
+          sodaUsed: item.sodaUsed,
+          syrupsUsed: item.syrupsUsed,
+          addIns: item.addIns,
+          price: item.price,
+          userCreated: true,
+          size: '24oz',
+          ice: 'normal',
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to add drink. Status: ${response.status}`);
+      }
+      const responseData = await response.json();
+      const drinkID = responseData.data.drinkId;
+      const cartList = await AsyncStorage.getItem('checkoutList');
+      const currentList = cartList ? JSON.parse(cartList) : [];
+      await AsyncStorage.setItem('checkoutList', JSON.stringify([...currentList, drinkID]));
+      navigation.navigate('Cart');
+    } catch (error) {
+      console.error('SeasonalCarousel add to cart:', error);
     }
+  };
 
     const renderItem = ({ item }) => (
         <TouchableOpacity style={styles.carouselItem} onPress={() => createDrink(item)}>

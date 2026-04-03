@@ -5,7 +5,8 @@ import DropDown from '../components/DropDown';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
-import {BASE_URL} from '../../ip_address'
+import { BASE_URL, getAiDrinkUrl } from '../../ip_address';
+import { iceForCreateApi, optionalAuthJsonHeaders } from '../utils/drinkCart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AIAlert from '../components/AIAlert';
 
@@ -49,52 +50,51 @@ const CreateDrinkPage = () => {
   
   const addToCart = async () => {
     try {
-      // check if ice and size have been selected
-      if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
-
-        Alert.alert("Choose soda, size, and ice before adding your drink.")
-
-      }else{
-        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            Name: "Drink in User Cart",  // Example name for the drink
-            SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-            SyrupsUsed: SyrupsUsed,
-            AddIns: AddIns,
-            Price: 2.00,
-            User_Created: true,    // Assuming the user is creating the drink
-            Size: selectedSize,
-            Ice: selectedIce,
-          })
-        });
-    
-        if (!response.ok) {
-          throw new Error(`Failed to add drink. Status: ${response.status}`);
-        }
-        // add drink item (the drinks ID) to the checkout list from App.js
-        try{
-          // gets list of out of storage on your phone
-          let cartList = await AsyncStorage.getItem("checkoutList");
-          const currentList = cartList ? JSON.parse(cartList) : [];
-          // takes the response (what we get after we create a drink) and extracts the drinkID
-          const data = await response.json();
-          const drinkID = data.DrinkID;
-          // add the drinkID to the checkoutList
-          const updatedList = [...currentList, drinkID]
-          // Saves the checkoutlist back into the storage on the phone
-          await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-        }catch (error){
-          console.log(error)
-        }
-
-        navigation.navigate('Cart');
+      if (selectedIce == null || selectedSize == null || SodaUsed.length === 0) {
+        Alert.alert('Choose soda, size, and ice before adding your drink.');
+        return;
       }
+
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+        method: 'POST',
+        headers: optionalAuthJsonHeaders(token),
+        body: JSON.stringify({
+          name: 'Drink in User Cart',
+          sodaUsed: SodaUsed,
+          syrupsUsed: SyrupsUsed,
+          addIns: AddIns,
+          price: 2.0,
+          userCreated: true,
+          size: selectedSize,
+          ice: iceForCreateApi(selectedIce),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add drink. Status: ${response.status}`);
+      }
+
+      try {
+        const cartList = await AsyncStorage.getItem('checkoutList');
+        const currentList = cartList ? JSON.parse(cartList) : [];
+        const payload = await response.json();
+        const drinkID = payload?.data?.drinkId;
+        if (drinkID == null) {
+          throw new Error('Missing drinkId in response');
+        }
+        const updatedList = [...currentList, drinkID];
+        await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Cart error', 'Drink was created but could not be saved to your cart.');
+        return;
+      }
+
+      navigation.navigate('Cart');
     } catch (error) {
       console.error('Error adding drink to cart:', error);
+      Alert.alert('Could not add drink', 'Check your connection and try again.');
     }
   };  
   
@@ -166,11 +166,7 @@ const CreateDrinkPage = () => {
     setIsGenerating(true);
     try {
       const user_id = await AsyncStorage.getItem('userId');
-      let url = `${BASE_URL}/backend/generate/`;
-
-      if (user_id) {
-        url = `${BASE_URL}/backend/generate/${user_id}/`;
-      }
+      const url = getAiDrinkUrl(user_id || null);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -180,6 +176,10 @@ const CreateDrinkPage = () => {
       });
 
       if (!response.ok) {
+        if (__DEV__) {
+          const detail = await response.text().catch(() => "");
+          console.warn("[AI drink GET]", response.status, url, detail?.slice(0, 300));
+        }
         throw new Error(`Error when trying to generate AI drink. Status: ${response.status}`);
       }
 
@@ -202,11 +202,7 @@ const CreateDrinkPage = () => {
     setIsGenerating(true);
     try {
       const user_id = await AsyncStorage.getItem('userId');
-      let url = `${BASE_URL}/backend/generate/`;
-
-      if (user_id) {
-        url = `${BASE_URL}/backend/generate/${user_id}/`;
-      }
+      const url = getAiDrinkUrl(user_id || null);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -217,6 +213,10 @@ const CreateDrinkPage = () => {
       });
 
       if (!response.ok) {
+        if (__DEV__) {
+          const detail = await response.text().catch(() => "");
+          console.warn("[AI drink POST]", response.status, url, detail?.slice(0, 300));
+        }
         throw new Error(`Error generating AI drink from prompt. Status: ${response.status}`);
       }
 

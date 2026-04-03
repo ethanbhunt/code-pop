@@ -1,6 +1,6 @@
 // src/routes/drinks.js
 import express from "express"
-import { asyncHandler, ApiError, ValidationError } from "../middleware/errorHandler.js"
+import { asyncHandler } from "../middleware/errorHandler.js"
 import { authenticate } from "../middleware/auth.js"
 import * as drinkService from "../services/drinkService.js"
 
@@ -13,14 +13,10 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", count: drinks.length, data: drinks })
 }))
 
-// POST /backend/drinks - Create drink
-router.post("/", authenticate, asyncHandler(async (req, res) => {
-  const drink = await drinkService.createDrink(req.body)
-  res.status(201).json({ status: "created", data: drink })
-}))
+// POST /backend/drinks → peer-node.js (guest-safe; avoids router + auth edge cases).
 
-// GET /backend/drinks/:id - Get drink
-router.get("/:id", authenticate, asyncHandler(async (req, res) => {
+// GET /backend/drinks/:id (no auth — cart)
+router.get("/:id", asyncHandler(async (req, res) => {
   const drink = await drinkService.getDrinkById(parseInt(req.params.id, 10))
   res.json({ status: "success", data: drink })
 }))

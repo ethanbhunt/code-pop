@@ -4,7 +4,8 @@ import NavBar from '../components/NavBar';
 import DropDown from '../components/DropDown';
 import { useNavigation } from '@react-navigation/native';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
-import {BASE_URL} from '../../ip_address'
+import { BASE_URL } from '../../ip_address';
+import { ingredientList } from '../utils/drinkCart';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UpdateDrink = ({route, navigation}) => {
@@ -17,9 +18,6 @@ const UpdateDrink = ({route, navigation}) => {
   const [AddIns, setAddIns] = useState([]);
   const [selectedSize, setSize] = useState(null);
   const [selectedIce, setIce] = useState(null);
-
-   console.log(drink)
-   console.log(drink.sodaUsed)
 
    // State for dropdown open status
    const [openDropdown, setOpenDropdown] = useState({
@@ -39,11 +37,11 @@ const UpdateDrink = ({route, navigation}) => {
 
   useEffect(() => {
     if (drink) {
-      setSoda(drink.SodaUsed || []);
-      setSyrups(drink.SyrupsUsed || []);
-      setAddIns(drink.AddIns || []);
-      setSize(drink.Size || null);
-      setIce(normalizeIce(drink.Ice));
+      setSoda(ingredientList(drink.sodaUsed ?? drink.SodaUsed));
+      setSyrups(ingredientList(drink.syrupsUsed ?? drink.SyrupsUsed));
+      setAddIns(ingredientList(drink.addIns ?? drink.AddIns));
+      setSize(drink.size ?? drink.Size ?? null);
+      setIce(normalizeIce(drink.ice ?? drink.Ice));
     }
   }, [drink]);
 
