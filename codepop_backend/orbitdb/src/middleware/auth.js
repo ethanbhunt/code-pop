@@ -12,7 +12,80 @@ function hasAdminPrivileges(role) {
 /** Staff-tier and above (legacy `manager` = store manager). */
 function hasStaffPrivileges(role) {
   const r = String(role ?? "").toLowerCase()
-  return ["staff", "manager", "admin", "superadmin"].includes(r)
+  return ["staff", "manager", "admin", "superadmin", "repair"].includes(r)
+}
+
+/**
+ * Normalize optional `assignedStores` from the user document.
+ * @param {unknown} raw
+ * @returns {number[]}
+ */
+function normalizeAssignedStores(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((id) => parseInt(String(id), 10))
+    .filter((n) => Number.isInteger(n) && n > 0)
+}
+
+/**
+ * Default store access when the document has no `assignedStores` (dev / migration).
+ * @param {string} userRole
+ * @returns {number[]}
+ */
+function fallbackAssignedStores(userRole) {
+  if (userRole === "manager" || userRole === "admin" || userRole === "super_admin") return [1]
+  return []
+}
+
+/**
+ * Merge persisted access fields with safe defaults so routes can use `userRole`, `enum`, and `assignedStores`.
+ * @param {Record<string, unknown>} user
+ * @returns {{ userRole: string, enum: string, assignedStores: number[] }}
+ */
+export function mergeAccessFromUserRecord(user) {
+  const rawStores = normalizeAssignedStores(user.assignedStores)
+  const explicitUr =
+    typeof user.userRole === "string" && user.userRole.trim()
+      ? user.userRole.trim().toLowerCase().replace(/\s+/g, "_")
+      : null
+  const explicitEnum =
+    typeof user.enum === "string" && user.enum.trim()
+      ? user.enum.trim().toLowerCase().replace(/\s+/g, "_")
+      : null
+
+  if (explicitUr && explicitEnum) {
+    const assignedStores =
+      rawStores.length > 0 ? rawStores : fallbackAssignedStores(explicitUr)
+    return { userRole: explicitUr, enum: explicitEnum, assignedStores }
+  }
+
+  const r = String(user.role ?? "").toLowerCase()
+  if (r === "admin") {
+    return {
+      userRole: "super_admin",
+      enum: "super_admin",
+      assignedStores: rawStores.length > 0 ? rawStores : [1],
+    }
+  }
+  if (r === "staff") {
+    return {
+      userRole: "manager",
+      enum: "manager",
+      assignedStores: rawStores.length > 0 ? rawStores : [1],
+    }
+  }
+  if (r === "repair") {
+    return {
+      userRole: "repair",
+      enum: "repair",
+      assignedStores: rawStores.length > 0 ? rawStores : [],
+    }
+  }
+  return {
+    userRole: "customer",
+    enum: "customer",
+    assignedStores: rawStores,
+  }
 }
 
 /**
@@ -74,14 +147,17 @@ export async function authenticate(req, res, next) {
       })
     }
 
-    // Attach user and token to request
+    const access = mergeAccessFromUserRecord(user)
     req.user = {
       userId: user.userId,
       username: user.username,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role
+      role: user.role,
+      userRole: access.userRole,
+      enum: access.enum,
+      assignedStores: access.assignedStores,
     }
     req.token = tokenKey
 
@@ -279,13 +355,17 @@ export async function optionalAuth(req, res, next) {
     const user = await usersDb.get(`user:${tokenEntry.userId}`)
 
     if (user) {
+      const access = mergeAccessFromUserRecord(user)
       req.user = {
         userId: user.userId,
         username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        userRole: access.userRole,
+        enum: access.enum,
+        assignedStores: access.assignedStores,
       }
       req.token = tokenKey
     } else {

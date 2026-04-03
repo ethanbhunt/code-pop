@@ -45,8 +45,9 @@ export async function GET() {
     );
   }
 
+  type MultiStorePayload = { aggregates?: { storeCount?: number } };
   const now = new Date().toISOString();
-  const [usersR, invR, revToday, revWeek, revMonth] = await Promise.all([
+  const [usersR, invR, revToday, revWeek, revMonth, multiStoreR] = await Promise.all([
     orbitJson<UsersPayload>(token, "/users", { method: "GET" }),
     orbitJson<InventoryPayload>(token, "/inventory", { method: "GET" }),
     orbitJson<{ totalRevenue?: number }>(
@@ -64,6 +65,9 @@ export async function GET() {
       `/revenues/report?startDate=${encodeURIComponent(startOfMonthIso())}&endDate=${encodeURIComponent(now)}`,
       { method: "GET" }
     ),
+    orbitJson<MultiStorePayload>(token, "/admin/system-reports/multi-store", {
+      method: "GET",
+    }),
   ]);
 
   if (!usersR.ok) {
@@ -94,6 +98,17 @@ export async function GET() {
   const today = revToday.data.totalRevenue ?? 0;
   const week = revWeek.data.totalRevenue ?? 0;
   const month = revMonth.data.totalRevenue ?? 0;
+  const multiBody = multiStoreR.ok ? multiStoreR.data : null;
+  const multiInner =
+    multiBody &&
+    typeof multiBody === "object" &&
+    multiBody !== null &&
+    "data" in multiBody &&
+    (multiBody as { data: MultiStorePayload }).data != null
+      ? (multiBody as { data: MultiStorePayload }).data
+      : (multiBody as MultiStorePayload | null);
+  const storeCountFromMulti =
+    multiInner?.aggregates?.storeCount != null ? multiInner.aggregates.storeCount : null;
 
   const generatedAt = new Date().toISOString();
 
@@ -101,7 +116,7 @@ export async function GET() {
     generatedAt,
     metrics: {
       inventoryLowCount: lowCount,
-      totalStores: 1,
+      totalStores: storeCountFromMulti ?? 1,
       totalRevenueToday: today,
     },
     revenue: { today, week, month },
@@ -119,6 +134,9 @@ export async function GET() {
         lastHeartbeat: generatedAt,
       },
     ],
-    note: "Revenue and inventory/users from OrbitDB. Maintenance, hubs, and store counts are placeholders until those APIs exist.",
+    note:
+      storeCountFromMulti != null
+        ? "Revenue and inventory/users from OrbitDB; store count from multi-store report. Maintenance and hub rows remain placeholders."
+        : "Revenue and inventory/users from OrbitDB. Maintenance, hubs, and store counts fall back when multi-store report is unavailable.",
   });
 }

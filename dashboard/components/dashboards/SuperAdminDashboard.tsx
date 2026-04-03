@@ -18,7 +18,10 @@ import {
   dashboardRoleToOrbit,
   defaultDashboardRoleForOrbit,
 } from "@/lib/orbit-role-map";
-import { hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
+import {
+  hasOrbitAdminDashboardRole,
+  hasSuperAdminDashboardRole,
+} from "@/lib/orbit-session";
 import Link from "next/link";
 import { downloadTextFile, rowsToCsv } from "@/lib/csv";
 
@@ -51,10 +54,37 @@ type OrbitUser = {
   role: string;
 };
 
+type OrbitStoreRow = {
+  storeId: number;
+  name?: string;
+  city?: string;
+  region?: string;
+};
+
+type MultiStoreReport = {
+  storeReports: Array<{
+    storeId: number;
+    storeName: string;
+    city?: string;
+    region?: string;
+    revenue: { total: number };
+    orders: { total: number; completed?: number };
+    inventory: { lowStockItems: number; criticalItems: number; totalItems?: number };
+  }>;
+  aggregates: {
+    totalRevenue: number;
+    totalOrders: number;
+    storeCount: number;
+    topStore: string | null;
+  };
+};
+
 export function SuperAdminDashboard() {
   const { data: session } = useSession();
   const myUserId = session?.user?.id ? Number(session.user.id) : null;
   const canManageUsers = session ? hasOrbitAdminDashboardRole(session) : false;
+  const canListStores = Boolean(session && hasSuperAdminDashboardRole(session));
+  const canMultiStoreReport = Boolean(session && hasOrbitAdminDashboardRole(session));
 
   const [reports, setReports] = useState<SystemReports | null>(null);
   const [loadingReports, setLoadingReports] = useState(false);
@@ -73,8 +103,14 @@ export function SuperAdminDashboard() {
   const [creating, setCreating] = useState(false);
   const [createMessage, setCreateMessage] = useState<string | null>(null);
 
-  const [superRegion, setSuperRegion] = useState("All");
-  const [superStore, setSuperStore] = useState("All");
+  const [orbitStores, setOrbitStores] = useState<OrbitStoreRow[] | null>(null);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [multiStoreReport, setMultiStoreReport] = useState<MultiStoreReport | null>(null);
+  const [loadingMultiStore, setLoadingMultiStore] = useState(false);
+  const [multiStoreError, setMultiStoreError] = useState<string | null>(null);
+  const [reportStartDate, setReportStartDate] = useState("");
+  const [reportEndDate, setReportEndDate] = useState("");
+  const [selectedStoreIds, setSelectedStoreIds] = useState<number[]>([]);
 
   const loadReports = useCallback(async () => {
     setLoadingReports(true);
@@ -94,6 +130,71 @@ export function SuperAdminDashboard() {
   useEffect(() => {
     void loadReports();
   }, [loadReports]);
+
+  const loadStores = useCallback(async () => {
+    if (!canListStores) return;
+    setLoadingStores(true);
+    try {
+      const res = await fetch("/api/orbit/stores?limit=100");
+      if (!res.ok) {
+        setOrbitStores(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: OrbitStoreRow[] };
+      setOrbitStores(json.data ?? []);
+    } finally {
+      setLoadingStores(false);
+    }
+  }, [canListStores]);
+
+  const loadMultiStore = useCallback(async () => {
+    if (!canMultiStoreReport) return;
+    setLoadingMultiStore(true);
+    setMultiStoreError(null);
+    try {
+      const params = new URLSearchParams();
+      if (reportStartDate.trim()) params.set("startDate", reportStartDate.trim());
+      if (reportEndDate.trim()) params.set("endDate", reportEndDate.trim());
+      if (selectedStoreIds.length > 0) {
+        params.set("storeIds", selectedStoreIds.join(","));
+      }
+      const q = params.toString();
+      const res = await fetch(
+        `/api/orbit/admin/system-reports/multi-store${q ? `?${q}` : ""}`
+      );
+      if (!res.ok) {
+        setMultiStoreReport(null);
+        setMultiStoreError(await res.text().catch(() => res.statusText));
+        return;
+      }
+      const data = (await res.json()) as MultiStoreReport;
+      setMultiStoreReport(data);
+    } catch (e) {
+      setMultiStoreReport(null);
+      setMultiStoreError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setLoadingMultiStore(false);
+    }
+  }, [
+    canMultiStoreReport,
+    reportStartDate,
+    reportEndDate,
+    selectedStoreIds,
+  ]);
+
+  useEffect(() => {
+    void loadStores();
+  }, [loadStores]);
+
+  useEffect(() => {
+    void loadMultiStore();
+  }, [loadMultiStore]);
+
+  function toggleStoreFilter(id: number) {
+    setSelectedStoreIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   function exportSystemReportCsv() {
     if (!reports) return;
@@ -230,12 +331,26 @@ export function SuperAdminDashboard() {
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">Stores Online</p>
+              <p className="text-sm text-muted-foreground">
+                {canListStores ? "Stores (Orbit)" : "Hubs online"}
+              </p>
               <p className="text-2xl font-semibold">
-                {loadingReports ? "…" : storesOnline}
+                {canListStores
+                  ? loadingStores
+                    ? "…"
+                    : (orbitStores?.length ?? "—")
+                  : loadingReports
+                    ? "…"
+                    : storesOnline}
               </p>
               <p className="text-xs text-muted-foreground">
-                {reports?.note ? "Partially live" : reports ? "OrbitDB" : "—"}
+                {canListStores
+                  ? "GET /api/orbit/stores"
+                  : reports?.note
+                    ? "Partially live"
+                    : reports
+                      ? "OrbitDB"
+                      : "—"}
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -265,99 +380,181 @@ export function SuperAdminDashboard() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Cross-Store Access</h3>
+              <h3 className="text-sm font-medium">Stores & report scope</h3>
               <div className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">
-                  Region and store are UI context only. Inventory and revenue in Orbit are{" "}
-                  <span className="font-medium text-foreground">not store-scoped</span> yet—per-store
-                  views require Orbit APIs.
-                </p>
-                <div className="mt-3 space-y-2">
-                  <label className="text-sm text-muted-foreground" htmlFor="superRegion">
-                    Region
-                  </label>
-                  <select
-                    id="superRegion"
-                    className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                    value={superRegion}
-                    onChange={(e) => setSuperRegion(e.target.value)}
-                  >
-                    <option value="All">All Regions</option>
-                    <option value="A">Region A</option>
-                    <option value="B">Region B</option>
-                    <option value="C">Region C</option>
-                  </select>
-
-                  <label className="text-sm text-muted-foreground" htmlFor="superStore">
-                    Store
-                  </label>
-                  <select
-                    id="superStore"
-                    className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                    value={superStore}
-                    onChange={(e) => setSuperStore(e.target.value)}
-                  >
-                    <option value="All">All Stores</option>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={String(n)}>
-                        Store {n}
-                      </option>
+                {!canListStores ? (
+                  <p className="text-sm text-muted-foreground">
+                    Listing all stores requires a Super Admin session (Orbit{" "}
+                    <code className="text-xs">GET /stores</code>).
+                  </p>
+                ) : loadingStores && !orbitStores?.length ? (
+                  <p className="text-sm text-muted-foreground">Loading stores…</p>
+                ) : !orbitStores?.length ? (
+                  <p className="text-sm text-muted-foreground">No stores returned from Orbit.</p>
+                ) : (
+                  <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
+                    {orbitStores.map((s) => (
+                      <li key={s.storeId} className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={selectedStoreIds.includes(s.storeId)}
+                          onChange={() => toggleStoreFilter(s.storeId)}
+                          id={`store-${s.storeId}`}
+                        />
+                        <label htmlFor={`store-${s.storeId}`} className="cursor-pointer">
+                          <span className="font-medium">{s.name ?? `Store ${s.storeId}`}</span>
+                          {s.city || s.region ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {[s.city, s.region].filter(Boolean).join(" · ")}
+                            </span>
+                          ) : null}
+                        </label>
+                      </li>
                     ))}
-                  </select>
-                </div>
+                  </ul>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Leave all unchecked to include every store in the multi-store report. Checked
+                  ids are sent as <code className="text-xs">storeIds</code>.
+                </p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Performance Metrics</h3>
+              <h3 className="text-sm font-medium">Multi-store report (Orbit)</h3>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground">
-                  Multi-store and national trends need aggregated Orbit data. Below: current
-                  system-report snapshot (global).
-                </p>
-                <div className="mt-3 overflow-x-auto rounded-md border">
-                  <table className="w-full text-sm">
-                    <tbody>
-                      <tr className="border-b">
-                        <td className="p-2 text-muted-foreground">Revenue (today)</td>
-                        <td className="p-2 font-medium">
-                          {loadingReports
-                            ? "…"
-                            : `$${(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()}`}
-                        </td>
-                      </tr>
-                      <tr className="border-b">
-                        <td className="p-2 text-muted-foreground">Revenue (week)</td>
-                        <td className="p-2">
-                          {loadingReports
-                            ? "…"
-                            : `$${(reports?.revenue.week ?? 0).toLocaleString()}`}
-                        </td>
-                      </tr>
-                      <tr className="border-b">
-                        <td className="p-2 text-muted-foreground">Revenue (month)</td>
-                        <td className="p-2">
-                          {loadingReports
-                            ? "…"
-                            : `$${(reports?.revenue.month ?? 0).toLocaleString()}`}
-                        </td>
-                      </tr>
-                      <tr className="border-b">
-                        <td className="p-2 text-muted-foreground">Low inventory rows</td>
-                        <td className="p-2">
-                          {loadingReports ? "…" : (reports?.metrics.inventoryLowCount ?? 0)}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 text-muted-foreground">Maintenance (placeholder)</td>
-                        <td className="p-2 text-xs">
-                          {loadingReports
-                            ? "…"
-                            : `machines ${reports?.maintenance.totalMachines ?? 0} · warn ${reports?.maintenance.inWarning ?? 0} · err ${reports?.maintenance.inError ?? 0}`}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                {!canMultiStoreReport ? (
+                  <p className="text-sm text-muted-foreground">
+                    Admin-level session required for{" "}
+                    <code className="text-xs">GET /admin/system-reports/multi-store</code>.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="ms-start">Start date (optional)</Label>
+                        <Input
+                          id="ms-start"
+                          type="date"
+                          value={reportStartDate}
+                          onChange={(e) => setReportStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="ms-end">End date (optional)</Label>
+                        <Input
+                          id="ms-end"
+                          type="date"
+                          value={reportEndDate}
+                          onChange={(e) => setReportEndDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loadingMultiStore}
+                        onClick={() => void loadMultiStore()}
+                      >
+                        {loadingMultiStore ? "Loading…" : "Refresh report"}
+                      </Button>
+                    </div>
+                    {multiStoreError ? (
+                      <p className="mt-2 text-xs text-destructive">{multiStoreError}</p>
+                    ) : null}
+                    {multiStoreReport ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="rounded-md bg-muted/30 p-2 text-xs">
+                          <p>
+                            Stores in scope: {multiStoreReport.aggregates.storeCount} · Total
+                            revenue: $
+                            {multiStoreReport.aggregates.totalRevenue.toLocaleString()} · Orders:{" "}
+                            {multiStoreReport.aggregates.totalOrders}
+                          </p>
+                          {multiStoreReport.aggregates.topStore ? (
+                            <p className="text-muted-foreground">
+                              Top store: {multiStoreReport.aggregates.topStore}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="overflow-x-auto rounded-md border">
+                          <table className="w-full text-sm">
+                            <thead className="border-b bg-muted/30">
+                              <tr className="text-left">
+                                <th className="p-2">Store</th>
+                                <th className="p-2">Revenue</th>
+                                <th className="p-2">Orders</th>
+                                <th className="p-2">Low / critical stock</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {multiStoreReport.storeReports.map((r) => (
+                                <tr key={r.storeId} className="border-t">
+                                  <td className="p-2">{r.storeName}</td>
+                                  <td className="p-2">${r.revenue.total.toLocaleString()}</td>
+                                  <td className="p-2">{r.orders.total}</td>
+                                  <td className="p-2 text-muted-foreground">
+                                    {r.inventory.lowStockItems} / {r.inventory.criticalItems}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : loadingMultiStore ? (
+                      <p className="mt-2 text-xs text-muted-foreground">Loading aggregates…</p>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted-foreground">No report data yet.</p>
+                    )}
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Snapshot card above still uses{" "}
+                      <code className="text-xs">/api/orbit/admin/system-reports</code> (global
+                      inventory slice). Multi-store rows use Orbit store and order/revenue data.
+                    </p>
+                  </>
+                )}
+                <div className="mt-4 border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground">Quick snapshot</p>
+                  <div className="mt-2 overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2 text-muted-foreground">Revenue (today)</td>
+                          <td className="p-2 font-medium">
+                            {loadingReports
+                              ? "…"
+                              : `$${(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()}`}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2 text-muted-foreground">Revenue (week)</td>
+                          <td className="p-2">
+                            {loadingReports
+                              ? "…"
+                              : `$${(reports?.revenue.week ?? 0).toLocaleString()}`}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2 text-muted-foreground">Low inventory rows</td>
+                          <td className="p-2">
+                            {loadingReports ? "…" : (reports?.metrics.inventoryLowCount ?? 0)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="p-2 text-muted-foreground">Maintenance (placeholder)</td>
+                          <td className="p-2 text-xs">
+                            {loadingReports
+                              ? "…"
+                              : `machines ${reports?.maintenance.totalMachines ?? 0} · warn ${reports?.maintenance.inWarning ?? 0} · err ${reports?.maintenance.inError ?? 0}`}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
