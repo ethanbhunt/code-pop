@@ -158,6 +158,7 @@ Use this flow to run the app locally against the backend and OrbitDB services.
 
 3. **Start the React Native App**
   - Navigate to the `codepop` directory and set `EXPO_PUBLIC_BACKEND_URL` to match your backend or OrbitDB endpoint.
+  - Set `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` to enable the arrival map on the post-checkout screen.
    - Install dependancies by running the following command:
       ```bash
       npm install
@@ -171,6 +172,21 @@ You should now see a terminal displaying logs from the backend and an Android em
 
 ## Docker and Cloud Run
 
+### Environment and secrets
+
+- Never commit production values for `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`, `AUTH_SECRET`, Stripe keys, or service credentials.
+- For local Docker, use shell environment variables (or a non-committed `.env`) so `docker-compose.yml` can resolve:
+  - `POSTGRES_PASSWORD`
+  - `DJANGO_SECRET_KEY`
+  - `DJANGO_ALLOWED_HOSTS`
+  - `ORBITDB_API_URL`
+  - `DJANGO_API_URL`
+  - `AUTH_SECRET`
+- In production, set these as managed secrets (Cloud Run environment variables backed by Secret Manager).
+- Backend safety behavior:
+  - With `DJANGO_DEBUG=False`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, and `POSTGRES_PASSWORD` are required.
+  - With `DJANGO_DEBUG=True`, local-development defaults are allowed.
+
 1. **Local container stack**
   - Run `docker compose up --build` from the repository root.
   - This starts PostgreSQL, the Django backend, the OrbitDB bootstrap node, the OrbitDB peer node, and the dashboard.
@@ -178,11 +194,13 @@ You should now see a terminal displaying logs from the backend and an Android em
 2. **Cloud build**
   - Run `gcloud builds submit --config cloudbuild.yaml` after setting your Artifact Registry repository name and region substitutions.
   - The build template produces backend, dashboard, and OrbitDB images.
+  - Build-time substitutions only control image names/tags; runtime secrets must be configured on Cloud Run services.
 
 3. **Cloud Run deployment**
   - Deploy the backend and dashboard images to Cloud Run.
   - Deploy the OrbitDB peer as the production API endpoint for the frontend apps.
-  - Set `EXPO_PUBLIC_BACKEND_URL`, `ORBITDB_API_URL`, and database credentials per environment.
+  - Set `EXPO_PUBLIC_BACKEND_URL`, `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`, `ORBITDB_API_URL`, and database credentials per environment.
+  - Set `AUTH_SECRET` for the dashboard service and `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `POSTGRES_*` for backend.
 
 ## After Installation
 Once everything has been installed you should be able to run the code using the following commands

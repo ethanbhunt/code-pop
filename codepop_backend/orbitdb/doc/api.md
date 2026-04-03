@@ -34,6 +34,8 @@ Authorization: Token {tokenKey}
 
 ## Overview
 
+The OrbitDB backend normalizes legacy role names while continuing to return the `userRole` field for compatibility with older clients.
+
 ### Data Model & Relationships
 
 CodePop uses a decentralized architecture with OrbitDB keyvalue databases. The application manages the following core entities:
@@ -81,7 +83,7 @@ Register a new user account.
   "username": "string (required, 3-30 chars, alphanumeric + underscore)",
   "email": "string (required, valid email format)",
   "password": "string (required, min 8 chars, uppercase + lowercase + number + special char)",
-  "userRole" : "string (optional, default is 'customer', ['customer', 'admin', 'staff', 'repair', 'manager'])"
+  "userRole" : "string (optional, default is 'customer', ['customer', 'manager', 'admin', 'super_admin', 'logistics_manager', 'repair_staff'])"
 }
 ```
 

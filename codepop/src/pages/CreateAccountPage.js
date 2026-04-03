@@ -30,10 +30,15 @@ const CreateAccountPage = ({ navigation }) => {
         },
         body: JSON.stringify({ firstName: first_name, username, password, email })
       });
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => null);
+        throw new Error(errorPayload?.error || 'Registration failed');
+      }
+      setMessage('');
       navigation.navigate('Auth');
     } catch (error) {
         console.log(error);
-      setMessage('Error registering user.');
+      setMessage(error?.message || 'Error registering user.');
     }
   };
 

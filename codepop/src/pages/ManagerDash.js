@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, Image, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 
 const ManagerDash = () => {
@@ -33,13 +34,22 @@ const ManagerDash = () => {
   };
 
   const fetchOrders = async () => {
+    const token = await AsyncStorage.getItem('userToken');
     const ordersResponse = await fetch(`${BASE_URL}/backend/orders/`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Token ${token}` } : {}),
+      },
     });
     const ordersData = await ordersResponse.json();
-    setOrders(Array.isArray(ordersData) ? ordersData : []);
-    setOrdersCount(Array.isArray(ordersData) ? ordersData.length : 0);
+    const normalizedOrders = Array.isArray(ordersData)
+      ? ordersData
+      : Array.isArray(ordersData?.data)
+        ? ordersData.data
+        : [];
+    setOrders(normalizedOrders);
+    setOrdersCount(normalizedOrders.length);
   };
 
   const updateLiveStatus = async (orderId, status = null, delayMinutes = 0) => {
@@ -85,7 +95,12 @@ const ManagerDash = () => {
             },
           });
           const revenueResponseData = await revenueResponse.json();
-          setRevenue(revenueResponseData.data);
+          const normalizedRevenue = Array.isArray(revenueResponseData)
+            ? revenueResponseData
+            : Array.isArray(revenueResponseData?.data)
+              ? revenueResponseData.data
+              : [];
+          setRevenue(normalizedRevenue);
 
           // Fetch inventory data (from /report endpoint)
           const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
@@ -96,9 +111,21 @@ const ManagerDash = () => {
             },
           });
           const inventoryResponseData = await inventoryResponse.json();
+          const inventoryItems = Array.isArray(inventoryResponseData?.inventory_items)
+            ? inventoryResponseData.inventory_items
+            : Array.isArray(inventoryResponseData?.data?.inventory_items)
+              ? inventoryResponseData.data.inventory_items
+              : [];
+
+          const normalizedInventory = inventoryItems.map((item) => ({
+            inventoryId: item.inventoryId ?? item.InventoryID,
+            itemName: item.itemName ?? item.ItemName,
+            quantity: item.quantity ?? item.Quantity,
+            thresholdLevel: item.thresholdLevel ?? item.ThresholdLevel,
+          }));
 
           // Sort inventory by Threshold Level (ascending order)
-          const sortedInventory = inventoryResponseData.data.inventory_items.sort((a, b) => a.thresholdLevel - b.thresholdLevel);
+          const sortedInventory = normalizedInventory.sort((a, b) => a.thresholdLevel - b.thresholdLevel);
           setInventory(sortedInventory);
 
         // Fetch orders count
@@ -167,7 +194,7 @@ const ManagerDash = () => {
        <View style={styles.card}>
          <Text style={styles.cardTitle}>Total Revenue</Text>
          <Text style={styles.cardContent}>
-           ${revenue.reduce((sum, rev) => sum + rev.totalAmount, 0).toFixed(2)}
+           ${revenue.reduce((sum, rev) => sum + Number(rev.totalAmount ?? rev.TotalAmount ?? 0), 0).toFixed(2)}
          </Text>
         <TouchableOpacity
           style={styles.button}
@@ -254,10 +281,10 @@ const ManagerDash = () => {
             ) : revenue.length > 0 ? (
                <ScrollView style={styles.scrollableList}>
                  {revenue.map((rev) => (
-                   <View key={rev.revenueId} style={styles.revenueCard}>
-                     <Text style={styles.revenueText}>Sale Date: {formatDate(rev.saleDate)}</Text>
-                     <Text style={styles.revenueText}>Order ID: {rev.orderId}</Text>
-                     <Text style={styles.revenueText}>Amount: ${rev.totalAmount.toFixed(2)}</Text>
+                   <View key={rev.revenueId ?? rev.RevenueID} style={styles.revenueCard}>
+                     <Text style={styles.revenueText}>Sale Date: {formatDate(rev.saleDate ?? rev.SaleDate)}</Text>
+                     <Text style={styles.revenueText}>Order ID: {rev.orderId ?? rev.OrderID}</Text>
+                     <Text style={styles.revenueText}>Amount: ${Number(rev.totalAmount ?? rev.TotalAmount ?? 0).toFixed(2)}</Text>
                    </View>
                  ))}
                </ScrollView>

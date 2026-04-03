@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: codepop_database
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     ports:
       - "5432:5432"
     volumes:
@@ -62,12 +62,12 @@ services:
     depends_on:
       - postgres
     environment:
-      DJANGO_DEBUG: "False"
-      DJANGO_ALLOWED_HOSTS: "*"
-      DJANGO_SECRET_KEY: "change-me"
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-local-dev}
       POSTGRES_DB: codepop_database
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
     command: sh -c "python manage.py migrate && gunicorn codepop_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120"
@@ -83,8 +83,9 @@ services:
     depends_on:
       - orbitdb-peer
     environment:
-      ORBITDB_API_URL: http://orbitdb-peer:3001
-      DJANGO_API_URL: http://backend:8000
+      ORBITDB_API_URL: ${ORBITDB_API_URL:-http://orbitdb-peer:3001}
+      DJANGO_API_URL: ${DJANGO_API_URL:-http://backend:8000}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-auth-secret-change-me}
       NEXT_TELEMETRY_DISABLED: "1"
     ports:
       - "3002:3000"

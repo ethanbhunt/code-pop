@@ -3,6 +3,32 @@
 
 import { getOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
+import * as drinkService from "./drinkService.js"
+import * as inventoryService from "./inventoryService.js"
+
+function buildIngredientCounts(drink, quantity = 1) {
+  const counts = new Map()
+  const ingredients = [
+    ...(Array.isArray(drink.sodas) ? drink.sodas : []),
+    ...(Array.isArray(drink.syrups) ? drink.syrups : []),
+    ...(Array.isArray(drink.addIns) ? drink.addIns : []),
+    ...(Array.isArray(drink.ingredients) ? drink.ingredients : []),
+  ]
+
+  for (const ingredient of ingredients) {
+    const key = String(ingredient || "").trim().toLowerCase()
+    if (!key) continue
+    counts.set(key, (counts.get(key) || 0) + quantity)
+  }
+
+  return counts
+}
+
+function mergeCounts(target, source) {
+  for (const [key, value] of source.entries()) {
+    target.set(key, (target.get(key) || 0) + value)
+  }
+}
 
 export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
   const ordersDb = getOrdersDb()
@@ -132,6 +158,60 @@ export async function deleteOrder(orderId) {
   if (!order) throw new Error("Order not found")
   await ordersDb.del(`order:${orderId}`)
   return true
+}
+
+export async function fulfillOrder(orderId, actor = null) {
+  const order = await getOrderById(orderId)
+
+  if (String(order.orderStatus || "").toLowerCase() === "completed") {
+    return order
+  }
+
+  const orderQuantities = order.quantities || {}
+  const ingredientCounts = new Map()
+
+  for (const drinkId of order.drinkIds || []) {
+    const drink = await drinkService.getDrinkById(drinkId)
+    const quantity = Number(orderQuantities[drinkId] ?? orderQuantities[String(drinkId)] ?? 1)
+    mergeCounts(ingredientCounts, buildIngredientCounts(drink, Number.isFinite(quantity) && quantity > 0 ? quantity : 1))
+  }
+
+  const inventoryItems = await inventoryService.getStoreInventory(order.storeId, 0, 1000)
+  const matchingInventory = new Map()
+
+  for (const item of inventoryItems.data) {
+    const key = String(item.itemName || "").trim().toLowerCase()
+    if (key) {
+      matchingInventory.set(key, item)
+    }
+  }
+
+  for (const [ingredientName, requiredQuantity] of ingredientCounts.entries()) {
+    const inventoryItem = matchingInventory.get(ingredientName)
+    if (!inventoryItem) {
+      throw new Error(`Inventory item not found for ingredient: ${ingredientName}`)
+    }
+    if (inventoryItem.quantity < requiredQuantity) {
+      throw new Error(`Insufficient inventory for ${inventoryItem.itemName}`)
+    }
+  }
+
+  for (const [ingredientName, requiredQuantity] of ingredientCounts.entries()) {
+    const inventoryItem = matchingInventory.get(ingredientName)
+    await inventoryService.updateInventoryQuantity(
+      inventoryItem.inventoryId,
+      inventoryItem.quantity - requiredQuantity,
+      actor
+    )
+  }
+
+  const updatedOrder = await updateOrder(orderId, {
+    orderStatus: "completed",
+    paymentStatus: order.paymentStatus || "paid",
+    completedAt: getTimestamp(),
+  })
+
+  return updatedOrder
 }
 
 export async function addDrinkToOrder(orderId, drinkId) {

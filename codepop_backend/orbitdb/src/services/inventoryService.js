@@ -4,8 +4,9 @@
 import { getInventoryDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateInventoryItemType, validatePositiveInteger } from "../utils/validation.js"
 import * as reorderService from "./reorderService.js"
+import * as auditService from "./auditService.js"
 
-export async function createInventoryItem(storeId, itemName, itemType, quantity, thresholdLevel, costPerUnit = null, supplier = null) {
+export async function createInventoryItem(storeId, itemName, itemType, quantity, thresholdLevel, costPerUnit = null, supplier = null, actor = null) {
   if (!itemName || !itemType) {
     throw new Error("Item name and type are required")
   }
@@ -40,6 +41,17 @@ export async function createInventoryItem(storeId, itemName, itemType, quantity,
   }
 
   await inventoryDb.put(`inventory:${itemId}`, item)
+
+  await auditService.recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "create",
+    actorUserId: actor?.userId ?? null,
+    actorRole: actor?.role ?? null,
+    storeId,
+    afterValue: item,
+  })
+
   return item
 }
 
@@ -64,7 +76,7 @@ export async function listInventory(limit = 100) {
   return items
 }
 
-export async function updateInventoryQuantity(itemId, newQuantity) {
+export async function updateInventoryQuantity(itemId, newQuantity, actor = null) {
   const inventoryDb = getInventoryDb()
   const item = await inventoryDb.get(`inventory:${itemId}`)
   if (!item) throw new Error("Inventory item not found")
@@ -74,9 +86,21 @@ export async function updateInventoryQuantity(itemId, newQuantity) {
   }
 
   const oldQuantity = item.quantity
+  const beforeValue = { ...item }
   item.quantity = parseInt(newQuantity, 10)
   item.lastUpdated = getTimestamp()
   await inventoryDb.put(`inventory:${itemId}`, item)
+
+  await auditService.recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "quantity_update",
+    actorUserId: actor?.userId ?? null,
+    actorRole: actor?.role ?? null,
+    storeId: item.storeId,
+    beforeValue,
+    afterValue: item,
+  })
   
   // Check if crossed threshold downward - auto-trigger reorder notification
   if (oldQuantity > item.minThreshold && item.quantity <= item.minThreshold) {
@@ -96,10 +120,12 @@ export async function updateInventoryQuantity(itemId, newQuantity) {
   return item
 }
 
-export async function updateInventoryItem(itemId, updates) {
+export async function updateInventoryItem(itemId, updates, actor = null) {
   const inventoryDb = getInventoryDb()
   const item = await inventoryDb.get(`inventory:${itemId}`)
   if (!item) throw new Error("Inventory item not found")
+
+  const beforeValue = { ...item }
 
   if (updates.itemName) item.itemName = updates.itemName
   if (updates.quantity !== undefined) {
@@ -120,10 +146,21 @@ export async function updateInventoryItem(itemId, updates) {
 
   item.lastUpdated = getTimestamp()
   await inventoryDb.put(`inventory:${itemId}`, item)
+
+  await auditService.recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "update",
+    actorUserId: actor?.userId ?? null,
+    actorRole: actor?.role ?? null,
+    storeId: item.storeId,
+    beforeValue,
+    afterValue: item,
+  })
   return item
 }
 
-export async function restockItem(itemId, newQuantity) {
+export async function restockItem(itemId, newQuantity, actor = null) {
   const inventoryDb = getInventoryDb()
   const item = await inventoryDb.get(`inventory:${itemId}`)
   if (!item) throw new Error("Inventory item not found")
@@ -132,19 +169,41 @@ export async function restockItem(itemId, newQuantity) {
     throw new Error("New quantity must be a non-negative integer")
   }
 
+  const beforeValue = { ...item }
   item.quantity = parseInt(newQuantity, 10)
   item.lastRestocked = getTimestamp()
   item.lastUpdated = getTimestamp()
 
   await inventoryDb.put(`inventory:${itemId}`, item)
+
+  await auditService.recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "restock",
+    actorUserId: actor?.userId ?? null,
+    actorRole: actor?.role ?? null,
+    storeId: item.storeId,
+    beforeValue,
+    afterValue: item,
+  })
   return item
 }
 
-export async function deleteInventoryItem(itemId) {
+export async function deleteInventoryItem(itemId, actor = null) {
   const inventoryDb = getInventoryDb()
   const item = await inventoryDb.get(`inventory:${itemId}`)
   if (!item) throw new Error("Inventory item not found")
   await inventoryDb.del(`inventory:${itemId}`)
+
+  await auditService.recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "delete",
+    actorUserId: actor?.userId ?? null,
+    actorRole: actor?.role ?? null,
+    storeId: item.storeId,
+    beforeValue: item,
+  })
   return true
 }
 

@@ -33,6 +33,7 @@ import revenueRoutes from "./src/routes/revenues.js"
 import paymentRoutes from "./src/routes/payments.js"
 import qrcodeRoutes from "./src/routes/qrcodes.js"
 import storeRoutes from "./src/routes/stores.js"
+import auditRoutes from "./src/routes/auditLogs.js"
 import maintenanceRoutes from "./src/routes/maintenance.js"
 import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
@@ -188,6 +189,7 @@ async function start() {
     app.use("/backend/payments", paymentRoutes)
     app.use("/backend/qrcodes", qrcodeRoutes)
     app.use("/backend/stores", storeRoutes)
+    app.use("/backend/audit-logs", auditRoutes)
     app.use("/backend/maintenance", maintenanceRoutes)
     app.use("/backend/logistics", logisticsRoutes)
     app.use("/backend/admin", adminRoutes)
@@ -236,6 +238,7 @@ async function start() {
       console.log(`   - Payments`)
       console.log(`   - QR Codes`)
       console.log(`   - Stores Management`)
+      console.log(`   - Audit Logs`)
       console.log(`   - Maintenance & Machines`)
       console.log(`   - Logistics & Transfers`)
       console.log(`   - Admin Reports\n`)

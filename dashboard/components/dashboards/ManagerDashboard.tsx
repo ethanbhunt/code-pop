@@ -113,7 +113,7 @@ export function ManagerDashboard() {
       setLoadingAiRec(true);
       try {
         const res = await fetch(
-          `/api/orbit/placeholders/logistics/ai-demand-prediction?region=${encodeURIComponent(
+          `/api/orbit/logistics/ai-demand-prediction?region=${encodeURIComponent(
             "Region C"
           )}&storeId=${encodeURIComponent(storeId)}`
         );
@@ -172,7 +172,7 @@ export function ManagerDashboard() {
         <CardHeader>
           <CardTitle>Manager Dashboard</CardTitle>
           <CardDescription>
-            Store revenue, inventory health, and ordering recommendations (scaffold).
+            Store revenue, inventory health, and live supply-order recommendations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -191,7 +191,7 @@ export function ManagerDashboard() {
               )}
               <div className="mt-3 h-40 rounded-md bg-muted/40" aria-hidden="true" />
               <p className="mt-2 text-xs text-muted-foreground">
-                Chart placeholder; data from{" "}
+                Revenue chart area; data from{" "}
                 <code className="text-xs">/api/orbit/revenues/report</code>.
               </p>
             </div>
@@ -360,7 +360,7 @@ export function ManagerDashboard() {
             <h3 className="text-sm font-medium">AI Supply Ordering Recommendations</h3>
             <div className="rounded-lg border p-3">
               {loadingAiRec && !aiRecommendations ? (
-                <p className="text-sm text-muted-foreground">Loading mock forecast…</p>
+                <p className="text-sm text-muted-foreground">Loading forecast…</p>
               ) : aiRecommendations?.length ? (
                 <ul className="space-y-2 text-sm">
                   {aiRecommendations.map((r) => (
@@ -377,11 +377,20 @@ export function ManagerDashboard() {
                 </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No recommendations (placeholder API unavailable).
+                  No recommendations available.
                 </p>
               )}
               <div className="mt-3 flex gap-2">
-                <Button type="button" disabled>
+                <Button
+                  type="button"
+                  disabled={!aiRecommendations?.length}
+                  onClick={() => {
+                    const first = aiRecommendations?.[0];
+                    if (!first) return;
+                    setOrderItemName(first.item);
+                    setOrderQty(String(first.suggestedReorderQty));
+                  }}
+                >
                   Apply Recommendations
                 </Button>
                 <Button type="button" variant="outline" disabled>
@@ -391,9 +400,9 @@ export function ManagerDashboard() {
               <p className="mt-2 text-xs text-muted-foreground">
                 Data from{" "}
                 <code className="text-xs">
-                  /api/orbit/placeholders/logistics/ai-demand-prediction
+                  /api/orbit/logistics/ai-demand-prediction
                 </code>{" "}
-                (mock). Applying orders requires inventory write access.
+                . Applying orders requires inventory write access.
               </p>
             </div>
           </div>

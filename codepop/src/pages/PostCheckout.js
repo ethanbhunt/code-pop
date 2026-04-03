@@ -4,8 +4,19 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
 import NavBar from '../components/NavBar';
+import GeoMap from '../components/map';
+
+const ORDER_POLL_INTERVAL_MS = 5000;
+
+const normalizeOrderPayload = (payload) => {
+  const data = payload?.data || payload || {};
+  return {
+    status: data.OrderStatus || data.orderStatus || 'pending',
+    pickupTime: data.PickupTime || data.pickupTime || null,
+    lockerCombo: data.LockerCombo || data.lockerCombo || null,
+  };
+};
 
 const PostCheckout = () => {
   const navigation = useNavigation();
@@ -19,6 +30,7 @@ const PostCheckout = () => {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
+  const [pollFailures, setPollFailures] = useState(0);
 
   const statusTimeline = ['pending', 'processing', 'completed'];
 
@@ -104,6 +116,7 @@ const PostCheckout = () => {
   useEffect(() => {
     const updateInventory = async () => {
       try {
+        const token = await AsyncStorage.getItem('userToken');
         const storedDrinks = await AsyncStorage.getItem("purchasedDrinks");
         const parsedDrinks = storedDrinks ? JSON.parse(storedDrinks) : [];
 
@@ -123,11 +136,19 @@ const PostCheckout = () => {
 
         const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Token ${token}` } : {}),
+          },
         });
         const inventoryData = await inventoryResponse.json();
+        const inventoryItems = Array.isArray(inventoryData?.inventory_items)
+          ? inventoryData.inventory_items
+          : Array.isArray(inventoryData?.data?.inventory_items)
+            ? inventoryData.data.inventory_items
+            : [];
 
-        const matchingInventoryIDs = inventoryData.inventory_items
+        const matchingInventoryIDs = inventoryItems
           .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
           .map(item => item.InventoryID);
 
@@ -136,7 +157,10 @@ const PostCheckout = () => {
             const data = { 'used_quantity': 1 };
             const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Token ${token}` } : {}),
+              },
               body: JSON.stringify(data),
             });
 
@@ -164,6 +188,26 @@ const PostCheckout = () => {
         setOrderNum(storedOrderNum || null);
         if (!storedOrderNum) {
           setLockerCombo('');
+          setOrderStatus('pending');
+          setEstimatedReadyTime(null);
+          setLastUpdateText('Waiting for first update...');
+        } else {
+          const cachedOrder = await AsyncStorage.getItem(`orderStatusCache:${storedOrderNum}`);
+          if (cachedOrder) {
+            try {
+              const parsedCache = JSON.parse(cachedOrder);
+              setOrderStatus(parsedCache.status || 'pending');
+              setEstimatedReadyTime(parsedCache.pickupTime || null);
+              if (parsedCache.lockerCombo) {
+                setLockerCombo(parsedCache.lockerCombo);
+              }
+              if (parsedCache.lastUpdated) {
+                setLastUpdateText(`Last synced: ${new Date(parsedCache.lastUpdated).toLocaleTimeString()}`);
+              }
+            } catch {
+              // Ignore stale cache parse failures and continue with live poll.
+            }
+          }
         }
         setOrderLoaded(true);
       })();
@@ -199,32 +243,55 @@ const PostCheckout = () => {
 
     const pollOrder = async () => {
       try {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers.Authorization = `Token ${token}`;
+        }
+
         const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
         });
 
         if (!response.ok) {
           throw new Error(`Order poll failed: ${response.status}`);
         }
 
-        const data = await response.json();
-        setOrderStatus(data.OrderStatus || 'pending');
-        setEstimatedReadyTime(data.PickupTime || null);
+        const payload = await response.json();
+        const normalized = normalizeOrderPayload(payload);
+
+        setOrderStatus(normalized.status);
+        setEstimatedReadyTime(normalized.pickupTime);
+        if (normalized.lockerCombo && !lockerCombo) {
+          setLockerCombo(String(normalized.lockerCombo));
+        }
         setLastUpdateText(`Live update: ${new Date().toLocaleTimeString()}`);
+        setPollFailures(0);
+
+        await AsyncStorage.setItem(
+          `orderStatusCache:${orderNum}`,
+          JSON.stringify({
+            status: normalized.status,
+            pickupTime: normalized.pickupTime,
+            lockerCombo: normalized.lockerCombo || lockerCombo || null,
+            lastUpdated: new Date().toISOString(),
+          })
+        );
       } catch (error) {
         console.error('Polling order failed:', error);
+        setPollFailures((prev) => prev + 1);
         setLastUpdateText('Live update unavailable. Retrying...');
       }
     };
 
     pollOrder();
-    const pollId = setInterval(pollOrder, 5000);
+    const pollId = setInterval(pollOrder, ORDER_POLL_INTERVAL_MS);
 
     return () => clearInterval(pollId);
-  }, [orderNum]);
+  }, [orderNum, lockerCombo]);
   
 
   const handleLockerCombo = () => {
@@ -239,15 +306,25 @@ const PostCheckout = () => {
 
   const updateLockerCombo = async () => {
     if (!orderNum) return;
-    await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-      method: 'PATCH',
-      headers: {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const headers = {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        LockerCombo: lockerCombo,
-      }),
-    });
+      };
+      if (token) {
+        headers.Authorization = `Token ${token}`;
+      }
+
+      await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          LockerCombo: lockerCombo,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to persist locker combo:', error);
+    }
   };
 
   // Convert timeLeft to minutes and seconds format
@@ -304,6 +381,11 @@ const PostCheckout = () => {
           <Text style={styles.headerStatus}>Status: {getStatusLabel(orderStatus)}</Text>
           <Text style={styles.headerEta}>ETA: {minutes}:{seconds}</Text>
           <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
+          {pollFailures > 0 ? (
+            <Text style={styles.pollWarning}>
+              Connection is unstable. Showing last known order state.
+            </Text>
+          ) : null}
           {errorMsg && <Text style={styles.errorMessage}>{errorMsg}</Text>}
 
           <View style={styles.progressRail}>
@@ -344,35 +426,14 @@ const PostCheckout = () => {
 
         <View style={styles.mapSection}>
           <Text style={styles.mapTitle}>Arrival map</Text>
-          <MapView
-            style={styles.map}
-            region={{
-              latitude: location ? location.coords.latitude : storeLocation.latitude,
-              longitude: location ? location.coords.longitude : storeLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-            <Marker
-              coordinate={{
-                latitude: storeLocation.latitude,
-                longitude: storeLocation.longitude,
-              }}
-              title="Code Pop"
-              description="Store location"
-              pinColor="#1F7A8C"
-            />
-            {location && (
-              <Marker
-                coordinate={{
-                  latitude: location.coords.latitude,
-                  longitude: location.coords.longitude,
-                }}
-                title="You are here"
-                description="Current location"
-              />
-            )}
-          </MapView>
+          <GeoMap
+            latitude={storeLocation.latitude}
+            longitude={storeLocation.longitude}
+            userLatitude={location?.coords?.latitude}
+            userLongitude={location?.coords?.longitude}
+            title="Code Pop"
+            description="Store location and your current position"
+          />
         </View>
 
         {orderStatus === 'completed' ? (
@@ -475,15 +536,8 @@ const styles = StyleSheet.create({
   },
   mapSection: {
     marginTop: 12,
-    backgroundColor: '#ffffff',
     width: '100%',
-    minHeight: 280,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#ffffff',
-    padding: 12,
+    padding: 0,
   },
   summaryLabel: {
     color: '#49627d',
@@ -515,11 +569,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  map: {
-    width: '100%',
-    height: 210,
-    borderRadius: 15,
-  },
   nearbySection: {
     marginTop: 12,
     backgroundColor: '#ffffff',
@@ -531,6 +580,11 @@ const styles = StyleSheet.create({
   lastUpdate: {
     color: '#dcefff',
     marginTop: 6,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  pollWarning: {
+    color: '#BFDBF7',
     marginBottom: 8,
     fontWeight: '600',
   },

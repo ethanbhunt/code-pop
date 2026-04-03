@@ -18,36 +18,6 @@ router.post("/", authenticate, asyncHandler(async (req, res) => {
   res.status(201).json({ status: "created", data: notification })
 }))
 
-router.get("/filter_by_time", authenticate, asyncHandler(async (req, res) => {
-  const { start, end } = req.query
-  const notifications = await notificationService.filterNotificationsByTimeRange(start, end)
-  res.json({ status: "success", count: notifications.length, data: notifications })
-}))
-
-router.get("/:id", authenticate, asyncHandler(async (req, res) => {
-  const notification = await notificationService.getNotificationById(parseInt(req.params.id, 10))
-  res.json({ status: "success", data: notification })
-}))
-
-router.put("/:id", authenticate, asyncHandler(async (req, res) => {
-  const notification = await notificationService.updateNotification(parseInt(req.params.id, 10), req.body)
-  res.json({ status: "updated", data: notification })
-}))
-
-router.delete("/:id", authenticate, asyncHandler(async (req, res) => {
-  await notificationService.deleteNotification(parseInt(req.params.id, 10))
-  res.json({ status: "deleted" })
-}))
-
-router.get("/user/:userId", authenticate, asyncHandler(async (req, res) => {
-  const notifications = await notificationService.getUserNotifications(parseInt(req.params.userId, 10))
-  res.json({ status: "success", count: notifications.length, data: notifications })
-}))
-
-/**
- * POST /backend/notifications/reorder
- * Create manual reorder notification
- */
 router.post("/reorder", authenticate, requireManager, asyncHandler(async (req, res) => {
   const { storeId, inventoryId } = req.body
   
@@ -79,6 +49,32 @@ router.post("/reorder", authenticate, requireManager, asyncHandler(async (req, r
     status: "created",
     data: notification
   })
+}))
+
+router.get("/filter_by_time", authenticate, asyncHandler(async (req, res) => {
+  const { start, end } = req.query
+  const notifications = await notificationService.filterNotificationsByTimeRange(start, end)
+  res.json({ status: "success", count: notifications.length, data: notifications })
+}))
+
+router.get("/:id", authenticate, asyncHandler(async (req, res) => {
+  const notification = await notificationService.getNotificationById(parseInt(req.params.id, 10))
+  res.json({ status: "success", data: notification })
+}))
+
+router.put("/:id", authenticate, asyncHandler(async (req, res) => {
+  const notification = await notificationService.updateNotification(parseInt(req.params.id, 10), req.body)
+  res.json({ status: "updated", data: notification })
+}))
+
+router.delete("/:id", authenticate, asyncHandler(async (req, res) => {
+  await notificationService.deleteNotification(parseInt(req.params.id, 10))
+  res.json({ status: "deleted" })
+}))
+
+router.get("/user/:userId", authenticate, asyncHandler(async (req, res) => {
+  const notifications = await notificationService.getUserNotifications(parseInt(req.params.userId, 10))
+  res.json({ status: "success", count: notifications.length, data: notifications })
 }))
 
 /**

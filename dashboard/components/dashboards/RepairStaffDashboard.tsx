@@ -86,6 +86,9 @@ export function RepairStaffDashboard() {
   const [historyMachineId, setHistoryMachineId] = useState<string>("all");
   const [historyPage, setHistoryPage] = useState(0);
   const [statusMachineId, setStatusMachineId] = useState("");
+  const [statusToApply, setStatusToApply] = useState("warning");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const pageSize = 5;
 
   useEffect(() => {
@@ -95,12 +98,12 @@ export function RepairStaffDashboard() {
       try {
         const [workflowRes, historyRes] = await Promise.all([
           fetch(
-            `/api/orbit/placeholders/maintenance/repair-workflow?region=${encodeURIComponent(
+            `/api/orbit/maintenance/repair-workflow?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
           fetch(
-            `/api/orbit/placeholders/maintenance/historical-records?storeId=${encodeURIComponent(
+            `/api/orbit/maintenance/historical-records?storeId=${encodeURIComponent(
               storeId
             )}`
           ),
@@ -192,9 +195,7 @@ export function RepairStaffDashboard() {
         <CardHeader>
           <CardTitle>Repair Staff Dashboard</CardTitle>
           <CardDescription>
-            Maintenance UI is scaffold data from{" "}
-            <code className="text-xs">/api/orbit/placeholders/…</code> until OrbitDB exposes
-            machines.{" "}
+            Maintenance workflow backed by live OrbitDB machine and transition APIs. {" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -270,8 +271,7 @@ export function RepairStaffDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Client-side filter on scaffold data. Requires Orbit: assignments keyed to user
-              roles and a machine registry.
+              Client-side filter over live machine assignment and status data.
             </p>
           </div>
 
@@ -331,7 +331,7 @@ export function RepairStaffDashboard() {
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Parsed locally for review. Applying rows to Orbit requires a maintenance API.
+                    Parsed locally for review. Import persistence requires a CSV ingest endpoint.
                   </p>
                 )}
               </div>
@@ -365,7 +365,8 @@ export function RepairStaffDashboard() {
                     <select
                       id="machineStatus"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      defaultValue="warning"
+                      value={statusToApply}
+                      onChange={(e) => setStatusToApply(e.target.value)}
                     >
                       <option value="normal">normal</option>
                       <option value="warning">warning</option>
@@ -380,20 +381,70 @@ export function RepairStaffDashboard() {
                 <div className="mt-3 flex gap-2">
                   <Button
                     type="button"
-                    onClick={() =>
-                      window.alert(
-                        "Status updates are not persisted until Orbit exposes a maintenance write API."
-                      )
-                    }
+                    disabled={!statusMachineId || updatingStatus}
+                    onClick={async () => {
+                      const machineId = Number.parseInt(statusMachineId.replace("M-", ""), 10);
+                      if (!Number.isFinite(machineId)) {
+                        setStatusNotice("Select a valid machine.");
+                        return;
+                      }
+
+                      setUpdatingStatus(true);
+                      setStatusNotice(null);
+                      try {
+                        const res = await fetch("/api/orbit/maintenance/status-transitions", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            machineId,
+                            newStatus: statusToApply,
+                            reason: "dashboard_update",
+                            notes: `Updated from repair dashboard for store ${storeId}`,
+                          }),
+                        });
+
+                        if (!res.ok) {
+                          const text = await res.text();
+                          setStatusNotice(`Status update failed: ${text || `HTTP ${res.status}`}`);
+                          return;
+                        }
+
+                        setStatusNotice("Status updated.");
+
+                        const [workflowRes, historyRes] = await Promise.all([
+                          fetch(
+                            `/api/orbit/maintenance/repair-workflow?region=${encodeURIComponent(
+                              region
+                            )}&storeId=${encodeURIComponent(storeId)}`
+                          ),
+                          fetch(
+                            `/api/orbit/maintenance/historical-records?storeId=${encodeURIComponent(
+                              storeId
+                            )}`
+                          ),
+                        ]);
+                        const [workflow, history] = await Promise.all([
+                          workflowRes.json(),
+                          historyRes.json(),
+                        ]);
+                        setRepairWorkflow(workflow as RepairWorkflowResponse);
+                        setHistoricalRecords(history.records as HistoricalMaintenanceRecord[]);
+                      } finally {
+                        setUpdatingStatus(false);
+                      }
+                    }}
                   >
-                    Update Status
+                    {updatingStatus ? "Updating..." : "Update Status"}
                   </Button>
                   <Button type="button" variant="outline">
                     Cancel
                   </Button>
                 </div>
+                {statusNotice ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{statusNotice}</p>
+                ) : null}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Requires Orbit: durable status history with timestamps and responsible personnel.
+                  Status transitions are persisted through the Orbit maintenance API.
                 </p>
               </div>
             </div>
@@ -567,7 +618,7 @@ export function RepairStaffDashboard() {
               <h3 className="text-sm font-medium">Export Repair Schedules to CSV</h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Download the optimized schedule from placeholder data as CSV.
+                  Download the optimized schedule from live maintenance data as CSV.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <Button

@@ -20,18 +20,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-20c3kbxd-=q$-6^1^i@6u)jklu(js%g87$9sko85kirto!8afv')
-
 # Stripe Configuration
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'TODO: get a new secret stripe key')
-STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', 'TODO: get a new publishable stripe key')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',') if host.strip()]
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-local-dev-only'
+    else:
+        raise RuntimeError('DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is False')
+
+allowed_hosts_default = '127.0.0.1,localhost' if DEBUG else ''
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('DJANGO_ALLOWED_HOSTS', allowed_hosts_default).split(',') if host.strip()]
+if not ALLOWED_HOSTS and not DEBUG:
+    raise RuntimeError('DJANGO_ALLOWED_HOSTS must be set when DJANGO_DEBUG is False')
 
 
 # Application definition
@@ -86,12 +94,19 @@ WSGI_APPLICATION = 'codepop_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+postgres_password = os.getenv('POSTGRES_PASSWORD')
+if not postgres_password:
+    if DEBUG:
+        postgres_password = 'password'
+    else:
+        raise RuntimeError('POSTGRES_PASSWORD must be set when DJANGO_DEBUG is False')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB', 'codepop_database'),
         'USER': os.getenv('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'password'),
+        'PASSWORD': postgres_password,
         'HOST': os.getenv('POSTGRES_HOST', '127.0.0.1'),
         'PORT': os.getenv('POSTGRES_PORT', '5432'), 
     }

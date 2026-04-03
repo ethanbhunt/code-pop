@@ -40,7 +40,7 @@ export async function GET() {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "ORBITDB_API_URL is not configured" },
       { status: 503 }
     );
   }
@@ -119,6 +119,6 @@ export async function GET() {
         lastHeartbeat: generatedAt,
       },
     ],
-    note: "Revenue and inventory/users from OrbitDB. Maintenance, hubs, and store counts are placeholders until those APIs exist.",
+    note: "Revenue and inventory/users are live from OrbitDB. Maintenance, hubs, and store totals are currently conservative defaults until dedicated aggregate APIs are exposed.",
   });
 }

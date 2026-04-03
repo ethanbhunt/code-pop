@@ -52,6 +52,15 @@ type OrbitInventoryItem = {
   thresholdLevel: number;
 };
 
+type TransferRow = {
+  transferId: number;
+  sourceStoreId: number;
+  destStoreId: number;
+  status: string;
+  createdAt: string;
+  items: Array<{ inventoryId?: number; itemName?: string; quantity: number }>;
+};
+
 const DELIVERY_STORE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 
 export function LogisticsManagerDashboard() {
@@ -66,6 +75,10 @@ export function LogisticsManagerDashboard() {
     useState<ForecastComparison | null>(null);
   const [exportMeta, setExportMeta] = useState<SupplyScheduleExport | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [transferRows, setTransferRows] = useState<TransferRow[] | null>(null);
+  const [loadingTransfers, setLoadingTransfers] = useState(false);
+  const [creatingTransfer, setCreatingTransfer] = useState(false);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
 
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][] } | null>(
     null
@@ -104,17 +117,17 @@ export function LogisticsManagerDashboard() {
       try {
         const [aiRes, cmpRes, expRes] = await Promise.all([
           fetch(
-            `/api/orbit/placeholders/logistics/ai-demand-prediction?region=${encodeURIComponent(
+            `/api/orbit/logistics/ai-demand-prediction?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
           fetch(
-            `/api/orbit/placeholders/logistics/forecast-comparison?region=${encodeURIComponent(
+            `/api/orbit/logistics/forecast-comparison?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
           fetch(
-            `/api/orbit/placeholders/logistics/supply-schedule-export?region=${encodeURIComponent(
+            `/api/orbit/logistics/supply-schedule-export?region=${encodeURIComponent(
               region
             )}&storeId=${encodeURIComponent(storeId)}`
           ),
@@ -142,22 +155,41 @@ export function LogisticsManagerDashboard() {
     };
   }, [region, storeId]);
 
-  const reloadAiPlaceholders = useCallback(async () => {
+  const loadTransfers = useCallback(async () => {
+    setLoadingTransfers(true);
+    try {
+      const res = await fetch(`/api/orbit/logistics/transfers?storeId=${encodeURIComponent(storeId)}&limit=20`);
+      if (!res.ok) {
+        setTransferRows(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: TransferRow[] };
+      setTransferRows(json.data ?? []);
+    } finally {
+      setLoadingTransfers(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    void loadTransfers();
+  }, [loadTransfers]);
+
+  const reloadAiInsights = useCallback(async () => {
     setLoadingAi(true);
     try {
       const [aiRes, cmpRes, expRes] = await Promise.all([
         fetch(
-          `/api/orbit/placeholders/logistics/ai-demand-prediction?region=${encodeURIComponent(
+          `/api/orbit/logistics/ai-demand-prediction?region=${encodeURIComponent(
             region
           )}&storeId=${encodeURIComponent(storeId)}`
         ),
         fetch(
-          `/api/orbit/placeholders/logistics/forecast-comparison?region=${encodeURIComponent(
+          `/api/orbit/logistics/forecast-comparison?region=${encodeURIComponent(
             region
           )}&storeId=${encodeURIComponent(storeId)}`
         ),
         fetch(
-          `/api/orbit/placeholders/logistics/supply-schedule-export?region=${encodeURIComponent(
+          `/api/orbit/logistics/supply-schedule-export?region=${encodeURIComponent(
             region
           )}&storeId=${encodeURIComponent(storeId)}`
         ),
@@ -174,6 +206,52 @@ export function LogisticsManagerDashboard() {
       setLoadingAi(false);
     }
   }, [region, storeId]);
+
+  const createTransfer = useCallback(async () => {
+    if (shipFrom === shipTo) {
+      setTransferNotice("Source and destination stores must be different.");
+      return;
+    }
+
+    const preferred = lowStockItems[0] ?? (orbitInventory ?? [])[0];
+    if (!preferred) {
+      setTransferNotice("No inventory rows available to build a transfer.");
+      return;
+    }
+
+    setCreatingTransfer(true);
+    setTransferNotice(null);
+    try {
+      const payload = {
+        sourceStoreId: Number(shipFrom),
+        destStoreId: Number(shipTo),
+        items: [
+          {
+            inventoryId: preferred.inventoryId,
+            itemName: preferred.itemName,
+            quantity: Math.max(1, preferred.thresholdLevel - preferred.quantity),
+          },
+        ],
+      };
+
+      const res = await fetch("/api/orbit/logistics/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        setTransferNotice(`Could not create transfer: ${text || `HTTP ${res.status}`}`);
+        return;
+      }
+
+      setTransferNotice("Transfer created successfully.");
+      await Promise.all([loadTransfers(), reloadAiInsights()]);
+    } finally {
+      setCreatingTransfer(false);
+    }
+  }, [shipFrom, shipTo, lowStockItems, orbitInventory, loadTransfers, reloadAiInsights]);
 
   function onCsvFile(file: File) {
     setCsvError(null);
@@ -234,9 +312,9 @@ export function LogisticsManagerDashboard() {
         <CardHeader>
           <CardTitle>Logistics Manager Dashboard</CardTitle>
           <CardDescription>
-            Regional supply coordination (scaffold). OrbitDB inventory is{" "}
-            <span className="font-medium">global</span>—region/store picker is UI-only until
-            the API supports locations.{" "}
+            Regional supply coordination with live OrbitDB-backed insights. OrbitDB inventory is{" "}
+            <span className="font-medium">currently global</span>, so region/store context is advisory until
+            location partitioning lands. {" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -311,9 +389,9 @@ export function LogisticsManagerDashboard() {
                   <Button
                     type="button"
                     disabled={!csvPreview}
-                    onClick={() => void reloadAiPlaceholders()}
+                    onClick={() => void reloadAiInsights()}
                   >
-                    Refetch mock AI forecast
+                    Recompute AI forecast
                   </Button>
                   <Button
                     type="button"
@@ -415,18 +493,18 @@ export function LogisticsManagerDashboard() {
                 <div className="mt-3 flex gap-2">
                   <Button
                     type="button"
-                    onClick={() =>
-                      setDeliveryDraft(
-                        `Draft: ship from Store ${shipFrom} → Store ${shipTo} (${region})`
-                      )
-                    }
+                    disabled={creatingTransfer}
+                    onClick={() => void createTransfer()}
                   >
-                    Assign Delivery
+                    {creatingTransfer ? "Assigning…" : "Assign Delivery"}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setDeliveryDraft(null)}>
                     Clear
                   </Button>
                 </div>
+                {transferNotice ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{transferNotice}</p>
+                ) : null}
                 {deliveryDraft ? (
                   <p className="mt-2 text-xs text-muted-foreground">{deliveryDraft}</p>
                 ) : null}
@@ -438,8 +516,7 @@ export function LogisticsManagerDashboard() {
             <h3 className="text-sm font-medium">Coordinate Supply Transfers</h3>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                Coordinating transfers between stores and regional suppliers requires persisted
-                shipment/transfer APIs in Orbit—the table below is illustrative only.
+                Active transfers from OrbitDB logistics service.
               </p>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -452,20 +529,35 @@ export function LogisticsManagerDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-t">
-                      <td className="p-2">T-102</td>
-                      <td className="p-2">Coconut</td>
-                      <td className="p-2">60</td>
-                      <td className="p-2 text-muted-foreground">Scheduled</td>
-                    </tr>
-                    <tr className="border-t">
-                      <td className="p-2">T-091</td>
-                      <td className="p-2">Dr. Pepper</td>
-                      <td className="p-2">90</td>
-                      <td className="p-2 text-muted-foreground">In Transit</td>
-                    </tr>
+                    {loadingTransfers && !transferRows ? (
+                      <tr>
+                        <td className="p-2 text-muted-foreground" colSpan={4}>
+                          Loading transfers…
+                        </td>
+                      </tr>
+                    ) : !(transferRows ?? []).length ? (
+                      <tr>
+                        <td className="p-2 text-muted-foreground" colSpan={4}>
+                          No transfer rows available.
+                        </td>
+                      </tr>
+                    ) : (
+                      (transferRows ?? []).map((row) => (
+                        <tr key={row.transferId} className="border-t">
+                          <td className="p-2">T-{row.transferId}</td>
+                          <td className="p-2">{row.items?.[0]?.itemName ?? `Inventory ${row.items?.[0]?.inventoryId ?? "?"}`}</td>
+                          <td className="p-2">{row.items?.[0]?.quantity ?? 0}</td>
+                          <td className="p-2 text-muted-foreground">{row.status}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void loadTransfers()}>
+                  Refresh transfers
+                </Button>
               </div>
             </div>
           </div>
@@ -499,7 +591,7 @@ export function LogisticsManagerDashboard() {
               </table>
             </div>
             <div className="mt-3 flex gap-2">
-              <Button disabled>Generate Schedule</Button>
+              <Button type="button" onClick={() => void reloadAiInsights()}>Generate Schedule</Button>
               <Button variant="outline" disabled>
                 Save Updates
               </Button>
@@ -619,7 +711,8 @@ export function LogisticsManagerDashboard() {
                       </table>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Mock confidence bands come from forecast `lower`/`upper` in the AI payload.
+                      Confidence bands come from forecast `lower`/`upper` values produced by the
+                      logistics forecast service.
                       Deeper analytics need historical actuals in Orbit.
                     </p>
                   </div>
@@ -665,8 +758,8 @@ export function LogisticsManagerDashboard() {
                   </ul>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Push/email notifications require a notification service; this list is from live
-                  inventory + mock AI suggestions.
+                  Push/email notifications require a notification service; this list combines live
+                  inventory thresholds with AI suggestions.
                 </p>
               </div>
             </div>
@@ -677,7 +770,7 @@ export function LogisticsManagerDashboard() {
                 {exportMeta ? (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Mock CSV export payload for this region/store context.
+                      CSV export preview generated from live logistics and inventory data.
                     </p>
                     <div className="rounded-md bg-muted/30 p-2 text-xs text-muted-foreground">
                       Filename: {exportMeta.filename}
@@ -705,7 +798,7 @@ export function LogisticsManagerDashboard() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Load export metadata from the placeholder API (region/store context).
+                    Load export metadata for the selected region/store context.
                   </p>
                 )}
                 <div className="mt-3 flex gap-2">

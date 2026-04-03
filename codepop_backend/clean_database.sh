@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu
+
 # Configuration: set your PostgreSQL credentials and database name here
 DB_NAME="codepop_database"
 DB_USER="postgres"
@@ -7,6 +9,12 @@ DB_HOST="localhost"
 DB_PORT="5432"
 
 echo "Cleaning out the database: $DB_NAME"
+echo "This will drop every table in the public schema and recreate the database contents."
+read -r -p "Type DELETE to continue: " confirmation
+if [ "$confirmation" != "DELETE" ]; then
+    echo "Aborted."
+    exit 1
+fi
 
 # Step 1: Drop all tables in the public schema
 echo "Dropping all tables in database $DB_NAME..."

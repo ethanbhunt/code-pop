@@ -27,8 +27,13 @@ const AuthPage = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
+    if (!username.trim() || !password) {
+      Alert.alert('Please enter username and password.');
+      return;
+    }
+
     try {
-      // Send credentials to Django backend
+      // Send credentials to the OrbitDB auth endpoint
       const response = await fetch(`${BASE_URL}/backend/auth/login/`, {
           method: 'POST',
           headers: {
@@ -37,20 +42,30 @@ const AuthPage = ({ navigation }) => {
           body: JSON.stringify({ username, password }),
       });
 
-      if (response.status === 200) {
-           const response_data = await response.json();
-           const userData = response_data.data; // Extract nested data object
-           const token = userData.token; // Get token from response
+      const responseData = await response.json().catch(() => ({}));
+
+       if (response.status === 200) {
+         const userData = responseData.data || responseData;
+         const authToken = userData.token || responseData.token;
+         const userId = userData.userId || userData.user_id || responseData.userId || responseData.user_id;
+         const firstName = userData.firstName || userData.first_name || responseData.firstName || responseData.first_name || '';
+         const isSuperuser = Boolean(userData.isSuperuser || userData.is_superuser || userData.isAdmin || userData.is_admin);
+         const isStaff = Boolean(userData.isStaff || userData.is_staff || userData.isManager || userData.is_manager);
+
+         if (!authToken || !userId) {
+           throw new Error('Login response was missing token or user id.');
+         }
 
            // Store the token, username, and user ID in AsyncStorage
-           await AsyncStorage.setItem('userToken', userData.token);
-           await AsyncStorage.setItem('userId', userData.userId.toString());  // Store user ID as string
-           await AsyncStorage.setItem('first_name', userData.firstName || '');
-            if(userData.isSuperuser){
+           await AsyncStorage.setItem('userToken', authToken);
+           await AsyncStorage.setItem('userId', String(userId));
+           await AsyncStorage.setItem('first_name', firstName);
+
+            if(isSuperuser){
              await AsyncStorage.setItem('userRole', 'admin');
              Alert.alert('Login successful!');
              navigation.navigate('AdminDash');
-           }else if(userData.isStaff){
+           }else if(isStaff){
              await AsyncStorage.setItem('userRole', 'manager');
              Alert.alert('Login successful!');
              navigation.navigate('ManagerDash');
@@ -60,9 +75,8 @@ const AuthPage = ({ navigation }) => {
              navigation.navigate('GeneralHome');
            }
         
-           // Navigate to Home screen on success
       } else {
-          Alert.alert('Invalid credentials, please try again.');
+          Alert.alert(responseData.error || 'Invalid credentials, please try again.');
       }
     } catch (error) {
       console.error(error);

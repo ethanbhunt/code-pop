@@ -4,7 +4,7 @@
  */
 
 export function getOrbitBaseUrl(): string | null {
-  const raw = process.env.ORBITDB_API_URL ?? process.env.DJANGO_API_URL;
+  const raw = process.env.ORBITDB_API_URL;
   if (!raw?.trim()) return null;
   return raw.replace(/\/$/, "");
 }
@@ -16,7 +16,7 @@ export async function orbitFetch(
 ): Promise<Response> {
   const base = getOrbitBaseUrl();
   if (!base) {
-    throw new Error("ORBITDB_API_URL or DJANGO_API_URL is not set");
+    throw new Error("ORBITDB_API_URL is not set");
   }
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const headers = new Headers(init?.headers);
@@ -35,7 +35,7 @@ export async function orbitFetch(
 export async function orbitFetchPublic(path: string, init?: RequestInit): Promise<Response> {
   const base = getOrbitBaseUrl();
   if (!base) {
-    throw new Error("ORBITDB_API_URL or DJANGO_API_URL is not set");
+    throw new Error("ORBITDB_API_URL is not set");
   }
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const headers = new Headers(init?.headers);

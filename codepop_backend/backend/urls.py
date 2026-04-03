@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework.authtoken.views import obtain_auth_token
-from .views import CreateUserAPIView, LogoutUserAPIView, CustomAuthToken
+from .views import CreateUserAPIView, LogoutUserAPIView, CustomAuthToken, CurrentUserAPIView
 from .views import StripePaymentIntentView
 from .views import UserPreferenceLookup, PreferencesOperations
 from .views import DrinkOperations, UserDrinksLookup
@@ -13,6 +13,8 @@ from .customerAI import Chatbot
 from .views import GenerateAIDrink
 from .views import RevenueViewSet
 from .views import UserOperations
+from .views import StoreOperations
+from .views import HealthCheckAPIView
 from .views import emailAPI
 
 #this ensures that the url calls the right function from the views for each type of request
@@ -71,14 +73,57 @@ revenue_list = RevenueViewSet.as_view({'get': 'list', 'post': 'create'})
 
 revenue_details = RevenueViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})
 
+store_list = StoreOperations.as_view({
+    'get': 'list',
+    'post': 'create',
+})
+
+store_detail = StoreOperations.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy',
+})
+
 user_operations = UserOperations.as_view({
     'get': 'get',
     'post': 'edit',
     'delete': 'delete',
 })
 
+supply_hub_list = SupplyHubOperations.as_view({
+    'get': 'list',
+})
+
+supply_hub_detail = SupplyHubOperations.as_view({
+    'get': 'retrieve',
+})
+
+supply_hub_inventory = SupplyHubOperations.as_view({
+    'get': 'inventory',
+})
+
+stock_transfer_list = StockTransferOperations.as_view({
+    'get': 'list',
+    'post': 'create',
+})
+
+stock_transfer_detail = StockTransferOperations.as_view({
+    'get': 'retrieve',
+    'put': 'update',
+    'patch': 'partial_update',
+    'delete': 'destroy',
+})
+
+order_fulfill = OrderOperations.as_view({
+    'post': 'fulfill_order',
+})
+
 
 urlpatterns = [
+    # Health check
+    path('health/', HealthCheckAPIView.as_view(), name='health_check'),
+
     # Authentication related URLs
     # Endpoint for user login
     # - POST: Authenticates a user and returns an auth token.
@@ -91,6 +136,10 @@ urlpatterns = [
     # Endpoint for user logout
     # - POST: Logs out the user by invalidating the auth token.
     path('auth/logout/', LogoutUserAPIView.as_view(), name='auth_user_logout'),
+
+    # Endpoint for current authenticated user profile
+    # - GET: Returns user metadata for current auth token.
+    path('auth/me/', CurrentUserAPIView.as_view(), name='auth_user_me'),
 
     # Preference-related URLs
     # Endpoint to list all preferences or create a new preference
@@ -124,15 +173,13 @@ urlpatterns = [
     # Retrieve Drinks by UserID
     path('users/<int:user_id>/drinks/', UserDrinksLookup.as_view(), name='user drink list'),
 
-    #inventory related URLs
-    # Endpoint to list all drinks created by a specific user identified by their user ID.
-    # - GET: Retrieve a list of drinks for the specified user.
-    path('users/<int:user_id>/drinks/', UserDrinksLookup.as_view(), name='user_preferences_list'),
-
     # Stripe payment
     path('create-payment-intent/', StripePaymentIntentView.as_view(), name='create-payment-intent'),
 
     # Inventory URLs
+    path('stores/', store_list, name='store_list_create'),
+    path('stores/<int:pk>/', store_detail, name='store_detail'),
+
     # Endpoint to list all inventory items
     # - GET: Retrieve a list of all inventory items.
     # - POST: Create a new inventory item. Requires authentication and item details.
@@ -184,6 +231,8 @@ urlpatterns = [
     # - DELETE: Remove the specific order from the database.
     path('orders/<int:pk>/', order_detail, name='order_detail'),
     path('orders/<int:pk>/fulfill/', order_fulfill, name='order_fulfill'),
+    path('orders/<int:pk>/complete/', order_fulfill, name='order_complete'),
+    path('fulfillment/orders/<int:pk>/', order_fulfill, name='fulfillment_order_complete'),
 
     # Live-order control endpoint for manager status updates
     path('orders/<int:pk>/live-status/', order_live_status, name='order_live_status'),

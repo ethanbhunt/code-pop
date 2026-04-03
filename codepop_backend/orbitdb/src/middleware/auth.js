@@ -3,16 +3,28 @@
 
 import { getTokensDb, getUsersDb } from "../utils/db.js"
 
+function normalizeRole(role) {
+  return String(role ?? "").toLowerCase().replace(/\s+/g, "_")
+}
+
 /** DB / seed may use legacy names; admin routes accept these. */
 function hasAdminPrivileges(role) {
-  const r = String(role ?? "").toLowerCase()
-  return r === "admin" || r === "superadmin"
+  const r = normalizeRole(role)
+  return r === "admin" || r === "super_admin" || r === "superadmin"
 }
 
 /** Staff-tier and above (legacy `manager` = store manager). */
 function hasStaffPrivileges(role) {
-  const r = String(role ?? "").toLowerCase()
-  return ["staff", "manager", "admin", "superadmin"].includes(r)
+  const r = normalizeRole(role)
+  return [
+    "staff",
+    "manager",
+    "logistics_manager",
+    "repair_staff",
+    "admin",
+    "super_admin",
+    "superadmin",
+  ].includes(r)
 }
 
 /**
@@ -81,7 +93,10 @@ export async function authenticate(req, res, next) {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role
+      role: user.role,
+      userRole: user.role,
+      enum: user.role,
+      assignedStores: Array.isArray(user.assignedStores) ? user.assignedStores : []
     }
     req.token = tokenKey
 
@@ -107,7 +122,7 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (!hasAdminPrivileges(req.user.role)) {
+  if (!hasAdminPrivileges(req.user.userRole || req.user.role || req.user.enum)) {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
@@ -128,7 +143,8 @@ export function requireSuperAdmin(req, res, next) {
     })
   }
 
-  if (req.user.userRole !== "super_admin") {
+  const role = String(req.user.userRole || req.user.role || req.user.enum || "").toLowerCase()
+  if (role !== "super_admin" && role !== "superadmin") {
     return res.status(403).json({
       error: "Super admin privileges required",
       code: "NOT_SUPER_ADMIN"
@@ -149,7 +165,15 @@ export function requireManager(req, res, next) {
     })
   }
 
-  if (req.user.userRole !== "manager" && req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
+  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
+  if (
+    role !== "manager" &&
+    role !== "logistics_manager" &&
+    role !== "staff" &&
+    role !== "admin" &&
+    role !== "super_admin" &&
+    role !== "superadmin"
+  ) {
     return res.status(403).json({
       error: "Manager privileges required",
       code: "NOT_MANAGER"
@@ -170,7 +194,8 @@ export function requireRepair(req, res, next) {
     })
   }
 
-  if (req.user.userRole !== "repair") {
+  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
+  if (role !== "repair" && role !== "repair_staff") {
     return res.status(403).json({
       error: "Repair user privileges required",
       code: "NOT_REPAIR"
@@ -192,12 +217,13 @@ export function requireStoreAccess(req, res, next) {
   }
 
   // Super admin can access all stores
-  if (req.user.userRole === "super_admin") {
+  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
+  if (role === "super_admin" || role === "superadmin") {
     return next()
   }
 
-  // Manager/admin must have store in assignedStores
-  if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+  // Manager/admin/logistics roles must have store in assignedStores.
+  if (role === "manager" || role === "staff" || role === "logistics_manager" || role === "admin") {
     const storeId = parseInt(req.params.storeId || req.query.storeId)
     if (!storeId) {
       return res.status(400).json({
@@ -228,7 +254,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (!hasStaffPrivileges(req.user.role)) {
+  if (!hasStaffPrivileges(req.user.userRole || req.user.role || req.user.enum)) {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"

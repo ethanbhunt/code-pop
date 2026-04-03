@@ -4,9 +4,6 @@ import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
-// todo
-  // test the removeAllDrinks function
-
 export default function CheckoutForm(totalPrice) {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
@@ -54,7 +51,7 @@ export default function CheckoutForm(totalPrice) {
     const { paymentIntent, ephemeralKey, customer } = paymentParams;
     if (!paymentIntent || !ephemeralKey || !customer) {
       setPaymentSheetReady(false);
-      setLoading(true);
+      setLoading(false);
       return;
     }
 
@@ -82,6 +79,11 @@ export default function CheckoutForm(totalPrice) {
       const currentList = cartList ? JSON.parse(cartList) : [];
       
       const userId = await AsyncStorage.getItem('userId');
+      const token = await AsyncStorage.getItem('userToken');
+
+      if (!token) {
+        throw new Error('User session is missing. Please sign in again.');
+      }
 
       if (!stripeNum) {
         throw new Error('Payment intent is missing.');
@@ -91,6 +93,7 @@ export default function CheckoutForm(totalPrice) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
         },
         body: JSON.stringify({
           UserID: userId,
@@ -104,7 +107,10 @@ export default function CheckoutForm(totalPrice) {
       // Check if the request was successful
       if (response.ok) {
         const data = await response.json(); // Parse JSON if returned
-        const createdOrderNum = data.OrderID;
+        const createdOrderNum = data.OrderID || data.orderId || data.id;
+        if (!createdOrderNum) {
+          throw new Error('Order was created but response did not include an order id.');
+        }
         console.log('Order Num:', createdOrderNum);
         await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
       } else {
@@ -114,7 +120,7 @@ export default function CheckoutForm(totalPrice) {
 
  
       // Update the local state to remove the drink from the cart page
-      setDrinks(null);
+      setDrinks([]);
   
       // Update the AsyncStorage to remove the drink ID from the checkout list
       await AsyncStorage.removeItem("checkoutList");

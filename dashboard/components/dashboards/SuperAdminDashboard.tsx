@@ -225,7 +225,7 @@ export function SuperAdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Super Admin Dashboard</CardTitle>
-          <CardDescription>System-wide visibility and cross-store control (scaffold).</CardDescription>
+          <CardDescription>System-wide visibility and cross-store control.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -244,7 +244,7 @@ export function SuperAdminDashboard() {
                 {loadingReports ? "…" : machinesNeedingRepair}
               </p>
               <p className="text-xs text-muted-foreground">
-                Placeholder until maintenance API exists
+                Derived from current maintenance summary payload
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -349,7 +349,7 @@ export function SuperAdminDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="p-2 text-muted-foreground">Maintenance (placeholder)</td>
+                        <td className="p-2 text-muted-foreground">Maintenance</td>
                         <td className="p-2 text-xs">
                           {loadingReports
                             ? "…"
@@ -545,7 +545,7 @@ export function SuperAdminDashboard() {
                 <p className="text-sm text-muted-foreground">
                   Summaries from{" "}
                   <code className="text-xs">/api/orbit/admin/system-reports</code>. Maintenance
-                  figures stay placeholder until Orbit exposes machines.
+                  figures reflect the current aggregated Orbit report payload.
                 </p>
                 {reports?.note ? (
                   <p className="mt-2 text-xs text-muted-foreground">{reports.note}</p>

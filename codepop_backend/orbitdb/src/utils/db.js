@@ -20,6 +20,7 @@ export async function initializeOrbitDB(orbitdbInstance, dbAddresses) {
     databases.notifications = await orbitdb.open(dbAddresses.notifications, { type: "keyvalue" })
     databases.revenues = await orbitdb.open(dbAddresses.revenues, { type: "keyvalue" })
     databases.payments = await orbitdb.open(dbAddresses.payments, { type: "keyvalue" })
+    databases.auditLogs = await orbitdb.open(dbAddresses.auditLogs, { type: "keyvalue" })
     databases.qrcodes = await orbitdb.open(dbAddresses.qrcodes, { type: "keyvalue" })
     databases.stores = await orbitdb.open(dbAddresses.stores, { type: "keyvalue" })
     databases.maintenance = await orbitdb.open(dbAddresses.maintenance, { type: "keyvalue" })
@@ -79,6 +80,11 @@ export function getPaymentsDb() {
   return databases.payments
 }
 
+export function getAuditLogsDb() {
+  if (!databases.auditLogs) throw new Error("Audit logs database not initialized")
+  return databases.auditLogs
+}
+
 export function getQRCodesDb() {
   if (!databases.qrcodes) throw new Error("QR Codes database not initialized")
   return databases.qrcodes
@@ -111,6 +117,7 @@ export function getAllDatabaseInfo() {
     notifications: databases.notifications?.address.toString() || "not initialized",
     revenues: databases.revenues?.address.toString() || "not initialized",
     payments: databases.payments?.address.toString() || "not initialized",
+    auditLogs: databases.auditLogs?.address.toString() || "not initialized",
     qrcodes: databases.qrcodes?.address.toString() || "not initialized",
     stores: databases.stores?.address.toString() || "not initialized",
     maintenance: databases.maintenance?.address.toString() || "not initialized",

@@ -22,20 +22,20 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Authentication
 
-Login is handled by [Auth.js](https://authjs.dev/) and validated against your Django backend.
+Login is handled by [Auth.js](https://authjs.dev/) and validated against the OrbitDB API.
 
 1. Copy `.env.example` to `.env.local` and set:
    - `AUTH_SECRET` — run `openssl rand -base64 32` to generate one.
-   - `DJANGO_API_URL` — base URL of your Django API (e.g. `http://localhost:8000`).
+   - `ORBITDB_API_URL` — base URL of your OrbitDB API (e.g. `http://localhost:3001`).
 
-2. **Django backend** (`codepop_backend`): the dashboard calls the existing login endpoint.
+2. **OrbitDB backend** (`codepop_backend/orbitdb`): the dashboard calls the existing login endpoint.
 
-   - **URL**: `POST {DJANGO_API_URL}/backend/auth/login/`
+   - **URL**: `POST {ORBITDB_API_URL}/backend/auth/login/`
    - **Body**: `{ "username": "...", "password": "..." }` (the login form sends the email field as `username`)
    - **Success (200)**: `{ "token", "user_id", "first_name", "is_admin", "is_manager" }`
    - **Failure (4xx)**: dashboard shows “Invalid email or password.”
 
-   Ensure CORS allows your dashboard origin (e.g. `http://localhost:3000`) so the browser can call the API. Run the backend with `python manage.py runserver` and set `DJANGO_API_URL=http://localhost:8000`.
+   Ensure CORS allows your dashboard origin (e.g. `http://localhost:3000`) so the browser can call the API. Run the OrbitDB peer with `npm run peer` and set `ORBITDB_API_URL=http://localhost:3001`.
 
 3. Protected routes (everything except `/login` and `/signup`) redirect to `/login` when not signed in. After login, users are redirected back to the page they tried to open or to `/`.
 

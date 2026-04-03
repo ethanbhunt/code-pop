@@ -66,7 +66,11 @@ router.post("/", authenticate, requireAdmin, asyncHandler(async (req, res) => {
     quantity,
     thresholdLevel,
     costPerUnit,
-    supplier
+    supplier,
+    {
+      userId: req.user.userId,
+      role: req.user.userRole || req.user.role || req.user.enum,
+    }
   )
   res.status(201).json({ status: "created", data: item })
 }))
@@ -82,12 +86,18 @@ router.get("/:id", authenticate, asyncHandler(async (req, res) => {
 }))
 
 router.patch("/:id", authenticate, asyncHandler(async (req, res) => {
-  const item = await inventoryService.updateInventoryItem(parseInt(req.params.id, 10), req.body)
+  const item = await inventoryService.updateInventoryItem(parseInt(req.params.id, 10), req.body, {
+    userId: req.user.userId,
+    role: req.user.userRole || req.user.role || req.user.enum,
+  })
   res.json({ status: "updated", data: item })
 }))
 
 router.delete("/:id", authenticate, asyncHandler(async (req, res) => {
-  await inventoryService.deleteInventoryItem(parseInt(req.params.id, 10))
+  await inventoryService.deleteInventoryItem(parseInt(req.params.id, 10), {
+    userId: req.user.userId,
+    role: req.user.userRole || req.user.role || req.user.enum,
+  })
   res.json({ status: "deleted" })
 }))
 

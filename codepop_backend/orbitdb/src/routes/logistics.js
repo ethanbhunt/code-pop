@@ -8,6 +8,18 @@ import * as storesService from "../services/storesService.js"
 
 const router = express.Router()
 
+function roleOf(req) {
+  return String(req.user.userRole || req.user.role || req.user.enum || "").toLowerCase().replace(/\s+/g, "_")
+}
+
+function hasStoreAccess(req, storeId) {
+  const role = roleOf(req)
+  if (role === "super_admin" || role === "superadmin") {
+    return true
+  }
+  return req.user.assignedStores.map((id) => parseInt(id, 10)).includes(parseInt(storeId, 10))
+}
+
 /**
  * POST /backend/logistics/transfers
  * Create transfer request
@@ -24,7 +36,7 @@ router.post("/transfers", authenticate, requireManager, async (req, res, next) =
     }
     
     // Verify user has access to source store
-    if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(sourceStoreId)) {
+    if (!hasStoreAccess(req, sourceStoreId)) {
       return res.status(403).json({
         error: "Access denied to source store",
         code: "STORE_ACCESS_DENIED"
@@ -63,7 +75,7 @@ router.get("/transfers", authenticate, requireManager, async (req, res, next) =>
       filters.storeId = parseInt(req.query.storeId)
       
       // Verify access to store
-      if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(filters.storeId)) {
+      if (!hasStoreAccess(req, filters.storeId)) {
         return res.status(403).json({
           error: "Access denied to this store",
           code: "STORE_ACCESS_DENIED"
@@ -110,7 +122,7 @@ router.patch("/transfers/:transferId", authenticate, requireManager, async (req,
     const transfer = await logisticsService.getTransferById(transferId)
     
     // Verify access to source store
-    if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(transfer.sourceStoreId)) {
+    if (!hasStoreAccess(req, transfer.sourceStoreId)) {
       return res.status(403).json({
         error: "Access denied",
         code: "STORE_ACCESS_DENIED"
@@ -139,9 +151,7 @@ router.get("/transfers/:transferId", authenticate, requireManager, async (req, r
     const transfer = await logisticsService.getTransferById(transferId)
     
     // Verify access
-    if (req.user.enum !== "super_admin" && 
-        !req.user.assignedStores.includes(transfer.sourceStoreId) &&
-        !req.user.assignedStores.includes(transfer.destStoreId)) {
+    if (!hasStoreAccess(req, transfer.sourceStoreId) && !hasStoreAccess(req, transfer.destStoreId)) {
       return res.status(403).json({
         error: "Access denied",
         code: "NOT_AUTHORIZED"
@@ -175,7 +185,7 @@ router.post("/delivery-assignments", authenticate, requireManager, async (req, r
     const transfer = await logisticsService.getTransferById(transferId)
     
     // Verify access to source store
-    if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(transfer.sourceStoreId)) {
+    if (!hasStoreAccess(req, transfer.sourceStoreId)) {
       return res.status(403).json({
         error: "Access denied",
         code: "STORE_ACCESS_DENIED"
@@ -247,7 +257,7 @@ router.patch("/delivery-assignments/:assignmentId", authenticate, requireManager
     const transfer = await logisticsService.getTransferById(assignment.transferId)
     
     // Verify access
-    if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(transfer.sourceStoreId)) {
+    if (!hasStoreAccess(req, transfer.sourceStoreId)) {
       return res.status(403).json({
         error: "Access denied",
         code: "STORE_ACCESS_DENIED"

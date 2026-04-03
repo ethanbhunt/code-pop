@@ -38,6 +38,7 @@ const DB_NAMES = {
   notifications: "notifications-db",
   revenues: "revenues-db",
   payments: "payments-db",
+  auditLogs: "auditlogs-db",
   qrcodes: "qrcodes-db",
   stores: "stores-db",
   maintenance: "maintenance-db",

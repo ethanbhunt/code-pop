@@ -24,14 +24,14 @@ export function orbitRoleToDashboardRoles(orbit: string | undefined): Role[] {
   const r = (orbit ?? "").toLowerCase();
   if (r === "admin") return [Role.SuperAdmin, Role.Admin];
   if (r === "staff") return [Role.Staff, Role.Manager, Role.LogisticsManager];
-  if (r === "superadmin") return [Role.SuperAdmin];
+  if (r === "superadmin" || r === "super_admin") return [Role.SuperAdmin];
   return [Role.Customer];
 }
 
 /** One `Role` per Orbit tier for role-picker defaults (editing users). */
 export function defaultDashboardRoleForOrbit(orbit: string | undefined): Role {
   const r = (orbit ?? "").toLowerCase();
-  if (r === "admin" || r === "superadmin") return Role.SuperAdmin;
+  if (r === "admin" || r === "superadmin" || r === "super_admin") return Role.SuperAdmin;
   if (r === "staff") return Role.Staff;
   return Role.Customer;
 }

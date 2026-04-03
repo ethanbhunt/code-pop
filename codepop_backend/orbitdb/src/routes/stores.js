@@ -31,36 +31,6 @@ router.get("/", authenticate, requireSuperAdmin, async (req, res, next) => {
 })
 
 /**
- * GET /backend/stores/:storeId
- * Get specific store details
- */
-router.get("/:storeId", authenticate, async (req, res, next) => {
-  try {
-    const storeId = parseInt(req.params.storeId)
-    
-    // Super admin can see all stores
-    if (req.user.enum !== "super_admin") {
-      // Manager/admin must have store in assignedStores
-      if (!req.user.assignedStores.includes(storeId)) {
-        return res.status(403).json({
-          error: "Access denied to this store",
-          code: "STORE_ACCESS_DENIED"
-        })
-      }
-    }
-    
-    const store = await storesService.getStoreById(storeId)
-    
-    res.json({
-      status: "success",
-      data: store
-    })
-  } catch (err) {
-    next(err)
-  }
-})
-
-/**
  * GET /backend/stores/:storeId/inventory
  * Get store-scoped inventory
  */
@@ -88,6 +58,36 @@ router.get("/:storeId/inventory", authenticate, async (req, res, next) => {
       storeId: storeId,
       count: result.count,
       data: result.data
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/**
+ * GET /backend/stores/:storeId
+ * Get specific store details
+ */
+router.get("/:storeId", authenticate, async (req, res, next) => {
+  try {
+    const storeId = parseInt(req.params.storeId)
+    
+    // Super admin can see all stores
+    if (req.user.enum !== "super_admin") {
+      // Manager/admin must have store in assignedStores
+      if (!req.user.assignedStores.includes(storeId)) {
+        return res.status(403).json({
+          error: "Access denied to this store",
+          code: "STORE_ACCESS_DENIED"
+        })
+      }
+    }
+    
+    const store = await storesService.getStoreById(storeId)
+    
+    res.json({
+      status: "success",
+      data: store
     })
   } catch (err) {
     next(err)

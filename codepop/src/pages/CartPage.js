@@ -8,6 +8,8 @@ import CheckoutForm from './CheckoutForm';
 import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
 const CartPage = () => {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
@@ -170,8 +172,20 @@ const CartPage = () => {
   };
   
 
+  if (!STRIPE_PUBLISHABLE_KEY) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.headerText}>Your Drinks</Text>
+        <Text style={styles.emptyCartText}>
+          Stripe is not configured. Set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY to enable checkout.
+        </Text>
+        <NavBar />
+      </View>
+    );
+  }
+
   return (
-    <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
         <View style={styles.container}>
         <Text style={styles.headerText}>Your Drinks</Text>
 

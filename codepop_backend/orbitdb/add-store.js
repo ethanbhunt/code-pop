@@ -183,7 +183,6 @@ async function main() {
     console.log(`   Region: ${store.region}`)
     console.log(`   Timezone: ${store.timezone}\n`)
 
-    // Cleanup
     await storesDb.close()
     await libp2p.stop()
     process.exit(0)

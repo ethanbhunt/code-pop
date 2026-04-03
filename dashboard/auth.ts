@@ -16,9 +16,7 @@ import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
  *
  * OrbitDB roles map to dashboard `Role` via `orbitRoleToDashboardRoles`.
  */
-const orbitDbBaseUrl = (
-  process.env.ORBITDB_API_URL ?? process.env.DJANGO_API_URL
-)?.replace(/\/$/, "");
+const orbitDbBaseUrl = process.env.ORBITDB_API_URL?.replace(/\/$/, "");
 
 const orbitDbLoginUrl = orbitDbBaseUrl ? `${orbitDbBaseUrl}/auth/login` : "";
 
@@ -44,7 +42,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         role: { label: "Role", type: "text" },
       },
       async authorize(credentials) {
-        // Dev-mode bypass: when enabled, do not call Django at all.
+        // Dev-mode bypass: when enabled, do not call OrbitDB at all.
         if (devBypassEnabled) {
           const usernameValue =
             typeof credentials?.username === "string"

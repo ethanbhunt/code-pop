@@ -93,6 +93,35 @@ router.post("/", authenticate, asyncHandler(async (req, res) => {
   res.status(201).json({ status: "created", data: order })
 }))
 
+router.post("/:id/fulfill", authenticate, asyncHandler(async (req, res) => {
+  const orderId = parseInt(req.params.id, 10)
+  const order = await orderService.getOrderById(orderId)
+  const role = String(req.user.userRole || req.user.role || req.user.enum || "").toLowerCase()
+
+  if (role !== "super_admin" && role !== "superadmin") {
+    if (role !== "manager" && role !== "admin") {
+      return res.status(403).json({
+        error: "Manager or admin privileges required",
+        code: "NOT_MANAGER"
+      })
+    }
+
+    if (!req.user.assignedStores.includes(order.storeId)) {
+      return res.status(403).json({
+        error: "Access denied to this store",
+        code: "STORE_ACCESS_DENIED"
+      })
+    }
+  }
+
+  const fulfilled = await orderService.fulfillOrder(orderId, {
+    userId: req.user.userId,
+    role: req.user.userRole || req.user.role || req.user.enum,
+  })
+
+  res.json({ status: "success", data: fulfilled })
+}))
+
 router.get("/:id", authenticate, asyncHandler(async (req, res) => {
   const order = await orderService.getOrderById(parseInt(req.params.id, 10))
   res.json({ status: "success", data: order })

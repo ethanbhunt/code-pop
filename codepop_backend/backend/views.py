@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.db.models import F
-from django.db import models
+from django.db import models, connection
 from django.utils import timezone
 from django.contrib.auth.models import User
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView, RetrieveUpdateAPIView
@@ -11,6 +11,7 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework import status, viewsets
 from rest_framework.views import APIView
+from django.conf import settings
 from .models import (
     Preference,
     Drink,
@@ -18,6 +19,7 @@ from .models import (
     Notification,
     Order,
     Revenue,
+    Store,
     SupplyHub,
     StockTransfer,
     AuditLog,
@@ -28,6 +30,7 @@ from .serializers import (
     PreferenceSerializer,
     DrinkSerializer,
     InventorySerializer,
+    StoreSerializer,
     NotificationSerializer,
     OrderSerializer,
     RevenueSerializer,
@@ -71,6 +74,22 @@ class IsStoreManager(BasePermission):
         return request.user and request.user.is_authenticated and (
             request.user.is_staff or request.user.is_superuser
         )
+
+
+class HealthCheckAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SELECT 1')
+                cursor.fetchone()
+            return Response({'status': 'ok', 'database': 'ok'}, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response(
+                {'status': 'error', 'database': 'unavailable', 'detail': str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
     
 #Custom login to so that it get's a token but also the user's first name and the user id
 class CustomAuthToken(ObtainAuthToken):
@@ -114,6 +133,24 @@ class LogoutUserAPIView(APIView):
         # Delete the token to log out the user
         request.user.auth_token.delete()
         return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+
+
+class CurrentUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        return Response(
+            {
+                'user_id': user.pk,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_admin': user.is_superuser,
+                'is_manager': user.is_staff,
+            },
+            status=status.HTTP_200_OK,
+        )
     
 class PreferencesOperations(viewsets.ModelViewSet):
     queryset = Preference.objects.all()
@@ -339,6 +376,12 @@ class InventoryUpdateAPIView(RetrieveUpdateAPIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+class StoreOperations(viewsets.ModelViewSet):
+    queryset = Store.objects.all().order_by('Region', 'Name')
+    serializer_class = StoreSerializer
+    permission_classes = [IsAuthenticated]
+
+
 class AuditLogListAPIView(ListAPIView):
     queryset = AuditLog.objects.all().order_by('-Timestamp')
     serializer_class = AuditLogSerializer
@@ -488,6 +531,13 @@ class OrderOperations(viewsets.ModelViewSet):
             return True
         return next_status in self.STATUS_TRANSITIONS.get(current_status, [])
 
+    def get_permissions(self):
+        if self.action in ['fulfill_order', 'live_status']:
+            return [IsAuthenticated(), IsStoreManager()]
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'patch']:
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
     def patch(self, request, *args, **kwargs):
         order = self.get_object()
         drinks_to_add = request.data.get("AddDrinks", [])
@@ -582,6 +632,24 @@ class OrderOperations(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'])
+    def fulfill_order(self, request, pk=None):
+        order = self.get_object()
+        try:
+            order = OrderCompletionService.fulfill_order(pk)
+        except ValueError as exc:
+            if order.UserID:
+                Notification.objects.create(
+                    UserID=order.UserID,
+                    Message=str(exc),
+                    Type='order_error',
+                    Global=False,
+                )
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
     def live_status(self, request, pk=None):
         order = self.get_object()
         requested_status = request.data.get('status')
@@ -656,7 +724,7 @@ class StripePaymentIntentView(View):
                 'paymentIntent': payment_intent.client_secret,
                 'ephemeralKey': ephemeral_key.secret,
                 'customer': customer.id,
-                'publishableKey': 'TODO: get a new publishable stripe key'
+                'publishableKey': settings.STRIPE_PUBLISHABLE_KEY
             })
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)

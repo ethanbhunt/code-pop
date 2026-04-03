@@ -1,6 +1,6 @@
 # CodePop OrbitDB Backend
 
-A decentralized backend for CodePop using OrbitDB, libp2p, and Express.js. This replaces the Django/PostgreSQL architecture with a peer-to-peer database system.
+A decentralized backend for CodePop using OrbitDB, libp2p, and Express.js. This adds the distributed data layer and API surface used by the current multi-store runtime.
 
 ## Architecture
 

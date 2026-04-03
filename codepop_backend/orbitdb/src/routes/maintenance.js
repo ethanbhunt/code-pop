@@ -8,6 +8,10 @@ import * as storesService from "../services/storesService.js"
 
 const router = express.Router()
 
+function roleOf(req) {
+  return String(req.user.userRole || req.user.role || req.user.enum || "").toLowerCase().replace(/\s+/g, "_")
+}
+
 /**
  * GET /backend/maintenance/machines
  * List machines for a store
@@ -18,13 +22,14 @@ router.get("/machines", authenticate, async (req, res, next) => {
   try {
     const offset = parseInt(req.query.offset || 0)
     const limit = Math.min(parseInt(req.query.limit || 50), 100)
+    const role = roleOf(req)
     
     let result
     
-    if (req.user.userRole === "repair") {
+    if (role === "repair" || role === "repair_staff") {
       // Repair users see only machines assigned to them
       result = await maintenanceService.getMachinesAssignedTo(req.user.userId, offset, limit)
-    } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    } else if (role === "manager" || role === "logistics_manager" || role === "staff" || role === "admin") {
       // Managers see machines for their stores
       const storeId = parseInt(req.query.storeId)
       if (!storeId) {
@@ -43,7 +48,7 @@ router.get("/machines", authenticate, async (req, res, next) => {
       }
       
        result = await maintenanceService.listMachinesByStore(storeId, offset, limit)
-     } else if (req.user.userRole === "super_admin") {
+    } else if (role === "super_admin" || role === "superadmin") {
       // Super admin sees all machines
       result = await maintenanceService.listAllMachines(offset, limit)
     } else {
@@ -98,6 +103,7 @@ router.get("/assignments/me", authenticate, requireRepair, async (req, res, next
  */
 router.post("/status-transitions", authenticate, async (req, res, next) => {
   try {
+      const role = roleOf(req)
     const { machineId, newStatus, reason, notes } = req.body
     
     if (!machineId || !newStatus || !reason) {
@@ -110,7 +116,7 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
     // Verify user can update this machine
     const machine = await maintenanceService.getMachineById(machineId)
     
-     if (req.user.userRole === "repair") {
+    if (role === "repair" || role === "repair_staff") {
        // Repair users can only update machines assigned to them
        if (machine.assignedTo !== req.user.userId) {
          return res.status(403).json({
@@ -118,7 +124,7 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
            code: "NOT_ASSIGNED"
          })
        }
-     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    } else if (role === "manager" || role === "logistics_manager" || role === "staff" || role === "admin") {
        // Managers can update machines in their stores
        if (!req.user.assignedStores.includes(machine.storeId)) {
          return res.status(403).json({
@@ -126,7 +132,7 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
            code: "STORE_ACCESS_DENIED"
          })
        }
-     } else if (req.user.userRole !== "super_admin") {
+    } else if (role !== "super_admin" && role !== "superadmin") {
       return res.status(403).json({
         error: "Not authorized",
         code: "NOT_AUTHORIZED"
@@ -156,6 +162,7 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
  */
 router.get("/history", authenticate, async (req, res, next) => {
   try {
+      const role = roleOf(req)
     const machineId = parseInt(req.query.machineId)
     const page = parseInt(req.query.page || 1)
     const limit = parseInt(req.query.limit || 25)
@@ -170,21 +177,21 @@ router.get("/history", authenticate, async (req, res, next) => {
     // Verify user can access this machine
     const machine = await maintenanceService.getMachineById(machineId)
     
-     if (req.user.userRole === "repair") {
+    if (role === "repair" || role === "repair_staff") {
        if (machine.assignedTo !== req.user.userId) {
          return res.status(403).json({
            error: "Not assigned to this machine",
            code: "NOT_ASSIGNED"
          })
        }
-     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    } else if (role === "manager" || role === "logistics_manager" || role === "staff" || role === "admin") {
        if (!req.user.assignedStores.includes(machine.storeId)) {
          return res.status(403).json({
            error: "Access denied",
            code: "STORE_ACCESS_DENIED"
          })
        }
-     } else if (req.user.userRole !== "super_admin") {
+    } else if (role !== "super_admin" && role !== "superadmin") {
       return res.status(403).json({
         error: "Not authorized",
         code: "NOT_AUTHORIZED"
@@ -217,8 +224,9 @@ router.post("/machines", authenticate, requireAdmin, async (req, res, next) => {
       })
     }
     
+     const role = roleOf(req)
      // Verify store access
-     if (req.user.userRole !== "super_admin" && !req.user.assignedStores.includes(storeId)) {
+     if (role !== "super_admin" && role !== "superadmin" && !req.user.assignedStores.includes(storeId)) {
       return res.status(403).json({
         error: "Access denied to this store",
         code: "STORE_ACCESS_DENIED"
