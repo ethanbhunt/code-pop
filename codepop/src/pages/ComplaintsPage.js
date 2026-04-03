@@ -3,155 +3,21 @@ import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, ScrollView 
 import NavBar from '../components/NavBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
-import { BASE_URL } from '../../ip_address';  // Ensure BASE_URL is your server's base URL
-import { registerRootComponent } from 'expo';
+import { BASE_URL } from '../../ip_address'; // Ensure BASE_URL is your server's base URL
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ComplaintsPage = () => {
     const [searchText, setSearchText] = useState('');
     const [messages, setMessages] = useState([{ text: "Hi! I'm Bob. How can I help you?", isBot: true }]);
     const scrollViewRef = useRef();
-    const [refund_phase, setRefundPhase] = useState("none");
-    const [wrong_drink_phase, setWrongDrinkPhase] = useState("none");
-    const [order_num, setOrderNum] = useState("none");
-    const [drink_nums, setDrinkNums] = useState("none");
+    const [refund_phase, setRefundPhase] = useState('none');
+    const [wrong_drink_phase, setWrongDrinkPhase] = useState('none');
+    const [order_num, setOrderNum] = useState('none');
+    const [drink_nums, setDrinkNums] = useState('none');
     const [loading, setLoading] = useState(false);
     const navigation = useNavigation();
 
-    // Function to handle message submission
-    const complaintAI = async () => {
-        if (searchText.trim() === '') return;
-
-        const userRequest = searchText;
-    
-        // Add the user's message
-        setMessages((prevMessages) => [
-            ...prevMessages,
-            { text: searchText, isBot: false }
-        ]);
-    
-        // Clear the input field
-        setSearchText('');
-
-        // Add a temporary "loading" message
-        setMessages((prevMessages) => [
-            ...prevMessages,
-            { text: "Bob is typing...", isBot: true, isLoading: true, showSpinner: true }
-        ]);
-        setLoading(true);
-
-<<<<<<< HEAD
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                            try {
-                                const controller = new AbortController();
-                                const timeoutId = setTimeout(() => controller.abort(), 30000);
-                                const token = await AsyncStorage.getItem('userToken');
-
-                                const headers = {
-                                    'Content-Type': 'application/json',
-                                };
-                                if (token) {
-                                    headers.Authorization = `Token ${token}`;
-                                }
-
-                                const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
-                                    method: 'POST',
-                                    headers,
-                                    body: JSON.stringify({
-                                        message: userRequest,
-                                        refund_phase: refund_phase,
-                                        wrong_drink_phase: wrong_drink_phase,
-                                        order_num: order_num,
-                                        drink_nums: drink_nums
-                                    }),
-                                    signal: controller.signal,
-                                });
-
-                                clearTimeout(timeoutId);
-
-                                if (response.ok) {
-                                    const rawData = await response.json();
-                                    const data = rawData.data ?? rawData;
-                                    const botResponse = data.responses;
-                                    const response_refund_phase = data.refund_phase ?? data.refundPhase;
-                                    const response_wrong_drink_phase = data.wrong_drink_phase ?? data.wrongDrinkPhase;
-                                    setOrderNum(data.order_num ?? data.orderNum);
-                                    setDrinkNums(data.drink_nums ?? data.drinkNums);
-                    // Replace the "typing" message with the actual response
-                    setMessages((prevMessages) =>
-                        prevMessages.map((msg, index) =>
-                            msg.isLoading ? { text: botResponse, isBot: true } : msg
-                        )
-                    );
-
-                     const token = await AsyncStorage.getItem('userToken');
-                     const orderResponse = await fetch(`${BASE_URL}/backend/orders/${order_num}/`, {
-                         method: 'GET',
-                         headers: {
-                             'Content-Type': 'application/json',
-                             'Authorization': `Token ${token}`,
-                         }
-                     });
-
-                     if(orderResponse.ok){
-                         const drinksForPost = [];
-                         const orderData = await orderResponse.json();
-                          // Use Promise.all to wait for all drink data to resolve
-                         const drinkPromises = orderData.data.drinks.map(drink => getDrinkData(drink));
-                         const resolvedDrinks = await Promise.all(drinkPromises); // Wait for all Promises to resolve
-
-                        // Add resolved drink data to drinksForPost
-                        drinksForPost.push(...resolvedDrinks);
-
-                        console.log("Backend complaints:", JSON.stringify(drinksForPost));
-
-                        await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(drinksForPost));
-                        await AsyncStorage.setItem("orderNum", order_num.toString());
-                    }else{
-                        console.log("problem getting order data")
-                    }
-                    setTimeout(() => {
-                        navigation.navigate("PostCheckout");
-                      }, 2000); // 2000 milliseconds = 2 seconds
-                    
-                } else {
-                    setRefundPhase(response_refund_phase);
-                    setWrongDrinkPhase(response_wrong_drink_phase);
-                    // Update messages with bot's response
-                    // Replace the "typing" message with the actual response
-                    setMessages((prevMessages) =>
-                        prevMessages.map((msg, index) =>
-                            msg.isLoading ? { text: botResponse, isBot: true } : msg
-                        )
-                    );
-                }
-            } else {
-                throw new Error("Failed to fetch response from chatbot");
-            }
-        } catch (error) {
-            console.error('Error in chatbot response:', error);
-            // Replace the "typing" message with an error message
-            setMessages((prevMessages) =>
-                prevMessages.map((msg, index) =>
-                    msg.isLoading ? { text: "I'm having trouble understanding right now. Please try again later.", isBot: true } : msg
-                )
-            );
-        }finally{
-            setLoading(false);
-        }
-    };
-
-     const getDrinkData = async (drinkID) => {
+    const getDrinkData = async (drinkID) => {
          try {
              const token = await AsyncStorage.getItem('userToken');
              const drinkData = await fetch(`${BASE_URL}/backend/drinks/${drinkID}/`, {
@@ -167,14 +33,142 @@ const ComplaintsPage = () => {
                  return null;
              }
      
-             const jsonForm = await drinkData.json();
-             return jsonForm.data;
+            const jsonForm = await drinkData.json();
+            return jsonForm.data;
         } catch (error) {
-            console.error("Error getting drink:", error);
+            console.error('Error getting drink:', error);
             return null;
         }
-    }
-    
+    };
+
+    const complaintAI = async () => {
+        if (searchText.trim() === '') return;
+
+        const userRequest = searchText.trim();
+
+        setMessages((prev) => [...prev, { text: userRequest, isBot: false }]);
+        setSearchText('');
+
+        setMessages((prev) => [
+            ...prev,
+            { text: "Bob is typing...", isBot: true, isLoading: true },
+        ]);
+        setLoading(true);
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            const token = await AsyncStorage.getItem('userToken');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers.Authorization = `Token ${token}`;
+            }
+
+            const response = await fetch(`${BASE_URL}/backend/chatbot/`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    message: userRequest,
+                    refund_phase,
+                    wrong_drink_phase,
+                    order_num,
+                    drink_nums,
+                }),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`Chatbot HTTP ${response.status}`);
+            }
+
+            const rawData = await response.json();
+            const data = rawData.data ?? rawData;
+            const botText = data.responses;
+            const botResponse =
+                typeof botText === 'string'
+                    ? botText
+                    : Array.isArray(botText)
+                      ? botText.join('\n')
+                      : data.message ?? JSON.stringify(data);
+
+            const responseRefundPhase = data.refund_phase ?? data.refundPhase;
+            const responseWrongDrinkPhase = data.wrong_drink_phase ?? data.wrongDrinkPhase;
+
+            if (responseRefundPhase != null) setRefundPhase(responseRefundPhase);
+            if (responseWrongDrinkPhase != null) setWrongDrinkPhase(responseWrongDrinkPhase);
+            if (data.order_num != null || data.orderNum != null) {
+                setOrderNum(data.order_num ?? data.orderNum);
+            }
+            if (data.drink_nums != null || data.drinkNums != null) {
+                setDrinkNums(data.drink_nums ?? data.drinkNums);
+            }
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.isLoading ? { text: botResponse, isBot: true } : msg
+                )
+            );
+
+            const resolvedOrderNum = data.order_num ?? data.orderNum;
+            const shouldLoadOrder =
+                resolvedOrderNum != null &&
+                resolvedOrderNum !== '' &&
+                resolvedOrderNum !== 'none' &&
+                token;
+
+            if (shouldLoadOrder) {
+                try {
+                    const orderResponse = await fetch(
+                        `${BASE_URL}/backend/orders/${resolvedOrderNum}/`,
+                        {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Token ${token}`,
+                            },
+                        }
+                    );
+
+                    if (orderResponse.ok) {
+                        const orderPayload = await orderResponse.json();
+                        const orderData = orderPayload.data ?? orderPayload;
+                        const drinks = orderData.drinks ?? [];
+                        const drinkPromises = drinks.map((id) => getDrinkData(id));
+                        const resolvedDrinks = (await Promise.all(drinkPromises)).filter(Boolean);
+
+                        console.log('Backend complaints:', JSON.stringify(resolvedDrinks));
+
+                        await AsyncStorage.setItem('purchasedDrinks', JSON.stringify(resolvedDrinks));
+                        await AsyncStorage.setItem('orderNum', String(resolvedOrderNum));
+
+                        setTimeout(() => navigation.navigate('PostCheckout'), 2000);
+                    } else {
+                        console.log('problem getting order data');
+                    }
+                } catch (orderErr) {
+                    console.error('Order fetch after chatbot:', orderErr);
+                }
+            }
+        } catch (error) {
+            console.error('Error in chatbot response:', error);
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.isLoading
+                        ? {
+                              text: "I'm having trouble understanding right now. Please try again later.",
+                              isBot: true,
+                          }
+                        : msg
+                )
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Scroll to the bottom of the chat whenever messages update
     useEffect(() => {
         if (scrollViewRef.current) {
