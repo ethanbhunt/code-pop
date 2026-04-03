@@ -10,15 +10,14 @@ const { width: windowWidth } = Dimensions.get('window');
 const SeasonalCarousel = () => {
     const navigation = useNavigation();
     const [data, setData] = useState([]);
+    const [errorMessage, setErrorMessage] = useState('');
 
       useEffect(() => {
           const fetchData = async () => {
                try {
                   const token = await AsyncStorage.getItem('userToken');
-                  
-                  // Skip fetching drinks if user is not logged in
                   if (!token) {
-                      console.log('No token found, skipping drinks fetch');
+                      setErrorMessage('Sign in to view seasonal drinks.');
                       setData([]);
                       return;
                   }
@@ -38,6 +37,7 @@ const SeasonalCarousel = () => {
                   } else {
                       console.warn(`Failed to fetch drinks. Status: ${response.status}`);
                   }
+                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
                   return;
               }
@@ -47,6 +47,7 @@ const SeasonalCarousel = () => {
               // Check if response has error or data is missing
               if (!drinksResponse.data || !Array.isArray(drinksResponse.data)) {
                   console.warn('No drinks data available or invalid response:', drinksResponse);
+                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
                   return;
               }
@@ -66,9 +67,11 @@ const SeasonalCarousel = () => {
               }));
               console.log('parsed')
               console.log(parsedDrinks);
+              setErrorMessage('');
               setData(parsedDrinks);
               } catch (error) {
                   console.error('Error fetching drinks:', error);
+                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
               } 
           };
@@ -80,7 +83,7 @@ const SeasonalCarousel = () => {
          try {
              const token = await AsyncStorage.getItem('userToken');
              // Get the list from AsyncStorage, or initialize as an empty array
-             cartList = await AsyncStorage.getItem("checkoutList");
+             const cartList = await AsyncStorage.getItem("checkoutList");
              const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
              const cleanedList = currentList.filter(item => item !== null && item !== undefined);
 
@@ -149,6 +152,7 @@ const SeasonalCarousel = () => {
 
     return (
         <View style={{ height: 250 }}>
+            {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
             <Carousel
                 width={250}
                 sliderWidth={windowWidth}
@@ -188,6 +192,12 @@ const styles = StyleSheet.create({
     },
     drinkPrice: {
         fontSize: 16,
+    },
+    errorMessage: {
+        marginBottom: 8,
+        textAlign: 'center',
+        color: '#7a4a00',
+        fontWeight: '700',
     },
     image: {
         width: 150,

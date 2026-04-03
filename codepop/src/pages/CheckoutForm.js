@@ -26,15 +26,14 @@ export default function CheckoutForm(totalPrice) {
 
       const payload = await response.json();
       if (!response.ok) {
-        console.log('Demo mode: payment intent unavailable, using fallback checkout.', payload);
-        return null;
+        throw new Error(payload.error || 'Unable to initialize payment sheet.');
       }
 
       const { paymentIntent, ephemeralKey, customer } = payload;
       setStripeNum(paymentIntent);
       return { paymentIntent, ephemeralKey, customer };
     } catch (error) {
-      console.log('Demo mode: payment intent request failed, using fallback checkout.', error);
+      console.error('Failed to fetch payment sheet parameters:', error);
       return null;
     }
   };
@@ -48,7 +47,7 @@ export default function CheckoutForm(totalPrice) {
     const paymentParams = await fetchPaymentSheetParams();
     if (!paymentParams) {
       setPaymentSheetReady(false);
-      setLoading(true);
+      setLoading(false);
       return;
     }
 
@@ -67,12 +66,12 @@ export default function CheckoutForm(totalPrice) {
       allowsDelayedPaymentMethods: true,
     });
     if (!error) {
-      setLoading(true);
+      setLoading(false);
       setPaymentSheetReady(true);
     } else {
       setPaymentSheetReady(false);
-      setLoading(true);
-      console.log('Demo mode: payment sheet init failed, using fallback checkout.', error.message);
+      setLoading(false);
+      console.error('Payment sheet initialization failed:', error.message);
     }
   };
 
@@ -83,8 +82,10 @@ export default function CheckoutForm(totalPrice) {
       const currentList = cartList ? JSON.parse(cartList) : [];
       
       const userId = await AsyncStorage.getItem('userId');
-      
-      console.log(currentList);
+
+      if (!stripeNum) {
+        throw new Error('Payment intent is missing.');
+      }
 
       const response = await fetch(`${BASE_URL}/backend/orders/`, {
         method: 'POST',
@@ -96,7 +97,7 @@ export default function CheckoutForm(totalPrice) {
           Drinks: currentList,
           OrderStatus: 'pending',
           PaymentStatus: 'paid',
-          StripeID: stripeNum || `demo_${Date.now()}`,
+          StripeID: stripeNum,
         })
       });
 
@@ -108,7 +109,7 @@ export default function CheckoutForm(totalPrice) {
         await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
       } else {
         console.error('Failed to create order:', response.status, await response.text());
-        return null;
+        throw new Error('Failed to create order.');
       }
 
  
@@ -160,7 +161,6 @@ export default function CheckoutForm(totalPrice) {
   const finalizeCheckout = async () => {
     const orderCreated = await removeAllDrinks();
     if (!orderCreated) {
-      console.warn('Order issue: unable to create order during demo checkout.');
       return;
     }
 
@@ -179,19 +179,18 @@ export default function CheckoutForm(totalPrice) {
 
   const openPaymentSheet = async () => {
     if (!paymentSheetReady) {
-      console.log('Demo checkout mode: payment gateway unavailable, continuing without popup.');
-      await finalizeCheckout();
+      console.error('Payment sheet is not ready. Checkout cannot continue.');
       return;
     }
 
     const { error } = await presentPaymentSheet();
   
     if (error) {
-      console.log('Demo mode: payment sheet error, using fallback checkout.', error.code, error.message);
-      await finalizeCheckout();
-    } else {
-      await finalizeCheckout();
+      console.error('Payment sheet presentation failed:', error.code, error.message);
+      return;
     }
+
+    await finalizeCheckout();
   };
 
   return { initializePaymentSheet, openPaymentSheet, loading };

@@ -19,10 +19,10 @@ import { LevelDatastore } from "datastore-level"
 import { createOrbitDB, OrbitDBAccessController } from "@orbitdb/core"
 import fs from "fs"
 
-const HTTP_PORT = 3000
-const LIBP2P_PORT = 4000
-const REPO = "./repo-bootstrap"
-const PEER_INFO_FILE = "./peer-info.json"
+const HTTP_PORT = parseInt(process.env.PORT || "3000")
+const LIBP2P_PORT = parseInt(process.env.LIBP2P_PORT || "4000")
+const REPO = process.env.ORBITDB_REPO_DIR || "./repo-bootstrap"
+const PEER_INFO_FILE = process.env.ORBITDB_PEER_INFO_FILE || "./peer-info.json"
 
 const app = express()
 app.use(express.json())

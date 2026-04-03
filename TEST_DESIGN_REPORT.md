@@ -241,3 +241,10 @@ These are manual tests that verify the full user journey across frontend and bac
 - [ ] Expand frontend test coverage if time permits
 - [ ] Add dashboard component tests using Vitest
 - [ ] Document any new tests written during the testing sprint
+
+## 9. Deployment and Runtime Validation
+
+- Add smoke tests for the OrbitDB peer endpoint and the Dockerized backend/dashboard startup paths.
+- Validate that the mobile app can point at a non-local backend URL through environment configuration.
+- Add Cloud Run deployment checks to confirm each container starts with the expected env vars and ports.
+- Record any cross-service failures that appear only when the services run together under Docker Compose.

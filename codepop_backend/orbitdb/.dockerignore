@@ -1,0 +1,5 @@
+node_modules/
+repo-*/
+peer-info.json
+coverage/
+.git/

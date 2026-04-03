@@ -3,7 +3,7 @@ services:
   postgres:
     image: postgres:16
     container_name: postgres
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: codepop_database
       POSTGRES_USER: postgres
@@ -13,6 +13,85 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  orbitdb-bootstrap:
+    build:
+      context: ./codepop_backend/orbitdb
+      dockerfile: Dockerfile
+    container_name: orbitdb-bootstrap
+    restart: unless-stopped
+    command: node bootstrap-node.js
+    environment:
+      PORT: 3000
+      LIBP2P_PORT: 4000
+      ORBITDB_REPO_DIR: /data/bootstrap
+      ORBITDB_PEER_INFO_FILE: /shared/peer-info.json
+    ports:
+      - "3000:3000"
+      - "4000:4000"
+    volumes:
+      - orbitdb_bootstrap_data:/data/bootstrap
+      - orbitdb_peer_info:/shared
+
+  orbitdb-peer:
+    build:
+      context: ./codepop_backend/orbitdb
+      dockerfile: Dockerfile
+    container_name: orbitdb-peer
+    restart: unless-stopped
+    depends_on:
+      - orbitdb-bootstrap
+    command: sh -c "until [ -f /shared/peer-info.json ]; do echo 'waiting for OrbitDB bootstrap'; sleep 1; done; node peer-node.js"
+    environment:
+      PORT: 3001
+      LIBP2P_PORT: 4001
+      ORBITDB_REPO_DIR: /data/peer
+      ORBITDB_PEER_INFO_FILE: /shared/peer-info.json
+    ports:
+      - "3001:3001"
+      - "4001:4001"
+    volumes:
+      - orbitdb_peer_data:/data/peer
+      - orbitdb_peer_info:/shared
+
+  backend:
+    build:
+      context: .
+      dockerfile: codepop_backend/Dockerfile
+    container_name: codepop-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_SECRET_KEY: "change-me"
+      POSTGRES_DB: codepop_database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    command: sh -c "python manage.py migrate && gunicorn codepop_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120"
+    ports:
+      - "8000:8000"
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: codepop-dashboard
+    restart: unless-stopped
+    depends_on:
+      - orbitdb-peer
+    environment:
+      ORBITDB_API_URL: http://orbitdb-peer:3001
+      DJANGO_API_URL: http://backend:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3002:3000"
+
 volumes:
   postgres_data:
+  orbitdb_bootstrap_data:
+  orbitdb_peer_data:
+  orbitdb_peer_info:
 

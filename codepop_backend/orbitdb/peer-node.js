@@ -38,9 +38,9 @@ import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
-const LIBP2P_PORT = HTTP_PORT + 1000
-const REPO = `./repo-peer-${HTTP_PORT}`
-const PEER_INFO_FILE = "./peer-info.json"
+const LIBP2P_PORT = parseInt(process.env.LIBP2P_PORT || String(HTTP_PORT + 1000))
+const REPO = process.env.ORBITDB_REPO_DIR || `./repo-peer-${HTTP_PORT}`
+const PEER_INFO_FILE = process.env.ORBITDB_PEER_INFO_FILE || "./peer-info.json"
 
 const app = express()
 

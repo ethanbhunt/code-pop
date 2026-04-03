@@ -2,36 +2,26 @@
 
 Follow these instructions to set up the CodePop project on your machine.
 
-## Show-and-Tell Quick Start (Live Order Journey Demo)
+## Local Development Quick Start
 
-Use this flow if you only need to run the live demo quickly.
+Use this flow to run the app locally against the backend and OrbitDB services.
 
-1. Start backend server
-  - Open terminal in `codepop_backend`
+1. Start the backend server
+  - Open a terminal in `codepop_backend`
   - Activate your Python environment
   - Run `python manage.py migrate`
   - Run `python manage.py runserver <YOUR IP ADDRESS:8000>`
 
-2. Start frontend app
-  - Open terminal in `codepop`
-  - Confirm `ip_address.js` uses the same backend IP
+2. Start the frontend app
+  - Open a terminal in `codepop`
+  - Set `EXPO_PUBLIC_BACKEND_URL` if you are not using the default local endpoint
   - Run `npm install`
   - Run `npm run android`
 
-3. Demo accounts (seeded by clean script)
-  - Manager: username `staff`, password `password`
-  - User: username `test`, password `password`
-
-4. Live Order Journey demo script (4-6 min)
-  - User account: create cart and complete checkout
-  - User screen opens PostCheckout and shows live status/ETA timeline
-  - Manager account: open Manager Dashboard and use `Live Order Controls`
-  - Click `Next` to move order `pending -> processing -> completed`
-  - Optionally click `+2 min` to demonstrate ETA delay handling
-
-5. Reliability fallback
-  - If network becomes unstable, PostCheckout automatically enters presentation fallback mode
-  - Continue the demo from manager controls and call out recovery behavior
+3. Start the OrbitDB service
+  - Open a terminal in `codepop_backend/orbitdb`
+  - Run the bootstrap node first, then the peer node
+  - Confirm the frontend app points at the OrbitDB HTTP endpoint you expose
 
 ## Backend Setup
 
@@ -154,7 +144,7 @@ Use this flow if you only need to run the live demo quickly.
      ```bash
      python manage.py runserver <YOUR IP ADDRESS:8000>
      ```
-   - **Note:** Each time you run the server, you will need to provide your IP address. This is necessary for the Android emulator to access the backend. you can find your ip address by using the ipconfig command in the terminal
+  - **Note:** Each time you run the server, you will need to provide your IP address unless you are using a stable deployed endpoint. You can find your local IP address by using `ipconfig` in the terminal.
 
 ## Frontend Setup
 
@@ -167,7 +157,7 @@ Use this flow if you only need to run the live demo quickly.
      [Android Studio Downloads](https://developer.android.com/studio)
 
 3. **Start the React Native App**
-   - Navigate to the `codepop` directory and edit the base URL in `ip_address.js` to match your IP address and port.
+  - Navigate to the `codepop` directory and set `EXPO_PUBLIC_BACKEND_URL` to match your backend or OrbitDB endpoint.
    - Install dependancies by running the following command:
       ```bash
       npm install
@@ -178,6 +168,21 @@ Use this flow if you only need to run the live demo quickly.
      ```
 
 You should now see a terminal displaying logs from the backend and an Android emulator with the app running!
+
+## Docker and Cloud Run
+
+1. **Local container stack**
+  - Run `docker compose up --build` from the repository root.
+  - This starts PostgreSQL, the Django backend, the OrbitDB bootstrap node, the OrbitDB peer node, and the dashboard.
+
+2. **Cloud build**
+  - Run `gcloud builds submit --config cloudbuild.yaml` after setting your Artifact Registry repository name and region substitutions.
+  - The build template produces backend, dashboard, and OrbitDB images.
+
+3. **Cloud Run deployment**
+  - Deploy the backend and dashboard images to Cloud Run.
+  - Deploy the OrbitDB peer as the production API endpoint for the frontend apps.
+  - Set `EXPO_PUBLIC_BACKEND_URL`, `ORBITDB_API_URL`, and database credentials per environment.
 
 ## After Installation
 Once everything has been installed you should be able to run the code using the following commands
@@ -196,7 +201,7 @@ Once everything has been installed you should be able to run the code using the 
     npm run android
     ```
 ## Troubleshooting
-If you encounter any issues while setting up or running the application, feel free to reach out to Wesley for help!
+If you encounter any issues while setting up or running the application, check the backend, OrbitDB, and frontend terminal output first.
 
 ### Pulling Down Changes To The Backend
 The backend database can get into a not so happy state when you pull new changes down from the repo where it doesn't see migrations to be made and as of such won't create needed tables in the database.

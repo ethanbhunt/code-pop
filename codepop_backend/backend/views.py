@@ -598,7 +598,6 @@ class OrderOperations(viewsets.ModelViewSet):
         if requested_status:
             order.OrderStatus = requested_status
 
-        # Delay is demo-friendly: adjust ETA up/down without changing lifecycle.
         if delay_minutes != 0:
             base_eta = order.PickupTime or self._estimate_ready_time(order.Drinks.count())
             order.PickupTime = base_eta + timedelta(minutes=delay_minutes)

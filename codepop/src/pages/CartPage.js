@@ -107,9 +107,7 @@ const CartPage = () => {
       const currentList = cartList ? JSON.parse(cartList) : [];
       const token = await AsyncStorage.getItem('userToken');
   
-      // Don't delete seasonal carousel items (items prepopulated in the database after running clean script)
       if (drinkId > 6) {
-        // Delete the drink from the backend database
         await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
           method: 'DELETE',
           headers: {
@@ -117,13 +115,6 @@ const CartPage = () => {
             'Authorization': `Token ${token}`,
           },
         });
-        // // Delete the drink from the backend database
-        // await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
-        //   method: 'DELETE',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        // });
       }
   
       // Update the local state to remove the drink from the cart page

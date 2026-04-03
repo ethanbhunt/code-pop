@@ -185,8 +185,7 @@ urlpatterns = [
     path('orders/<int:pk>/', order_detail, name='order_detail'),
     path('orders/<int:pk>/fulfill/', order_fulfill, name='order_fulfill'),
 
-    # Demo/live-order control endpoint
-    # - POST: Advance status and/or shift ETA minutes for manager-led demos.
+    # Live-order control endpoint for manager status updates
     path('orders/<int:pk>/live-status/', order_live_status, name='order_live_status'),
 
     # Retrieve Orders by UserID

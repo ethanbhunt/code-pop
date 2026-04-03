@@ -1,3 +1,10 @@
-const BASE_URL = 'http://localhost:3001'; // Your backend URL
+const resolveBaseUrl = () => {
+	const configuredUrl =
+		process.env.EXPO_PUBLIC_BACKEND_URL ||
+		process.env.EXPO_PUBLIC_API_URL ||
+		'http://localhost:3001';
 
-export { BASE_URL };
+	return configuredUrl.replace(/\/$/, '');
+};
+
+export const BASE_URL = resolveBaseUrl();

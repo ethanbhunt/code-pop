@@ -16,8 +16,6 @@ const PostCheckout = () => {
   const [orderStatus, setOrderStatus] = useState('pending');
   const [estimatedReadyTime, setEstimatedReadyTime] = useState(null);
   const [lastUpdateText, setLastUpdateText] = useState('Waiting for first update...');
-  const [isDemoFallback, setIsDemoFallback] = useState(false);
-  const [failedPollCount, setFailedPollCount] = useState(0);
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
@@ -34,21 +32,19 @@ const PostCheckout = () => {
         try {
           let { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
-            setErrorMsg(null);
+            setErrorMsg('Location permission is required to show your proximity to the store.');
             return;
           }
 
           try {
-                // Fetch the user's current location
-                let currentLocation = await Location.getCurrentPositionAsync({});
-                setLocation(currentLocation);
-              } catch (error) {
-                // Silently ignore location fetch failures in demo mode
-                setErrorMsg(null);
-              }
+            let currentLocation = await Location.getCurrentPositionAsync({});
+            setLocation(currentLocation);
+            setErrorMsg(null);
+          } catch (error) {
+            setErrorMsg('Unable to read your current location. Arrival tracking may be unavailable.');
+          }
         } catch (error) {
-          // Silently ignore permission request failures in demo mode
-          setErrorMsg(null);
+          setErrorMsg('Unable to request location permission. Arrival tracking may be unavailable.');
         }
       })();
     }, []);
@@ -218,18 +214,9 @@ const PostCheckout = () => {
         setOrderStatus(data.OrderStatus || 'pending');
         setEstimatedReadyTime(data.PickupTime || null);
         setLastUpdateText(`Live update: ${new Date().toLocaleTimeString()}`);
-        setFailedPollCount(0);
-        setIsDemoFallback(false);
       } catch (error) {
         console.error('Polling order failed:', error);
-        setFailedPollCount((prev) => {
-          const next = prev + 1;
-          if (next >= 2) {
-            setIsDemoFallback(true);
-            setLastUpdateText('Presentation mode: network unstable, using local fallback.');
-          }
-          return next;
-        });
+        setLastUpdateText('Live update unavailable. Retrying...');
       }
     };
 
@@ -317,9 +304,7 @@ const PostCheckout = () => {
           <Text style={styles.headerStatus}>Status: {getStatusLabel(orderStatus)}</Text>
           <Text style={styles.headerEta}>ETA: {minutes}:{seconds}</Text>
           <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
-          {isDemoFallback && (
-            <Text style={styles.fallbackBadge}>Presentation fallback active</Text>
-          )}
+          {errorMsg && <Text style={styles.errorMessage}>{errorMsg}</Text>}
 
           <View style={styles.progressRail}>
             <View style={[styles.progressFill, { width: progressPercent }]} />
@@ -548,15 +533,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 8,
     fontWeight: '600',
-  },
-  fallbackBadge: {
-    color: '#022B3A',
-    backgroundColor: '#BFDBF7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 15,
-    fontWeight: 'bold',
-    marginBottom: 8,
   },
   timelineRow: {
     width: '100%',

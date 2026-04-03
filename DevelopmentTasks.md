@@ -3,6 +3,12 @@
 ## Purpose
 This document is the execution-ready development backlog for the CodePop development phase. It consolidates all required implementation tasks and detailed steps.
 
+## Current Delivery Focus
+- Normalize the frontend runtime around OrbitDB-backed endpoints and shared environment configuration.
+- Finish container and Cloud Run scaffolding for the backend, dashboard, and OrbitDB peer services.
+- Expand automated test coverage for the mobile app, dashboard, backend, and OrbitDB endpoints.
+- Consolidate the remaining setup and deployment guidance into the canonical root docs.
+
 ## Task Index (Prioritized)
 
 ### MUST HAVE
