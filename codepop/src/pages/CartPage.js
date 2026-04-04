@@ -24,20 +24,20 @@ const CartPage = () => {
   }, [totalPrice]);
 
   const normalizeDrink = (rawDrink) => {
-    if (!rawDrink) {
-      return null;
-    }
+     if (!rawDrink) {
+       return null;
+     }
 
-    return {
-      drinkId: rawDrink.DrinkID ?? rawDrink.drinkId,
-      size: rawDrink.Size ?? rawDrink.size,
-      sodaUsed: rawDrink.SodaUsed ?? rawDrink.sodaUsed ?? [],
-      syrupsUsed: rawDrink.SyrupsUsed ?? rawDrink.syrupsUsed ?? [],
-      addIns: rawDrink.AddIns ?? rawDrink.addIns ?? [],
-      ice: rawDrink.Ice ?? rawDrink.ice,
-      price: rawDrink.Price ?? rawDrink.price,
-    };
-  };
+     return {
+       drinkId: rawDrink.DrinkID ?? rawDrink.drinkId,
+       size: rawDrink.Size ?? rawDrink.size,
+       sodaUsed: rawDrink.SodaUsed ?? rawDrink.sodaUsed ?? rawDrink.sodas ?? [],
+       syrupsUsed: rawDrink.SyrupsUsed ?? rawDrink.syrupsUsed ?? rawDrink.syrups ?? [],
+       addIns: rawDrink.AddIns ?? rawDrink.addIns ?? [],
+       ice: rawDrink.Ice ?? rawDrink.ice,
+       price: rawDrink.Price ?? rawDrink.price,
+     };
+   };
 
   const fetchDrinks = async () => {
     try {
@@ -148,31 +148,31 @@ const CartPage = () => {
   
 
   const renderDrinkItem = (drink) => (
-    <View style={styles.drinkContainer}>
-      <Text style={styles.drinkTitle}>{drink.Size} Drink</Text>
-      <Text style={styles.drinkDetail}>Soda: {drink.SodaUsed.join(', ')}</Text>
-      <Text style={styles.drinkDetail}>Ice: {drink.Ice}</Text>
-      {drink.SyrupsUsed && drink.SyrupsUsed.length > 0 && (
-        <Text style={styles.drinkDetail}>Syrups: {drink.SyrupsUsed.join(', ')}</Text>
-      )}
-      {drink.AddIns && drink.AddIns.length > 0 && (
-        <Text style={styles.drinkDetail}>Add-ins: {drink.AddIns.join(', ')}</Text>
-      )}
-      <Text style={styles.priceText}>${calculatePrice(drink).toFixed(2)}</Text>
+     <View style={styles.drinkContainer}>
+       <Text style={styles.drinkTitle}>{drink.size} Drink</Text>
+       <Text style={styles.drinkDetail}>Soda: {Array.isArray(drink.sodaUsed) ? drink.sodaUsed.join(', ') : 'N/A'}</Text>
+       <Text style={styles.drinkDetail}>Ice: {drink.ice}</Text>
+       {drink.syrupsUsed && drink.syrupsUsed.length > 0 && (
+         <Text style={styles.drinkDetail}>Syrups: {drink.syrupsUsed.join(', ')}</Text>
+       )}
+       {drink.addIns && drink.addIns.length > 0 && (
+         <Text style={styles.drinkDetail}>Add-ins: {drink.addIns.join(', ')}</Text>
+       )}
+       <Text style={styles.priceText}>${calculatePrice(drink).toFixed(2)}</Text>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.iconButton}>
-          <Icon name="create-outline" size={20} color="#1F7A8C" />
-          <Text style={styles.iconButtonText}>Edit</Text>
-        </TouchableOpacity>
+       <View style={styles.buttonRow}>
+         <TouchableOpacity onPress={() => navigation.navigate('UpdateDrink', { drink })} style={styles.iconButton}>
+           <Icon name="create-outline" size={20} color="#1F7A8C" />
+           <Text style={styles.iconButtonText}>Edit</Text>
+         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => removeDrink(drink.DrinkID)} style={styles.iconButton}>
-          <Icon name="close-circle-outline" size={20} color="#c0392b" />
-          <Text style={styles.removeButtonText}>Remove</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+         <TouchableOpacity onPress={() => removeDrink(drink.drinkId)} style={styles.iconButton}>
+           <Icon name="close-circle-outline" size={20} color="#c0392b" />
+           <Text style={styles.removeButtonText}>Remove</Text>
+         </TouchableOpacity>
+       </View>
+     </View>
+   );
 
   const goToCheckout = () => {
     navigation.navigate('Checkout');

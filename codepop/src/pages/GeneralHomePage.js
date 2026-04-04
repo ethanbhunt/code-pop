@@ -226,26 +226,26 @@ const GeneralHomePage = () => {
 
         <Text style={styles.dailyDrinksTitle}>Drinks of The Day</Text>
 
-        {drinksLoading ? (
-          <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 16 }} />
-        ) : (
-          dailyDrinks.map((drink, index) => {
-            const soda = Array.isArray(drink.SodaUsed) ? drink.SodaUsed : [drink.SodaUsed];
-            const syrups = Array.isArray(drink.SyrupsUsed) ? drink.SyrupsUsed : [];
-            const addIns = Array.isArray(drink.AddIns) ? drink.AddIns : [];
+         {drinksLoading ? (
+           <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 16 }} />
+         ) : (
+           dailyDrinks.map((drink, index) => {
+             const soda = Array.isArray(drink.sodaUsed || drink.SodaUsed || drink.sodas) ? (drink.sodaUsed || drink.SodaUsed || drink.sodas) : [(drink.sodaUsed || drink.SodaUsed || drink.sodas)];
+             const syrups = Array.isArray(drink.syrupsUsed || drink.SyrupsUsed || drink.syrups) ? (drink.syrupsUsed || drink.SyrupsUsed || drink.syrups) : [];
+             const addIns = Array.isArray(drink.addIns || drink.AddIns) ? (drink.addIns || drink.AddIns) : [];
 
-            return (
-              <View key={index} style={styles.dailyDrinkCard}>
-                <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
-                <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(soda)}</Text>
-                <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrups)}</Text>
-                <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addIns)}</Text>
-                <Text style={styles.dailyDrinkDetail}>Size: {drink.Size || '24oz'}</Text>
-                <Text style={styles.dailyDrinkDetail}>Ice: {drink.Ice || 'regular'}</Text>
-              </View>
-            );
-          })
-        )}
+             return (
+               <View key={index} style={styles.dailyDrinkCard}>
+                 <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
+                 <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(soda)}</Text>
+                 <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrups)}</Text>
+                 <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addIns)}</Text>
+                 <Text style={styles.dailyDrinkDetail}>Size: {drink.size || drink.Size || '24oz'}</Text>
+                 <Text style={styles.dailyDrinkDetail}>Ice: {drink.ice || drink.Ice || 'regular'}</Text>
+               </View>
+             );
+           })
+         )}
 
       </ScrollView>
       <NavBar />

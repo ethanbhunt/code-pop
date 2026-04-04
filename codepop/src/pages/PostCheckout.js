@@ -113,17 +113,21 @@ const PostCheckout = () => {
 
         const allUsedItems = [];
 
-        parsedDrinks.forEach((drink) => {
-          if (drink.SyrupsUsed && drink.SyrupsUsed.length > 0) {
-            allUsedItems.push(...drink.SyrupsUsed);
-          }
-          if (drink.SodaUsed && drink.SodaUsed.length > 0) {
-            allUsedItems.push(...drink.SodaUsed);
-          }
-          if (drink.AddIns && drink.AddIns.length > 0) {
-            allUsedItems.push(...drink.AddIns);
-          }
-        });
+         parsedDrinks.forEach((drink) => {
+           const syrups = drink.syrupsUsed || drink.SyrupsUsed || drink.syrups;
+           const sodas = drink.sodaUsed || drink.SodaUsed || drink.sodas;
+           const addins = drink.addIns || drink.AddIns;
+           
+           if (syrups && syrups.length > 0) {
+             allUsedItems.push(...syrups);
+           }
+           if (sodas && sodas.length > 0) {
+             allUsedItems.push(...sodas);
+           }
+           if (addins && addins.length > 0) {
+             allUsedItems.push(...addins);
+           }
+         });
 
         const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
           method: 'GET',
