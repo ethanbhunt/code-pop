@@ -2,20 +2,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as Font from 'expo-font';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { BASE_URL } from '../../ip_address';
 import NavBar from '../components/NavBar';
 
 const GeneralHomePage = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isManager, setIsManager] = useState(false);
-  const [name, setName] = useState(null);
-  const [activeOrderNum, setActiveOrderNum] = useState(null);
-  const [dailyDrinks, setDailyDrinks] = useState([]);
-  const [drinksLoading, setDrinksLoading] = useState(true);
-  const navigation = useNavigation();
+   const [isLoggedIn, setIsLoggedIn] = useState(false);
+   const [isAdmin, setIsAdmin] = useState(false);
+   const [isManager, setIsManager] = useState(false);
+   const [name, setName] = useState(null);
+   const [activeOrderNum, setActiveOrderNum] = useState(null);
+   const [dailyDrinks, setDailyDrinks] = useState([]);
+   const [drinksLoading, setDrinksLoading] = useState(true);
+   const [storeModalVisible, setStoreModalVisible] = useState(false);
+   const [stores, setStores] = useState([]);
+   const [storesLoading, setStoresLoading] = useState(false);
+   const navigation = useNavigation();
 
   // Check login status when the screen gains focus
   useFocusEffect(
@@ -156,15 +159,75 @@ const GeneralHomePage = () => {
     navigation.navigate('ManagerDash');  // Navigate to the login page
   };
 
-  const formatDrinkField = (value) => {
-    if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
-    return value || 'None';
-  };
+   const formatDrinkField = (value) => {
+     if (Array.isArray(value)) return value.length ? value.join(', ') : 'None';
+     return value || 'None';
+   };
 
-  // Generate drinks button press
-  const generateDrinks = () => {
-    navigation.navigate('CreateDrink', { fromGenerateButton: true });
-  }
+   const fetchStores = async () => {
+     try {
+       setStoresLoading(true);
+       const token = await AsyncStorage.getItem('userToken');
+
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
+       const response = await fetch(`${BASE_URL}/backend/stores`, {
+         method: 'GET',
+         headers,
+       });
+
+       if (!response.ok) {
+         throw new Error(`Failed to fetch stores. Status: ${response.status}`);
+       }
+
+       const data = await response.json();
+       setStores(data.data || []);
+     } catch (error) {
+       console.error('Error fetching stores:', error);
+     } finally {
+       setStoresLoading(false);
+     }
+   };
+
+   const handleSelectStore = async (store) => {
+     try {
+       await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
+       await AsyncStorage.setItem('selectedStoreName', store.name);
+       
+       if (store.databases) {
+         await AsyncStorage.setItem('selectedStoreDbAddresses', JSON.stringify(store.databases));
+       }
+
+       setStoreModalVisible(false);
+     } catch (error) {
+       console.error('Error selecting store:', error);
+       Alert.alert('Error', 'Failed to select store. Please try again.');
+     }
+   };
+
+   const promptStoreSelection = async () => {
+     try {
+       const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
+       if (!selectedStoreId) {
+         await fetchStores();
+         setStoreModalVisible(true);
+       }
+     } catch (error) {
+       console.error('Error checking store selection:', error);
+     }
+   };
+
+   // Generate drinks button press
+   const generateDrinks = async () => {
+     await promptStoreSelection();
+     navigation.navigate('CreateDrink', { fromGenerateButton: true });
+   }
 
   const goToTrackOrder = () => {
     if (!activeOrderNum) {
@@ -176,6 +239,14 @@ const GeneralHomePage = () => {
 
   const selectDailyDrink = async (drink) => {
     try {
+      // Check if store is selected
+      const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
+      if (!selectedStoreId) {
+        await fetchStores();
+        setStoreModalVisible(true);
+        return;
+      }
+
       const token = await AsyncStorage.getItem('userToken');
       
       // Prepare drink data with all required fields
@@ -318,10 +389,53 @@ const GeneralHomePage = () => {
             })
          )}
 
-      </ScrollView>
-      <NavBar />
-    </View>
-  );
+       </ScrollView>
+       
+       {/* Store Selection Modal */}
+       <Modal
+         visible={storeModalVisible}
+         transparent={true}
+         animationType="fade"
+         onRequestClose={() => setStoreModalVisible(false)}
+       >
+         <View style={styles.modalOverlay}>
+           <View style={styles.modalContent}>
+             <View style={styles.modalHeader}>
+               <Text style={styles.modalTitle}>Select a Store</Text>
+               <TouchableOpacity onPress={() => setStoreModalVisible(false)}>
+                 <Icon name="close" size={24} color="#1c334d" />
+               </TouchableOpacity>
+             </View>
+
+             {storesLoading ? (
+               <ActivityIndicator size="large" color="#1F7A8C" style={styles.loadingContainer} />
+             ) : (
+               <ScrollView style={styles.storesList}>
+                 {stores.map((store) => (
+                   <TouchableOpacity
+                     key={store.storeId}
+                     style={styles.storeOption}
+                     onPress={() => handleSelectStore(store)}
+                   >
+                     <View style={styles.storeInfo}>
+                       <Icon name="storefront" size={20} color="#1F7A8C" />
+                       <View style={styles.storeDetails}>
+                         <Text style={styles.storeName}>{store.name}</Text>
+                         <Text style={styles.storeAddress}>{store.address || 'Address not available'}</Text>
+                       </View>
+                     </View>
+                     <Icon name="chevron-forward" size={20} color="#1F7A8C" />
+                   </TouchableOpacity>
+                 ))}
+               </ScrollView>
+             )}
+           </View>
+         </View>
+       </Modal>
+
+       <NavBar />
+     </View>
+   );
 };
 
 const styles = StyleSheet.create({
@@ -468,11 +582,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F7A8C',
     alignItems: 'center',
   },
-  addToCartButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+   addToCartButtonText: {
+     color: '#fff',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   modalOverlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     justifyContent: 'flex-end',
+   },
+   modalContent: {
+     backgroundColor: '#ffffff',
+     borderTopLeftRadius: 24,
+     borderTopRightRadius: 24,
+     maxHeight: '80%',
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 16,
+     paddingVertical: 16,
+     borderBottomWidth: 1,
+     borderBottomColor: '#E1E5F2',
+   },
+   modalTitle: {
+     fontSize: 18,
+     fontWeight: '800',
+     color: '#1c334d',
+   },
+   loadingContainer: {
+     paddingVertical: 40,
+   },
+   storesList: {
+     paddingHorizontal: 12,
+     paddingVertical: 12,
+   },
+   storeOption: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 12,
+     paddingVertical: 14,
+     marginVertical: 6,
+     backgroundColor: '#f9f9f9',
+     borderRadius: 12,
+     borderWidth: 1,
+     borderColor: '#E1E5F2',
+   },
+   storeInfo: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+     gap: 12,
+   },
+   storeDetails: {
+     flex: 1,
+   },
+   storeName: {
+     fontSize: 16,
+     fontWeight: '700',
+     color: '#1c334d',
+     marginBottom: 4,
+   },
+   storeAddress: {
+     fontSize: 12,
+     color: '#49627d',
+     fontWeight: '500',
+   },
 });
 
 export default GeneralHomePage;

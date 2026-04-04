@@ -204,8 +204,8 @@ async function start() {
 
     // ── Additional standalone endpoints ────────────────────────────────────────
     
-    // POST /backend/create-payment-intent - Create Stripe payment intent
-    app.post("/backend/create-payment-intent", authenticate, (req, res) => {
+    // POST /backend/create-payment-intent - Create Stripe payment intent (public endpoint, no authentication required)
+    app.post("/backend/create-payment-intent", (req, res) => {
       try {
         const { amount } = req.body
         
@@ -221,7 +221,7 @@ async function start() {
         res.json({
           paymentIntent: `pi_demo_${Date.now()}`,
           ephemeralKey: `ek_demo_${Date.now()}`,
-          customer: `cus_demo_${req.user?.userId || Date.now()}`
+          customer: `cus_demo_${req.user?.userId || `guest_${Date.now()}`}`
         })
       } catch (error) {
         console.error("Error creating payment intent:", error)
@@ -306,7 +306,7 @@ async function start() {
         
         res.json({
           status: "success",
-          response: response["response"],
+          response: response,
           orderId: order_num,
           timestamp: new Date().toISOString()
         })
@@ -319,8 +319,8 @@ async function start() {
       }
     })
     
-    // GET /backend/email/:orderNum - Send order confirmation email
-    app.get("/backend/email/:orderNum", authenticate, (req, res) => {
+    // GET /backend/email/:orderNum - Send order confirmation email (public endpoint, no authentication required)
+    app.get("/backend/email/:orderNum", (req, res) => {
       try {
         const orderNum = req.params.orderNum
         
