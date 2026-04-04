@@ -129,14 +129,22 @@ const PostCheckout = () => {
            }
          });
 
-         const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-           method: 'GET',
-           headers: { 'Content-Type': 'application/json' },
-         });
-         const inventoryData = await inventoryResponse.json();
+          // Get the selected store ID from AsyncStorage
+          const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+          const token = await AsyncStorage.getItem('userToken');
+          
+          // Fetch inventory from the selected store's database
+          const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/?storeId=${selectedStoreId}`, {
+            method: 'GET',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+          });
+          const inventoryData = await inventoryResponse.json();
 
-         // Handle both response formats: {inventory_items: [...]} and {status, data: {inventory_items: [...]}}
-         const inventoryItems = inventoryData.inventory_items || inventoryData.data?.inventory_items || [];
+          // Handle both response formats: {inventory_items: [...]} and {status, data: {inventory_items: [...]}}
+          const inventoryItems = inventoryData.inventory_items || inventoryData.data?.inventory_items || inventoryData.data || [];
          
          if (!inventoryItems || inventoryItems.length === 0) {
            console.warn('No inventory items found in response');

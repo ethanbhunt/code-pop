@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView, Alert } from 'react-native';
 import NavBar from '../components/NavBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect, NavigationContainer } from '@react-navigation/native';
@@ -190,9 +190,37 @@ const CartPage = () => {
      </View>
    );
 
-  const goToCheckout = () => {
-    navigation.navigate('Checkout');
-  };
+   const goToCheckout = () => {
+     navigation.navigate('Checkout');
+   };
+
+   const handlePaymentWithStoreCheck = async () => {
+     try {
+       const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
+       const selectedStoreName = await AsyncStorage.getItem('selectedStoreName');
+
+       if (!selectedStoreId || selectedStoreId === '0' || storeName === 'Select Store') {
+         Alert.alert(
+           'Select a Store',
+           'Please select a store before checking out.',
+           [
+             { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+             { 
+               text: 'Select Store', 
+               onPress: () => navigation.navigate('StoreSelect')
+             }
+           ]
+         );
+         return;
+       }
+
+       // Store is selected, proceed to payment
+       openPaymentSheet();
+     } catch (error) {
+       console.error('Error checking store selection:', error);
+       Alert.alert('Error', 'Failed to process checkout');
+     }
+   };
   
 
    return (
@@ -227,10 +255,10 @@ const CartPage = () => {
 
           <Text style={styles.totalText}>Cart Total: ${totalPrice.toFixed(2)}</Text>
 
-          <TouchableOpacity onPress={openPaymentSheet} style={styles.payButton}>
-            <Icon name="card-outline" size={24} color="#fff" />
-            <Text style={styles.payButtonText}>Pay Now</Text>
-          </TouchableOpacity>
+           <TouchableOpacity onPress={handlePaymentWithStoreCheck} style={styles.payButton}>
+             <Icon name="card-outline" size={24} color="#fff" />
+             <Text style={styles.payButtonText}>Pay Now</Text>
+           </TouchableOpacity>
         </View>
 
         <NavBar />

@@ -168,6 +168,53 @@ const GeneralHomePage = () => {
     navigation.navigate('PostCheckout');
   }
 
+  const selectDailyDrink = async (drink) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      
+      // Prepare drink data with all required fields
+      const drinkData = {
+        name: drink.name || "Daily Drink",
+        sodaUsed: Array.isArray(drink.sodaUsed) ? drink.sodaUsed : [drink.sodaUsed],
+        syrupsUsed: Array.isArray(drink.syrupsUsed) ? drink.syrupsUsed : [],
+        addIns: Array.isArray(drink.addIns) ? drink.addIns : [],
+        price: drink.price || 2.00,
+        userCreated: true,
+        size: drink.size || "24oz",
+        ice: drink.ice || "regular"
+      };
+
+      // Create the drink in the backend
+      const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify(drinkData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add drink. Status: ${response.status}`);
+      }
+
+      // Add drink to checkout list
+      let cartList = await AsyncStorage.getItem("checkoutList");
+      const currentList = cartList ? JSON.parse(cartList) : [];
+      const data = await response.json();
+      const drinkID = data.data?.drinkId || data.drinkId;
+      const updatedList = [...currentList, drinkID];
+      await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+
+      Alert.alert('Success', 'Drink added to cart!', [
+        { text: 'OK', onPress: () => navigation.navigate('Cart') }
+      ]);
+    } catch (error) {
+      console.error('Error adding daily drink:', error);
+      Alert.alert('Error', 'Failed to add drink to cart');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.contentContainer}>
@@ -248,6 +295,12 @@ const GeneralHomePage = () => {
                   <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addInsArray)}</Text>
                   <Text style={styles.dailyDrinkDetail}>Size: {drink.size || drink.Size || '24oz'}</Text>
                   <Text style={styles.dailyDrinkDetail}>Ice: {drink.ice || drink.Ice || 'regular'}</Text>
+                  <TouchableOpacity 
+                    onPress={() => selectDailyDrink(drink)} 
+                    style={styles.addToCartButton}
+                  >
+                    <Text style={styles.addToCartButtonText}>Add to Cart</Text>
+                  </TouchableOpacity>
                 </View>
               );
             })
@@ -394,6 +447,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#49627d',
     marginBottom: 3,
+  },
+  addToCartButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#1F7A8C',
+    alignItems: 'center',
+  },
+  addToCartButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

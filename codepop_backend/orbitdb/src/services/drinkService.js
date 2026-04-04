@@ -65,7 +65,7 @@ export async function createDrink(data) {
     sodaUsed: validateStringArray(finalSodas) ? finalSodas : [],
     price: parseFloat(price),
     size: size || "16oz",
-    ice: ice || "regular",
+    ice: (ice || "regular").toLowerCase(),
     userCreated: Boolean(userCreated),
     isVegan: Boolean(isVegan) || false,
     isGlutenFree: Boolean(isGlutenFree) || false,
