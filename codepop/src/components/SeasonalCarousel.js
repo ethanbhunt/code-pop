@@ -75,35 +75,41 @@ const SeasonalCarousel = () => {
           fetchData();
       }, []);
     
-     const createDrink = async (item) => {
-         console.log('creating drinks...');
-         try {
-             const token = await AsyncStorage.getItem('userToken');
-             // Get the list from AsyncStorage, or initialize as an empty array
-             cartList = await AsyncStorage.getItem("checkoutList");
-             const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
-             const cleanedList = currentList.filter(item => item !== null && item !== undefined);
+      const createDrink = async (item) => {
+          console.log('creating drinks...');
+          try {
+              const token = await AsyncStorage.getItem('userToken');
+              // Get the list from AsyncStorage, or initialize as an empty array
+              cartList = await AsyncStorage.getItem("checkoutList");
+              const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
+              const cleanedList = currentList.filter(item => item !== null && item !== undefined);
 
-             // Log the item to ensure it has the correct structure
-             console.log(item);
+              // Log the item to ensure it has the correct structure
+              console.log(item);
 
-             const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                 method: 'POST',
-                 headers: {
-                   'Content-Type': 'application/json',
-                   'Authorization': `Token ${token}`,
-                 },
-                 body: JSON.stringify({ 
-                   name: item.name,  // Example name for the drink
-                   sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
-                   syrupsUsed: item.syrupsUsed,
-                   addIns: item.addIns,
-                   price: item.price,
-                   userCreated: true,    // Assuming the user is creating the drink
-                   size: '24oz',
-                   ice: 'regular',
-                 })
-              });
+              const headers = {
+                'Content-Type': 'application/json',
+              };
+              
+              // Only add authorization header if token exists
+              if (token) {
+                headers['Authorization'] = `Token ${token}`;
+              }
+
+              const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ 
+                    name: item.name,  // Example name for the drink
+                    sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
+                    syrupsUsed: item.syrupsUsed,
+                    addIns: item.addIns,
+                    price: item.price,
+                    userCreated: true,    // Assuming the user is creating the drink
+                    size: '24oz',
+                    ice: 'regular',
+                  })
+               });
             
               if (!response.ok) {
                 throw new Error(`Failed to add drink. Status: ${response.status}`);

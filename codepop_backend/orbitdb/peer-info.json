@@ -24,10 +24,10 @@
     "store-3-revenues": "/orbitdb/zdpuApYTjAyxmisHn8DBuUpizLSC6dvXKVGNTSt4yWq6V8nHb"
   },
   "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWNrrEnuhMijycoPsTvrvczpTkdqtJQFaXD73fSpU5SnZM",
-    "/ip4/192.168.68.53/tcp/4000/p2p/12D3KooWNrrEnuhMijycoPsTvrvczpTkdqtJQFaXD73fSpU5SnZM",
-    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWNrrEnuhMijycoPsTvrvczpTkdqtJQFaXD73fSpU5SnZM"
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWQi2Ekz5PVM6eYxNvcmDv48cCgFZPPqYb7PjGcfKJZtua",
+    "/ip4/192.168.68.53/tcp/4000/p2p/12D3KooWQi2Ekz5PVM6eYxNvcmDv48cCgFZPPqYb7PjGcfKJZtua",
+    "/ip4/10.0.0.3/tcp/4000/p2p/12D3KooWQi2Ekz5PVM6eYxNvcmDv48cCgFZPPqYb7PjGcfKJZtua"
   ],
-  "peerId": "12D3KooWNrrEnuhMijycoPsTvrvczpTkdqtJQFaXD73fSpU5SnZM",
-  "timestamp": "2026-04-04T19:10:05.242Z"
+  "peerId": "12D3KooWQi2Ekz5PVM6eYxNvcmDv48cCgFZPPqYb7PjGcfKJZtua",
+  "timestamp": "2026-04-04T19:31:01.932Z"
 }

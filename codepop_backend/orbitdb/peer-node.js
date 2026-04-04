@@ -232,8 +232,8 @@ async function start() {
       }
     })
     
-    // GET /backend/generate - Generate random drink or user-specific AI drink
-    app.get("/backend/generate", authenticate, (req, res) => {
+    // GET /backend/generate - Generate random drink (public endpoint, no authentication required)
+    app.get("/backend/generate", (req, res) => {
       try {
         // Return a random AI-generated drink with complete information
         const drinks = [

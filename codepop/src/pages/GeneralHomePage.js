@@ -48,12 +48,18 @@ const GeneralHomePage = () => {
 
        const fetchOneDrink = async () => {
          const token = await AsyncStorage.getItem('userToken');
+         const headers = {
+           'Content-Type': 'application/json',
+         };
+         
+         // Only add authorization header if token exists
+         if (token) {
+           headers['Authorization'] = `Token ${token}`;
+         }
+         
          const res = await fetch(`${BASE_URL}/backend/generate/`, {
            method: 'GET',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Token ${token}`,
-           }
+           headers,
          });
          if (!res.ok) return null;
          return res.json();
@@ -185,12 +191,18 @@ const GeneralHomePage = () => {
       };
 
       // Create the drink in the backend
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Token ${token}`;
+      }
+
       const response = await fetch(`${BASE_URL}/backend/drinks/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
+        headers,
         body: JSON.stringify(drinkData)
       });
 

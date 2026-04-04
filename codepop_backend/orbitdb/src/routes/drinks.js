@@ -13,8 +13,8 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", count: drinks.length, data: drinks })
 }))
 
-// POST /backend/drinks - Create drink
-router.post("/", authenticate, asyncHandler(async (req, res) => {
+// POST /backend/drinks - Create drink (public endpoint, no authentication required)
+router.post("/", asyncHandler(async (req, res) => {
   const drink = await drinkService.createDrink(req.body)
   res.status(201).json({ status: "created", data: drink })
 }))

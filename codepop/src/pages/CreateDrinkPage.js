@@ -54,25 +54,31 @@ const CreateDrinkPage = () => {
 
          Alert.alert("Choose soda, size, and ice before adding your drink.")
 
-       }else{
-         const token = await AsyncStorage.getItem('userToken');
-         const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Token ${token}`,
-           },
-           body: JSON.stringify({ 
-             name: "Drink in User Cart",  // Example name for the drink
-             sodaUsed: SodaUsed,  // Default value if SodaUsed is null
-             syrupsUsed: SyrupsUsed,
-             addIns: AddIns,
-             price: 2.00,
-             userCreated: true,    // Assuming the user is creating the drink
-             size: selectedSize,
-             ice: selectedIce,
-           })
-        });
+        }else{
+          const token = await AsyncStorage.getItem('userToken');
+          const headers = {
+            'Content-Type': 'application/json',
+          };
+          
+          // Only add authorization header if token exists
+          if (token) {
+            headers['Authorization'] = `Token ${token}`;
+          }
+
+          const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ 
+              name: "Drink in User Cart",  // Example name for the drink
+              sodaUsed: SodaUsed,  // Default value if SodaUsed is null
+              syrupsUsed: SyrupsUsed,
+              addIns: AddIns,
+              price: 2.00,
+              userCreated: true,    // Assuming the user is creating the drink
+              size: selectedSize,
+              ice: selectedIce,
+            })
+         });
     
         if (!response.ok) {
           throw new Error(`Failed to add drink. Status: ${response.status}`);

@@ -23,12 +23,18 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
          console.warn('sodaUsed is empty, setting to default soda.');
        }
    
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       // Only add authorization header if token exists
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
          method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
+         headers,
          body: JSON.stringify({
            name: "AI drink", // Example name for the drink
            sodaUsed: sodaUsed, // Make sure it's an array with at least one item
