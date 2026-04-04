@@ -83,21 +83,21 @@ const CreateDrinkPage = () => {
         if (!response.ok) {
           throw new Error(`Failed to add drink. Status: ${response.status}`);
         }
-         // add drink item (the drinks ID) to the checkout list from App.js
-         try{
-           // gets list of out of storage on your phone
-           let cartList = await AsyncStorage.getItem("checkoutList");
-           const currentList = cartList ? JSON.parse(cartList) : [];
-           // takes the response (what we get after we create a drink) and extracts the drinkID
-           const data = await response.json();
-           const drinkID = data.data?.drinkId || data.drinkId;
-           // add the drinkID to the checkoutList
-           const updatedList = [...currentList, drinkID]
-           // Saves the checkoutlist back into the storage on the phone
-           await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-         }catch (error){
-           console.log(error)
-         }
+         // add drink item (full drink object) to the checkout list from App.js
+          try{
+            // gets list of out of storage on your phone
+            let cartList = await AsyncStorage.getItem("checkoutList");
+            const currentList = cartList ? JSON.parse(cartList) : [];
+            // takes the response (what we get after we create a drink) and extracts the full drink object
+            const data = await response.json();
+            const drinkObject = data.data || data;
+            // add the full drink object to the checkoutList
+            const updatedList = [...currentList, drinkObject]
+            // Saves the checkoutlist back into the storage on the phone
+            await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+          }catch (error){
+            console.log(error)
+          }
 
         navigation.navigate('Cart');
       }

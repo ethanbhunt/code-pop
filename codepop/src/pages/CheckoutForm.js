@@ -16,17 +16,23 @@ export default function CheckoutForm(totalPrice) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
 
-  const fetchPaymentSheetParams = async () => {
-     try {
-       const token = await AsyncStorage.getItem('userToken');
-       const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
-         method: 'POST',
-         headers: { 
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
-         body: JSON.stringify({ amount: totalPrice }), // amount in dollars
-       });
+   const fetchPaymentSheetParams = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = { 
+          'Content-Type': 'application/json',
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ amount: totalPrice }), // amount in dollars
+        });
 
       const payload = await response.json();
       if (!response.ok) {
@@ -80,34 +86,42 @@ export default function CheckoutForm(totalPrice) {
     }
   };
 
-  // function to remove all drinks from cart list after sucessful checkout
-  const removeAllDrinks = async () => {
-    try {
-      const cartList = await AsyncStorage.getItem('checkoutList');
-      const currentList = cartList ? JSON.parse(cartList) : [];
-      
-       const userId = await AsyncStorage.getItem('userId');
-       const token = await AsyncStorage.getItem('userToken');
-       const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+   // function to remove all drinks from cart list after sucessful checkout
+   const removeAllDrinks = async () => {
+     try {
+       const cartList = await AsyncStorage.getItem('checkoutList');
+       const currentList = cartList ? JSON.parse(cartList) : [];
        
-       console.log(currentList);
+        const userId = await AsyncStorage.getItem('userId');
+        const token = await AsyncStorage.getItem('userToken');
+        const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+        
+        console.log(currentList);
 
-       const response = await fetch(`${BASE_URL}/backend/orders/`, {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
-         body: JSON.stringify({
-           storeId: parseInt(selectedStoreId),
-           drinkIds: currentList,
-           UserID: userId,
-           Drinks: currentList,
-           OrderStatus: 'pending',
-           PaymentStatus: 'paid',
-           StripeID: stripeNum || `demo_${Date.now()}`,
-         })
-      });
+        // Extract drink IDs from the full drink objects
+        const drinkIds = currentList.map(drink => {
+          if (typeof drink === 'object' && drink.drinkId) {
+            return drink.drinkId;
+          }
+          return drink; // Fallback for backward compatibility with just IDs
+        });
+
+        const response = await fetch(`${BASE_URL}/backend/orders/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`,
+          },
+          body: JSON.stringify({
+            storeId: parseInt(selectedStoreId),
+            drinkIds: drinkIds,
+            UserID: userId,
+            Drinks: drinkIds,
+            OrderStatus: 'pending',
+            PaymentStatus: 'paid',
+            StripeID: stripeNum || `demo_${Date.now()}`,
+          })
+       });
 
        // Check if the request was successful
        if (response.ok) {
@@ -142,17 +156,23 @@ export default function CheckoutForm(totalPrice) {
     }
   };
 
-  const addRevenue = async () => {
-    try {
-      const orderNum = await AsyncStorage.getItem("orderNum");
-    
-       const token = await AsyncStorage.getItem('userToken');
-       const response = await fetch(`${BASE_URL}/backend/revenues/`, {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
+   const addRevenue = async () => {
+     try {
+       const orderNum = await AsyncStorage.getItem("orderNum");
+     
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        const response = await fetch(`${BASE_URL}/backend/revenues/`, {
+          method: 'POST',
+          headers,
           body: JSON.stringify({
             OrderID: Number(orderNum),
             TotalAmount: Number(totalPrice),
@@ -178,18 +198,24 @@ export default function CheckoutForm(totalPrice) {
       return;
     }
 
-     await addRevenue();
-     const savedOrderNum = await AsyncStorage.getItem("orderNum");
-     if (savedOrderNum) {
-       const token = await AsyncStorage.getItem('userToken');
-       await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
-         method: 'GET',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
-       });
-     }
+      await addRevenue();
+      const savedOrderNum = await AsyncStorage.getItem("orderNum");
+      if (savedOrderNum) {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
+          method: 'GET',
+          headers,
+        });
+      }
     navigation.navigate('PostCheckout');
   };
 

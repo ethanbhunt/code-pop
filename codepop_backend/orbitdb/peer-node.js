@@ -238,9 +238,9 @@ async function start() {
         // Return a random AI-generated drink with complete information
         const drinks = [
           { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
-          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "20oz", ice: "light" },
+          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "24oz", ice: "light" },
           { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
-          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "20oz", ice: "extra" },
+          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "24oz", ice: "extra" },
           { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
         ]
         
@@ -306,7 +306,7 @@ async function start() {
         
         res.json({
           status: "success",
-          response: response,
+          response: response["response"],
           orderId: order_num,
           timestamp: new Date().toISOString()
         })

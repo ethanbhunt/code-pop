@@ -56,17 +56,17 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
       }
   
       const responseData = await response.json();
-      const data = responseData.data;
+      const drinkObject = responseData.data || responseData;
       // gets list of out of storage on your phone
       let cartList = await AsyncStorage.getItem("checkoutList");
       const currentList = cartList ? JSON.parse(cartList) : [];
   
-      const drinkID = data.drinkId; // assuming the response contains drinkId
-      const updatedList = [...currentList, drinkID];
+      // Store the full drink object, not just the ID
+      const updatedList = [...currentList, drinkObject];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
 
       console.log("created drink obj")
-      return data; // Return the created drink object
+      return drinkObject; // Return the created drink object
   
     } catch (error) {
       console.error('Error in createObj:', error); // Log any other errors

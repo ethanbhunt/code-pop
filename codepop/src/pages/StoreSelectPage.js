@@ -33,12 +33,18 @@ const StoreSelectPage = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
 
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Only add authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Token ${token}`;
+      }
+
       const response = await fetch(`${BASE_URL}/backend/stores`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
+        headers,
       });
 
       if (!response.ok) {

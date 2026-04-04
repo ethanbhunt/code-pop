@@ -11,9 +11,9 @@ const router = express.Router()
 
 /**
  * GET /backend/stores
- * List all stores (authenticated users can view)
+ * List all stores (public endpoint, no authentication required)
  */
-router.get("/", authenticate, async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
     const offset = parseInt(req.query.offset || 0)
     const limit = Math.min(parseInt(req.query.limit || 50), 100)

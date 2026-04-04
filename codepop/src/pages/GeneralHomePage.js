@@ -210,12 +210,12 @@ const GeneralHomePage = () => {
         throw new Error(`Failed to add drink. Status: ${response.status}`);
       }
 
-      // Add drink to checkout list
+      // Add drink to checkout list with full drink object
       let cartList = await AsyncStorage.getItem("checkoutList");
       const currentList = cartList ? JSON.parse(cartList) : [];
       const data = await response.json();
-      const drinkID = data.data?.drinkId || data.drinkId;
-      const updatedList = [...currentList, drinkID];
+      const drinkObject = data.data || data;
+      const updatedList = [...currentList, drinkObject];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
 
       Alert.alert('Success', 'Drink added to cart!', [

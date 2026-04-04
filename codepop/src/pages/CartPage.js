@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
 import NavBar from '../components/NavBar';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect, NavigationContainer } from '@react-navigation/native';
@@ -9,11 +9,14 @@ import {BASE_URL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CartPage = () => {
-  const navigation = useNavigation();
-  const [drinks, setDrinks] = useState([]);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [storeName, setStoreName] = useState('Select Store');
-  const { initializePaymentSheet, openPaymentSheet, loading } = CheckoutForm(totalPrice);
+   const navigation = useNavigation();
+   const [drinks, setDrinks] = useState([]);
+   const [totalPrice, setTotalPrice] = useState(0);
+   const [storeName, setStoreName] = useState('Select Store');
+   const [storeModalVisible, setStoreModalVisible] = useState(false);
+   const [stores, setStores] = useState([]);
+   const [storesLoading, setStoresLoading] = useState(false);
+   const { initializePaymentSheet, openPaymentSheet, loading } = CheckoutForm(totalPrice);
 
   useFocusEffect(React.useCallback(() => {
     fetchDrinks();
@@ -25,16 +28,71 @@ const CartPage = () => {
     initializePaymentSheet(); // Initialize payment sheet on page load
   }, [totalPrice]);
 
-  const loadStoreName = async () => {
-    try {
-      const stored = await AsyncStorage.getItem('selectedStoreName');
-      if (stored) {
-        setStoreName(stored);
-      }
-    } catch (error) {
-      console.error('Error loading store name:', error);
-    }
-  };
+   const loadStoreName = async () => {
+     try {
+       const stored = await AsyncStorage.getItem('selectedStoreName');
+       if (stored) {
+         setStoreName(stored);
+       }
+     } catch (error) {
+       console.error('Error loading store name:', error);
+     }
+   };
+
+   const fetchStores = async () => {
+     try {
+       setStoresLoading(true);
+       const token = await AsyncStorage.getItem('userToken');
+
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       // Only add authorization header if token exists
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
+       const response = await fetch(`${BASE_URL}/backend/stores`, {
+         method: 'GET',
+         headers,
+       });
+
+       if (!response.ok) {
+         throw new Error(`Failed to fetch stores. Status: ${response.status}`);
+       }
+
+       const data = await response.json();
+       setStores(data.data || []);
+     } catch (error) {
+       console.error('Error fetching stores:', error);
+       Alert.alert('Error', 'Failed to load stores. Please try again.');
+     } finally {
+       setStoresLoading(false);
+     }
+   };
+
+   const handleSelectStore = async (store) => {
+     try {
+       // Save store selection to AsyncStorage
+       await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
+       await AsyncStorage.setItem('selectedStoreName', store.name);
+       
+       // If store has database addresses, save them too
+       if (store.databases) {
+         await AsyncStorage.setItem('selectedStoreDbAddresses', JSON.stringify(store.databases));
+       }
+
+       setStoreName(store.name);
+       setStoreModalVisible(false);
+       
+       // Proceed to payment after store selection
+       openPaymentSheet();
+     } catch (error) {
+       console.error('Error selecting store:', error);
+       Alert.alert('Error', 'Failed to select store. Please try again.');
+     }
+   };
 
   const normalizeDrink = (rawDrink) => {
      if (!rawDrink) {
@@ -52,41 +110,35 @@ const CartPage = () => {
      };
    };
 
-  const fetchDrinks = async () => {
-    try {
-      const cartList = await AsyncStorage.getItem('checkoutList');
-      const currentList = cartList ? JSON.parse(cartList) : [];
-      const token = await AsyncStorage.getItem('userToken');
+   const fetchDrinks = async () => {
+     try {
+       const cartList = await AsyncStorage.getItem('checkoutList');
+       const currentList = cartList ? JSON.parse(cartList) : [];
 
-      // Save drinks to a separate AsyncStorage list before removing - so the user can rate them on the post checkout page
-      // await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(currentList));
-
-      const fetchedDrinks = [];
+       // Use locally stored drink objects instead of fetching from backend
+       // This allows unauthenticated users to view their cart
+       const fetchedDrinks = [];
        for (let i = 0; i < currentList.length; i++) {
-          const response = await fetch(`${BASE_URL}/backend/drinks/${currentList[i]}/`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Token ${token}`,
-            },
-          });
-          const responseData = await response.json();
-          const drink = normalizeDrink(responseData.data || responseData);
-          if (drink != null && drink.size && drink.sodaUsed && drink.ice) {
-            fetchedDrinks.push(drink); // Add each drink to the temporary array
-          }
+         const drinkObject = currentList[i];
+         // Check if it's a full drink object or just an ID (for backward compatibility)
+         if (typeof drinkObject === 'object' && drinkObject.drinkId) {
+           const drink = normalizeDrink(drinkObject);
+           if (drink != null && drink.size && drink.sodaUsed && drink.ice) {
+             fetchedDrinks.push(drink);
+           }
+         }
        }
-      
-      setDrinks(fetchedDrinks); // Update state once after all drinks are collected
-      calculateTotalPrice(fetchedDrinks); // Calculate total price after fetching drinks
+       
+       setDrinks(fetchedDrinks); // Update state once after all drinks are collected
+       calculateTotalPrice(fetchedDrinks); // Calculate total price after fetching drinks
 
-      // Store the full drink objects in `purchasedDrinks` instead of IDs
-      await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(fetchedDrinks));
-  
-    } catch (error) {
-      console.error('Failed to get drinks: ', error);
-    }
-  };
+       // Store the full drink objects in `purchasedDrinks` for order tracking
+       await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(fetchedDrinks));
+   
+     } catch (error) {
+       console.error('Failed to get drinks: ', error);
+     }
+   };
   
   
 
@@ -200,17 +252,9 @@ const CartPage = () => {
        const selectedStoreName = await AsyncStorage.getItem('selectedStoreName');
 
        if (!selectedStoreId || selectedStoreId === '0' || storeName === 'Select Store') {
-         Alert.alert(
-           'Select a Store',
-           'Please select a store before checking out.',
-           [
-             { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-             { 
-               text: 'Select Store', 
-               onPress: () => navigation.navigate('StoreSelect')
-             }
-           ]
-         );
+         // Show store selection modal
+         await fetchStores();
+         setStoreModalVisible(true);
          return;
        }
 
@@ -226,16 +270,9 @@ const CartPage = () => {
    return (
      <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
          <View style={styles.container}>
-         <View style={styles.headerContainer}>
-           <Text style={styles.headerText}>Your Drinks</Text>
-           <TouchableOpacity 
-             style={styles.storeButton}
-             onPress={() => navigation.navigate('StoreSelect')}
-           >
-             <Icon name="storefront-outline" size={18} color="#fff" />
-             <Text style={styles.storeButtonText}>{storeName}</Text>
-           </TouchableOpacity>
-         </View>
+        <View style={styles.headerContainer}>
+            <Text style={styles.headerText}>Your Drinks</Text>
+          </View>
 
         {Array.isArray(drinks) && drinks.length === 0 ? (
           <Text style={styles.emptyCartText}>Your cart is empty</Text>
@@ -261,10 +298,52 @@ const CartPage = () => {
            </TouchableOpacity>
         </View>
 
-        <NavBar />
-        </View>
-    </StripeProvider>
-  );
+         <NavBar />
+         
+         {/* Store Selection Modal */}
+         <Modal
+           visible={storeModalVisible}
+           transparent={true}
+           animationType="fade"
+           onRequestClose={() => setStoreModalVisible(false)}
+         >
+           <View style={styles.modalOverlay}>
+             <View style={styles.modalContent}>
+               <View style={styles.modalHeader}>
+                 <Text style={styles.modalTitle}>Select a Store</Text>
+                 <TouchableOpacity onPress={() => setStoreModalVisible(false)}>
+                   <Icon name="close" size={24} color="#1c334d" />
+                 </TouchableOpacity>
+               </View>
+
+               {storesLoading ? (
+                 <ActivityIndicator size="large" color="#1F7A8C" style={styles.loadingContainer} />
+               ) : (
+                 <ScrollView style={styles.storesList}>
+                   {stores.map((store) => (
+                     <TouchableOpacity
+                       key={store.storeId}
+                       style={styles.storeOption}
+                       onPress={() => handleSelectStore(store)}
+                     >
+                       <View style={styles.storeInfo}>
+                         <Icon name="storefront" size={20} color="#1F7A8C" />
+                         <View style={styles.storeDetails}>
+                           <Text style={styles.storeName}>{store.name}</Text>
+                           <Text style={styles.storeAddress}>{store.address || 'Address not available'}</Text>
+                         </View>
+                       </View>
+                       <Icon name="chevron-forward" size={20} color="#1F7A8C" />
+                     </TouchableOpacity>
+                   ))}
+                 </ScrollView>
+               )}
+             </View>
+           </View>
+         </Modal>
+         </View>
+     </StripeProvider>
+   );
 };
 
 const styles = StyleSheet.create({
@@ -391,9 +470,73 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginLeft: 8,
   },
-  listContainer: {
-    paddingBottom: 10,
-  },
+   listContainer: {
+     paddingBottom: 10,
+   },
+   modalOverlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     justifyContent: 'flex-end',
+   },
+   modalContent: {
+     backgroundColor: '#ffffff',
+     borderTopLeftRadius: 24,
+     borderTopRightRadius: 24,
+     maxHeight: '80%',
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 16,
+     paddingVertical: 16,
+     borderBottomWidth: 1,
+     borderBottomColor: '#E1E5F2',
+   },
+   modalTitle: {
+     fontSize: 18,
+     fontWeight: '800',
+     color: '#1c334d',
+   },
+   loadingContainer: {
+     paddingVertical: 40,
+   },
+   storesList: {
+     paddingHorizontal: 12,
+     paddingVertical: 12,
+   },
+   storeOption: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 12,
+     paddingVertical: 14,
+     marginVertical: 6,
+     backgroundColor: '#f9f9f9',
+     borderRadius: 12,
+     borderWidth: 1,
+     borderColor: '#E1E5F2',
+   },
+   storeInfo: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+     gap: 12,
+   },
+   storeDetails: {
+     flex: 1,
+   },
+   storeName: {
+     fontSize: 16,
+     fontWeight: '700',
+     color: '#1c334d',
+     marginBottom: 4,
+   },
+   storeAddress: {
+     fontSize: 12,
+     color: '#49627d',
+     fontWeight: '500',
+   },
 });
 export default CartPage;
 
