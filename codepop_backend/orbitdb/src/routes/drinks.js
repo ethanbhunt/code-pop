@@ -33,7 +33,16 @@ router.put("/:id", authenticate, asyncHandler(async (req, res) => {
 
 // DELETE /backend/drinks/:id - Delete drink
 router.delete("/:id", authenticate, asyncHandler(async (req, res) => {
-  await drinkService.deleteDrink(parseInt(req.params.id, 10))
+  try {
+    await drinkService.deleteDrink(parseInt(req.params.id, 10))
+  } catch (error) {
+    // Return success even if drink doesn't exist (idempotent delete)
+    if (error.message === "Drink not found") {
+      console.warn(`Attempted to delete non-existent drink ID: ${req.params.id}`)
+      return res.json({ status: "deleted", note: "Drink not found but delete considered successful" })
+    }
+    throw error
+  }
   res.json({ status: "deleted" })
 }))
 

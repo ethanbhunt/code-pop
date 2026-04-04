@@ -62,6 +62,16 @@ app.use((req, res, next) => {
   next()
 })
 
+// Normalize trailing slashes - remove trailing slash for matching but keep query params
+app.use((req, res, next) => {
+  if (req.path.length > 1 && req.path.endsWith('/')) {
+    const baseUrl = req.baseUrl || req.path
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''
+    req.url = baseUrl.slice(0, -1) + queryString
+  }
+  next()
+})
+
 // Request logging
 app.use((req, res, next) => {
   const startTime = Date.now()
