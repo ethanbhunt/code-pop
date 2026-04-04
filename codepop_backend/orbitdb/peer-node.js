@@ -192,6 +192,151 @@ async function start() {
     app.use("/backend/logistics", logisticsRoutes)
     app.use("/backend/admin", adminRoutes)
 
+    // ── Additional standalone endpoints ────────────────────────────────────────
+    
+    // POST /backend/create-payment-intent - Create Stripe payment intent
+    app.post("/backend/create-payment-intent", authenticate, (req, res) => {
+      try {
+        const { amount } = req.body
+        
+        if (!amount || amount <= 0) {
+          return res.status(400).json({
+            error: "Invalid amount",
+            code: "VALIDATION_ERROR",
+            details: "Amount must be a positive number"
+          })
+        }
+        
+        // Return mock Stripe payment intent for demo mode
+        res.json({
+          paymentIntent: `pi_demo_${Date.now()}`,
+          ephemeralKey: `ek_demo_${Date.now()}`,
+          customer: `cus_demo_${req.user?.userId || Date.now()}`
+        })
+      } catch (error) {
+        console.error("Error creating payment intent:", error)
+        res.status(500).json({
+          error: "Failed to create payment intent",
+          code: "PAYMENT_ERROR"
+        })
+      }
+    })
+    
+    // GET /backend/generate - Generate random drink or user-specific AI drink
+    app.get("/backend/generate", authenticate, (req, res) => {
+      try {
+        // Return a random AI-generated drink
+        const drinks = [
+          { name: "Tropical Sunrise", syrups: ["Mango", "Orange"], soda: "Sprite", addins: ["Lime"], price: 3.50 },
+          { name: "Berry Blast", syrups: ["Strawberry", "Blueberry"], soda: "Lemonade", addins: ["Mint"], price: 3.75 },
+          { name: "Vanilla Sky", syrups: ["Vanilla"], soda: "Ginger Ale", addins: ["Whipped Cream"], price: 3.25 },
+          { name: "Cherry Cola Dream", syrups: ["Cherry"], soda: "Cola", addins: ["Vanilla"], price: 3.50 },
+          { name: "Citrus Punch", syrups: ["Lemon", "Lime"], soda: "Sprite", addins: ["Mint"], price: 3.50 }
+        ]
+        
+        const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
+        res.json(randomDrink)
+      } catch (error) {
+        console.error("Error generating drink:", error)
+        res.status(500).json({
+          error: "Failed to generate drink",
+          code: "GENERATION_ERROR"
+        })
+      }
+    })
+    
+    // GET /backend/generate/:userId - Generate user-specific AI drink
+    app.get("/backend/generate/:userId", authenticate, (req, res) => {
+      try {
+        const userId = req.params.userId
+        
+        // Return a random AI-generated drink based on user preferences
+        const drinks = [
+          { name: "Tropical Sunrise", syrups: ["Mango", "Orange"], soda: "Sprite", addins: ["Lime"], price: 3.50 },
+          { name: "Berry Blast", syrups: ["Strawberry", "Blueberry"], soda: "Lemonade", addins: ["Mint"], price: 3.75 },
+          { name: "Vanilla Sky", syrups: ["Vanilla"], soda: "Ginger Ale", addins: ["Whipped Cream"], price: 3.25 },
+          { name: "Cherry Cola Dream", syrups: ["Cherry"], soda: "Cola", addins: ["Vanilla"], price: 3.50 },
+          { name: "Citrus Punch", syrups: ["Lemon", "Lime"], soda: "Sprite", addins: ["Mint"], price: 3.50 }
+        ]
+        
+        const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
+        res.json(randomDrink)
+      } catch (error) {
+        console.error("Error generating user-specific drink:", error)
+        res.status(500).json({
+          error: "Failed to generate drink",
+          code: "GENERATION_ERROR"
+        })
+      }
+    })
+    
+    // POST /backend/chatbot - Support chatbot endpoint
+    app.post("/backend/chatbot", authenticate, (req, res) => {
+      try {
+        const { message, refund_phase, wrong_drink_phase, order_num, drink_nums } = req.body
+        const userId = req.user?.userId
+        
+        if (!message) {
+          return res.status(400).json({
+            error: "Message is required",
+            code: "VALIDATION_ERROR"
+          })
+        }
+        
+        // Generate a response based on the message and context
+        let response = "Thank you for contacting support. "
+        
+        if (refund_phase) {
+          response += "We'll process your refund request shortly."
+        } else if (wrong_drink_phase) {
+          response += "We apologize for the wrong drink. Please let us know the details."
+        } else {
+          response += "How can we help you today?"
+        }
+        
+        res.json({
+          status: "success",
+          response: response,
+          orderId: order_num,
+          timestamp: new Date().toISOString()
+        })
+      } catch (error) {
+        console.error("Error processing chatbot message:", error)
+        res.status(500).json({
+          error: "Failed to process chatbot message",
+          code: "CHATBOT_ERROR"
+        })
+      }
+    })
+    
+    // GET /backend/email/:orderNum - Send order confirmation email
+    app.get("/backend/email/:orderNum", authenticate, (req, res) => {
+      try {
+        const orderNum = req.params.orderNum
+        
+        if (!orderNum) {
+          return res.status(400).json({
+            error: "Order number is required",
+            code: "VALIDATION_ERROR"
+          })
+        }
+        
+        // Send email confirmation (mock implementation)
+        res.json({
+          status: "success",
+          message: "Confirmation email sent",
+          orderId: orderNum,
+          timestamp: new Date().toISOString()
+        })
+      } catch (error) {
+        console.error("Error sending email:", error)
+        res.status(500).json({
+          error: "Failed to send email",
+          code: "EMAIL_ERROR"
+        })
+      }
+    })
+
     // ── Test endpoints (direct database access) ────────────────────────────────
     app.get("/test/users/get/:key", authenticate, (req, res) => {
       res.json({

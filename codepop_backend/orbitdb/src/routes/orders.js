@@ -113,4 +113,24 @@ router.get("/user/:userId", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", count: orders.length, data: orders })
 }))
 
+// POST /:id/live-status - Update live status for an order
+router.post("/:id/live-status", authenticate, asyncHandler(async (req, res) => {
+  const orderId = parseInt(req.params.id, 10)
+  const { status } = req.body
+  
+  if (!status) {
+    return res.status(400).json({
+      error: "Status is required",
+      code: "VALIDATION_ERROR"
+    })
+  }
+  
+  const order = await orderService.updateOrder(orderId, { 
+    OrderStatus: status,
+    lastStatusUpdate: new Date().toISOString()
+  })
+  
+  res.json({ status: "success", data: order })
+}))
+
 export default router
