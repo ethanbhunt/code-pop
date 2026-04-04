@@ -12,16 +12,29 @@ const CartPage = () => {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [storeName, setStoreName] = useState('Select Store');
   const { initializePaymentSheet, openPaymentSheet, loading } = CheckoutForm(totalPrice);
 
   useFocusEffect(React.useCallback(() => {
     fetchDrinks();
+    loadStoreName();
     initializePaymentSheet();
   }, []));
 
   useEffect(() => {
     initializePaymentSheet(); // Initialize payment sheet on page load
   }, [totalPrice]);
+
+  const loadStoreName = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('selectedStoreName');
+      if (stored) {
+        setStoreName(stored);
+      }
+    } catch (error) {
+      console.error('Error loading store name:', error);
+    }
+  };
 
   const normalizeDrink = (rawDrink) => {
      if (!rawDrink) {
@@ -182,10 +195,19 @@ const CartPage = () => {
   };
   
 
-  return (
-    <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
-        <View style={styles.container}>
-        <Text style={styles.headerText}>Your Drinks</Text>
+   return (
+     <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
+         <View style={styles.container}>
+         <View style={styles.headerContainer}>
+           <Text style={styles.headerText}>Your Drinks</Text>
+           <TouchableOpacity 
+             style={styles.storeButton}
+             onPress={() => navigation.navigate('StoreSelect')}
+           >
+             <Icon name="storefront-outline" size={18} color="#fff" />
+             <Text style={styles.storeButtonText}>{storeName}</Text>
+           </TouchableOpacity>
+         </View>
 
         {Array.isArray(drinks) && drinks.length === 0 ? (
           <Text style={styles.emptyCartText}>Your cart is empty</Text>
@@ -222,17 +244,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: '#f9f9f9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
   padding: {
     paddingHorizontal: 12,
   },
   headerText: {
-    fontSize: 27,
+    fontSize: 24,
     fontWeight: '800',
     color: '#1c334d',
-    marginBottom: 4,
-    textAlign: 'center',
-    paddingTop: 16,
-    paddingBottom: 8,
+    flex: 1,
+  },
+  storeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1F7A8C',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  storeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   drinkContainer: {
     backgroundColor: '#ffffff',

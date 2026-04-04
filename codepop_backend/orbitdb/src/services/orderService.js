@@ -1,11 +1,12 @@
 // src/services/orderService.js
 // Customer orders service
 
-import { getOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
+import { getOrdersDb, getStoreOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
 
 export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
-  const ordersDb = getOrdersDb()
+  // Use store-specific orders database if storeId is provided
+  const ordersDb = storeId ? getStoreOrdersDb(storeId) : getOrdersDb()
   const orderId = await getNextId(ordersDb, "order")
 
   const order = {
@@ -50,13 +51,27 @@ export async function getUserOrders(userId) {
 }
 
 export async function getStoreOrders(storeId, offset = 0, limit = 50) {
-  const ordersDb = getOrdersDb()
-  const allOrders = await ordersDb.all()
+  // Use store-specific orders database
+  let storeOrders = []
   
-  const storeOrders = allOrders
-    .filter(entry => entry.value && entry.value.storeId === storeId)
-    .map(entry => entry.value)
-    .sort((a, b) => new Date(b.creationTime) - new Date(a.creationTime))
+  try {
+    const storeOrdersDb = getStoreOrdersDb(storeId)
+    const allOrders = await storeOrdersDb.all()
+    
+    storeOrders = allOrders
+      .filter(entry => entry.value && entry.key.startsWith("order:"))
+      .map(entry => entry.value)
+      .sort((a, b) => new Date(b.creationTime) - new Date(a.creationTime))
+  } catch (err) {
+    // Fallback to global orders db if store-specific db doesn't exist
+    const ordersDb = getOrdersDb()
+    const allOrders = await ordersDb.all()
+    
+    storeOrders = allOrders
+      .filter(entry => entry.value && entry.value.storeId === storeId)
+      .map(entry => entry.value)
+      .sort((a, b) => new Date(b.creationTime) - new Date(a.creationTime))
+  }
   
   const paginatedOrders = storeOrders.slice(offset, offset + limit)
   

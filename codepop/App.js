@@ -18,6 +18,7 @@ import ManagerDash from './src/pages/ManagerDash';
 import PaymentPage from './src/pages/PaymentPage';
 import PostCheckout from './src/pages/PostCheckout';
 import PreferencesPage from './src/pages/PreferencesPage';
+import StoreSelectPage from './src/pages/StoreSelectPage';
 import UpdateDrink from './src/pages/UpdateDrink';
 import { BASE_URL } from './ip_address';
 
@@ -142,6 +143,7 @@ const App = () => {
         <Stack.Screen name="CreateDrink" component={CreateDrinkPage} />
         <Stack.Screen name="ComplaintsPage" component={ComplaintsPage} />
         <Stack.Screen name="Preferences" component={PreferencesPage} />
+        <Stack.Screen name="StoreSelect" component={StoreSelectPage} />
         <Stack.Screen name="GeneralHome" component={GeneralHomePage} />
         <Stack.Screen name="payment" component={PaymentPage} />
         <Stack.Screen name="UpdateDrink" component={UpdateDrink} />

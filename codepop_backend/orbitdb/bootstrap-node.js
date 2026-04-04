@@ -190,10 +190,58 @@ async function start() {
       }
     ]
 
+    // Create store-scoped databases and seed store data
+    console.log("[ ^ ] Creating store-scoped databases...")
+    const storeDbAddresses = {}
+    
     for (const store of initialStores) {
-      await storesDb.put(`store:${store.storeId}`, store)
+      // Create store-specific databases
+      const storeOrdersDb = await orbitdb.open(`store-${store.storeId}-orders-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-orders-db`, { type: "keyvalue" }))
+      
+      const storeInventoryDb = await orbitdb.open(`store-${store.storeId}-inventory-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-inventory-db`, { type: "keyvalue" }))
+      
+      const storeRevenuesDb = await orbitdb.open(`store-${store.storeId}-revenues-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-revenues-db`, { type: "keyvalue" }))
+      
+      // Store database addresses for peer distribution
+      storeDbAddresses[`store-${store.storeId}-orders`] = storeOrdersDb.address.toString()
+      storeDbAddresses[`store-${store.storeId}-inventory`] = storeInventoryDb.address.toString()
+      storeDbAddresses[`store-${store.storeId}-revenues`] = storeRevenuesDb.address.toString()
+      
+      console.log(`  [ ^ ] Created databases for store ${store.storeId}: ${store.name}`)
+      
+      // Add database addresses to store metadata
+      const storeWithDatabases = {
+        ...store,
+        databases: {
+          orders: storeOrdersDb.address.toString(),
+          inventory: storeInventoryDb.address.toString(),
+          revenues: storeRevenuesDb.address.toString()
+        }
+      }
+      
+      await storesDb.put(`store:${store.storeId}`, storeWithDatabases)
       console.log(`  [ ^ ] Seeded store ${store.storeId}: ${store.name}`)
     }
+    
+    console.log()
+
+    // Merge store-scoped database addresses into main dbAddresses
+    Object.assign(dbAddresses, storeDbAddresses)
 
     // Initialize counter for next store ID
     await storesDb.put("counter:store", 3)

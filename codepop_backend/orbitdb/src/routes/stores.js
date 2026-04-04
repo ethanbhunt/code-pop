@@ -11,9 +11,9 @@ const router = express.Router()
 
 /**
  * GET /backend/stores
- * List all stores (super admin only)
+ * List all stores (authenticated users can view)
  */
-router.get("/", authenticate, requireSuperAdmin, async (req, res, next) => {
+router.get("/", authenticate, async (req, res, next) => {
   try {
     const offset = parseInt(req.query.offset || 0)
     const limit = Math.min(parseInt(req.query.limit || 50), 100)

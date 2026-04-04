@@ -88,6 +88,7 @@ export default function CheckoutForm(totalPrice) {
       
        const userId = await AsyncStorage.getItem('userId');
        const token = await AsyncStorage.getItem('userToken');
+       const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
        
        console.log(currentList);
 
@@ -97,13 +98,15 @@ export default function CheckoutForm(totalPrice) {
            'Content-Type': 'application/json',
            'Authorization': `Token ${token}`,
          },
-        body: JSON.stringify({
-          UserID: userId,
-          Drinks: currentList,
-          OrderStatus: 'pending',
-          PaymentStatus: 'paid',
-          StripeID: stripeNum || `demo_${Date.now()}`,
-        })
+         body: JSON.stringify({
+           storeId: parseInt(selectedStoreId),
+           drinkIds: currentList,
+           UserID: userId,
+           Drinks: currentList,
+           OrderStatus: 'pending',
+           PaymentStatus: 'paid',
+           StripeID: stripeNum || `demo_${Date.now()}`,
+         })
       });
 
        // Check if the request was successful
