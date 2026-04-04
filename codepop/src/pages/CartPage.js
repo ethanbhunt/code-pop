@@ -101,49 +101,52 @@ const CartPage = () => {
     setTotalPrice(total); // Update the total price state
   };
 
-  const removeDrink = async (drinkId) => {
-    try {
-      const cartList = await AsyncStorage.getItem('checkoutList');
-      const currentList = cartList ? JSON.parse(cartList) : [];
-      const token = await AsyncStorage.getItem('userToken');
-  
-      // Don't delete seasonal carousel items (items prepopulated in the database after running clean script)
-      if (drinkId > 6) {
-        // Delete the drink from the backend database
-        await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-        });
-        // // Delete the drink from the backend database
-        // await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
-        //   method: 'DELETE',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        // });
-      }
-  
-      // Update the local state to remove the drink from the cart page
-      const updatedDrinks = drinks.filter(data => data.drinkId !== drinkId);
-      setDrinks(updatedDrinks);
-  
-      // Update the AsyncStorage to remove the drink ID from the checkout list
-      const updatedList = currentList.filter(item => item !== drinkId);
-      await AsyncStorage.setItem("checkoutList", JSON.stringify(updatedList));
-      // also update the rating list
-      await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(updatedDrinks));
-  
-      // Recalculate the total price with the updated drinks list
-      calculateTotalPrice(updatedDrinks);
-  
-      console.log('Drink removed and total price recalculated successfully');
-    } catch (error) {
-      console.error('Error removing drink:', error);
-    }
-  };
+   const removeDrink = async (drinkId) => {
+     try {
+       const cartList = await AsyncStorage.getItem('checkoutList');
+       const currentList = cartList ? JSON.parse(cartList) : [];
+       const token = await AsyncStorage.getItem('userToken');
+   
+       // Don't delete seasonal carousel items (items prepopulated in the database after running clean script)
+       if (drinkId > 6) {
+         try {
+           // Delete the drink from the backend database
+           const response = await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`, {
+             method: 'DELETE',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Token ${token}`,
+             },
+           });
+           
+           if (!response.ok) {
+             console.warn(`Failed to delete drink ${drinkId} from backend: ${response.status}`);
+             // Continue with local deletion even if backend delete fails
+           }
+         } catch (backendError) {
+           console.warn(`Error deleting drink from backend: ${backendError.message}`);
+           // Continue with local deletion
+         }
+       }
+   
+       // Update the local state to remove the drink from the cart page
+       const updatedDrinks = drinks.filter(data => data.drinkId !== drinkId);
+       setDrinks(updatedDrinks);
+   
+       // Update the AsyncStorage to remove the drink ID from the checkout list
+       const updatedList = currentList.filter(item => item !== drinkId);
+       await AsyncStorage.setItem("checkoutList", JSON.stringify(updatedList));
+       // also update the rating list
+       await AsyncStorage.setItem("purchasedDrinks", JSON.stringify(updatedDrinks));
+   
+       // Recalculate the total price with the updated drinks list
+       calculateTotalPrice(updatedDrinks);
+   
+       console.log('Drink removed and total price recalculated successfully');
+     } catch (error) {
+       console.error('Error removing drink:', error);
+     }
+   };
   
   
 
