@@ -106,16 +106,21 @@ export default function CheckoutForm(totalPrice) {
         })
       });
 
-      // Check if the request was successful
-      if (response.ok) {
-        const data = await response.json(); // Parse JSON if returned
-        const createdOrderNum = data.OrderID;
-        console.log('Order Num:', createdOrderNum);
-        await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
-      } else {
-        console.error('Failed to create order:', response.status, await response.text());
-        return null;
-      }
+       // Check if the request was successful
+       if (response.ok) {
+         const data = await response.json(); // Parse JSON if returned
+         const createdOrderNum = data.OrderID || data.data?.orderId || data.data?.id;
+         if (!createdOrderNum) {
+           console.error('Failed to get order ID from response:', data);
+           return null;
+         }
+         console.log('Order Num:', createdOrderNum);
+         await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
+       } else {
+         const errorData = await response.json().catch(() => ({}));
+         console.error('Failed to create order:', response.status, errorData);
+         return null;
+       }
 
  
       // Update the local state to remove the drink from the cart page

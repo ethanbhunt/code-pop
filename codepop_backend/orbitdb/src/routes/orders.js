@@ -62,19 +62,33 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
 }))
 
 router.post("/", authenticate, asyncHandler(async (req, res) => {
-  const { storeId, drinkIds, quantities, specialInstructions, estimatedPickupTime } = req.body
+  // Support both old and new field formats
+  const {
+    storeId,
+    drinkIds,
+    quantities,
+    specialInstructions,
+    estimatedPickupTime,
+    // Old format fields
+    UserID,
+    Drinks,
+    OrderStatus,
+    PaymentStatus,
+    StripeID,
+    LockerCombo
+  } = req.body
   
-  if (!storeId) {
-    return res.status(400).json({
-      error: "storeId is required",
-      code: "MISSING_STORE_ID"
-    })
-  }
+  // Use default store (1) if not provided
+  const finalStoreId = storeId || 1
+  
+  // Convert old format to new format if needed
+  const finalDrinkIds = drinkIds || Drinks || []
+  const finalQuantities = quantities || (Drinks ? Drinks.map(() => 1) : [])
   
   // Customers can order from any store
   // Managers can create orders for their stores
   if (req.user.userRole === "manager" || req.user.userRole === "admin") {
-    if (!req.user.assignedStores.includes(storeId)) {
+    if (req.user.assignedStores && !req.user.assignedStores.includes(finalStoreId)) {
       return res.status(403).json({
         error: "Access denied to this store",
         code: "STORE_ACCESS_DENIED"
@@ -84,13 +98,19 @@ router.post("/", authenticate, asyncHandler(async (req, res) => {
   
   const order = await orderService.createOrder(
     req.user.userId,
-    storeId,
-    drinkIds,
-    quantities,
+    finalStoreId,
+    finalDrinkIds,
+    finalQuantities,
     specialInstructions,
     estimatedPickupTime
   )
-  res.status(201).json({ status: "created", data: order })
+  
+  // Return response in a format that works with both old and new frontend
+  res.status(201).json({
+    status: "created",
+    data: order,
+    OrderID: order.orderId || order.id,  // Support both field names
+  })
 }))
 
 router.get("/:id", authenticate, asyncHandler(async (req, res) => {
