@@ -62,36 +62,36 @@ const CreateDrinkPage = () => {
              'Content-Type': 'application/json',
              'Authorization': `Token ${token}`,
            },
-          body: JSON.stringify({ 
-            Name: "Drink in User Cart",  // Example name for the drink
-            SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-            SyrupsUsed: SyrupsUsed,
-            AddIns: AddIns,
-            Price: 2.00,
-            User_Created: true,    // Assuming the user is creating the drink
-            Size: selectedSize,
-            Ice: selectedIce,
-          })
+           body: JSON.stringify({ 
+             name: "Drink in User Cart",  // Example name for the drink
+             sodaUsed: SodaUsed,  // Default value if SodaUsed is null
+             syrupsUsed: SyrupsUsed,
+             addIns: AddIns,
+             price: 2.00,
+             userCreated: true,    // Assuming the user is creating the drink
+             size: selectedSize,
+             ice: selectedIce,
+           })
         });
     
         if (!response.ok) {
           throw new Error(`Failed to add drink. Status: ${response.status}`);
         }
-        // add drink item (the drinks ID) to the checkout list from App.js
-        try{
-          // gets list of out of storage on your phone
-          let cartList = await AsyncStorage.getItem("checkoutList");
-          const currentList = cartList ? JSON.parse(cartList) : [];
-          // takes the response (what we get after we create a drink) and extracts the drinkID
-          const data = await response.json();
-          const drinkID = data.DrinkID;
-          // add the drinkID to the checkoutList
-          const updatedList = [...currentList, drinkID]
-          // Saves the checkoutlist back into the storage on the phone
-          await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-        }catch (error){
-          console.log(error)
-        }
+         // add drink item (the drinks ID) to the checkout list from App.js
+         try{
+           // gets list of out of storage on your phone
+           let cartList = await AsyncStorage.getItem("checkoutList");
+           const currentList = cartList ? JSON.parse(cartList) : [];
+           // takes the response (what we get after we create a drink) and extracts the drinkID
+           const data = await response.json();
+           const drinkID = data.data?.drinkId || data.drinkId;
+           // add the drinkID to the checkoutList
+           const updatedList = [...currentList, drinkID]
+           // Saves the checkoutlist back into the storage on the phone
+           await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+         }catch (error){
+           console.log(error)
+         }
 
         navigation.navigate('Cart');
       }
