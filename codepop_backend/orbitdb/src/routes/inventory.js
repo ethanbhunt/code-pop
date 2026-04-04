@@ -6,28 +6,29 @@ import * as inventoryService from "../services/inventoryService.js"
 
 const router = express.Router()
 
-router.get("/", authenticate, asyncHandler(async (req, res) => {
+router.get("/", asyncHandler(async (req, res) => {
   const offset = parseInt(req.query.offset || 0)
   const limit = Math.min(parseInt(req.query.limit || 50), 100)
   
   // If storeId provided, return store-scoped inventory
+  // Unauthenticated users can access this for drink creation
   if (req.query.storeId) {
     const storeId = parseInt(req.query.storeId)
     
-    // Verify access - admins can access all stores, customers can access any store
-    const userRole = String(req.user.role || "").toLowerCase()
-    if (userRole !== "admin" && userRole !== "customer") {
-      return res.status(403).json({
-        error: "Access denied to this store",
-        code: "STORE_ACCESS_DENIED"
-      })
-    }
-    
+    // Allow both authenticated and unauthenticated users to view store inventory for drink creation
     const result = await inventoryService.getStoreInventory(storeId, offset, limit)
     return res.json({ status: "success", storeId, count: result.count, data: result.data })
   }
   
   // Otherwise return all inventory (admin only)
+  // Unauthenticated users cannot access all inventory
+  if (!req.user) {
+    return res.status(403).json({
+      error: "Not authorized to view all inventory",
+      code: "NOT_AUTHORIZED"
+    })
+  }
+  
   const userRole = String(req.user.role || "").toLowerCase()
   if (userRole !== "admin") {
     return res.status(403).json({
@@ -71,7 +72,7 @@ router.get("/report", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", data: report })
 }))
 
-router.get("/:id", authenticate, asyncHandler(async (req, res) => {
+router.get("/:id", asyncHandler(async (req, res) => {
   const item = await inventoryService.getInventoryById(parseInt(req.params.id, 10))
   res.json({ status: "success", data: item })
 }))

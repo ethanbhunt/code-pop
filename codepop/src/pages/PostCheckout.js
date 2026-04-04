@@ -133,44 +133,73 @@ const PostCheckout = () => {
           const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
           const token = await AsyncStorage.getItem('userToken');
           
-          // Fetch inventory from the selected store's database
-          const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/?storeId=${selectedStoreId}`, {
-            method: 'GET',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Token ${token}`,
-            },
-          });
-          const inventoryData = await inventoryResponse.json();
+         // Fetch inventory from the selected store's database
+           const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/?storeId=${selectedStoreId}`, {
+             method: 'GET',
+             headers: { 
+               'Content-Type': 'application/json',
+               ...(token && { 'Authorization': `Token ${token}` }),
+             },
+           });
+           
+           if (!inventoryResponse.ok) {
+             console.warn('Failed to fetch inventory:', inventoryResponse.status);
+             return; // Exit early if inventory fetch fails
+           }
+           
+           const inventoryData = await inventoryResponse.json();
 
-          // Handle both response formats: {inventory_items: [...]} and {status, data: {inventory_items: [...]}}
-          const inventoryItems = inventoryData.inventory_items || inventoryData.data?.inventory_items || inventoryData.data || [];
-         
-         if (!inventoryItems || inventoryItems.length === 0) {
-           console.warn('No inventory items found in response');
-           return; // Exit early if no inventory to update
-         }
-
-         const matchingInventoryIDs = inventoryItems
-           .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
-           .map(item => item.InventoryID);
-
-        for (const id of matchingInventoryIDs) {
-          try {
-            const data = { 'used_quantity': 1 };
-            const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data),
-            });
-
-            if (!response.ok) {
-              throw new Error('Failed to update Inventory');
-            }
-          } catch (error) {
-            console.error('Error resetting inventory:', error);
+           // Extract inventory items from response - the API returns {status, storeId, count, data: [...]}
+           const inventoryItems = inventoryData.data || [];
+          
+          if (!inventoryItems || inventoryItems.length === 0) {
+            console.warn('No inventory items found in response', inventoryData);
+            return; // Exit early if no inventory to update
           }
-        }
+
+          // Match used items with inventory items (field names: inventoryId, itemName)
+          const matchingInventoryIDs = inventoryItems
+            .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.itemName.toLowerCase()))
+            .map(item => item.inventoryId);
+
+         for (const id of matchingInventoryIDs) {
+           try {
+             const token = await AsyncStorage.getItem('userToken');
+             const headers = {
+               'Content-Type': 'application/json',
+               ...(token && { 'Authorization': `Token ${token}` }),
+             };
+             
+             // Fetch current quantity first
+             const getResponse = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+               method: 'GET',
+               headers,
+             });
+             
+             if (!getResponse.ok) {
+               console.warn(`Failed to get inventory item ${id}`);
+               continue;
+             }
+             
+             const itemData = await getResponse.json();
+             const currentItem = itemData.data || itemData;
+             const newQuantity = Math.max(0, (currentItem.quantity || 0) - 1);
+             
+             // Update with decremented quantity
+             const updateData = { quantity: newQuantity };
+             const updateResponse = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+               method: 'PATCH',
+               headers,
+               body: JSON.stringify(updateData),
+             });
+
+             if (!updateResponse.ok) {
+               console.warn(`Failed to update inventory item ${id}`);
+             }
+           } catch (error) {
+             console.error('Error updating inventory:', error);
+           }
+         }
       } catch (error) {
         console.error("Error updating inventory:", error);
       }

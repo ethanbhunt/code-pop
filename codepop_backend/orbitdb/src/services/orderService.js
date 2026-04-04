@@ -1,17 +1,22 @@
 // src/services/orderService.js
 // Customer orders service
 
+import { randomUUID } from "crypto"
 import { getOrdersDb, getStoreOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
 
-export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null) {
+export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null, orderToken = null) {
   // Use store-specific orders database if storeId is provided
   const ordersDb = storeId ? getStoreOrdersDb(storeId) : getOrdersDb()
   const orderId = await getNextId(ordersDb, "order")
 
+  // Generate orderToken for guest orders if not provided
+  const token = orderToken || randomUUID()
+
   const order = {
     orderId,
     userId,
+    orderToken: token,  // Unique token for tracking (for guests and authenticated users)
     storeId,
     drinkIds: Array.isArray(drinkIds) ? drinkIds : [],
     quantities: quantities || {},

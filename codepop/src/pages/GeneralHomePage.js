@@ -4,13 +4,14 @@ import * as Font from 'expo-font';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { BASE_URL } from '../../ip_address';
+import { BASE_URL, isGuestMode } from '../../ip_address';
 import NavBar from '../components/NavBar';
 
 const GeneralHomePage = () => {
    const [isLoggedIn, setIsLoggedIn] = useState(false);
    const [isAdmin, setIsAdmin] = useState(false);
    const [isManager, setIsManager] = useState(false);
+   const [isGuest, setIsGuest] = useState(false);
    const [name, setName] = useState(null);
    const [activeOrderNum, setActiveOrderNum] = useState(null);
    const [dailyDrinks, setDailyDrinks] = useState([]);
@@ -23,31 +24,36 @@ const GeneralHomePage = () => {
   // Check login status when the screen gains focus
   useFocusEffect(
     React.useCallback(() => {
-      const checkLoginStatus = async () => {
-        try {
-          const storedName = await AsyncStorage.getItem('first_name');
-          const token = await AsyncStorage.getItem('userToken');
-          const userRole = await AsyncStorage.getItem('userRole');
-          const orderNum = await AsyncStorage.getItem('orderNum');
-          if (token && storedName) {
-            setIsLoggedIn(true);
-            setName(storedName);
-          } else {
-            setIsLoggedIn(false);
-          }
-          if (userRole == 'admin'){
-            setIsAdmin(true);
-          }else if(userRole == 'manager'){
-            setIsManager(true);
-          }else{
-            setIsAdmin(false);
-            setIsManager(false);
-          }
-          setActiveOrderNum(orderNum);
-        } catch (error) {
-          console.error('Error checking login status:', error);
-        }
-      };
+       const checkLoginStatus = async () => {
+         try {
+           const storedName = await AsyncStorage.getItem('first_name');
+           const token = await AsyncStorage.getItem('userToken');
+           const userRole = await AsyncStorage.getItem('userRole');
+           const orderNum = await AsyncStorage.getItem('orderNum');
+           
+           // Check if user is in guest mode
+           const guestMode = await isGuestMode();
+           setIsGuest(guestMode);
+           
+           if (token && storedName) {
+             setIsLoggedIn(true);
+             setName(storedName);
+           } else {
+             setIsLoggedIn(false);
+           }
+           if (userRole == 'admin'){
+             setIsAdmin(true);
+           }else if(userRole == 'manager'){
+             setIsManager(true);
+           }else{
+             setIsAdmin(false);
+             setIsManager(false);
+           }
+           setActiveOrderNum(orderNum);
+         } catch (error) {
+           console.error('Error checking login status:', error);
+         }
+       };
 
        const fetchOneDrink = async () => {
          const token = await AsyncStorage.getItem('userToken');
@@ -332,31 +338,39 @@ const GeneralHomePage = () => {
           </TouchableOpacity>
         </View>
 
-        {isLoggedIn ? (
-          <View style={styles.accountCard}>
-            {name ? <Text style={styles.greeting}>Welcome back, {name}</Text> : null}
-            <TouchableOpacity onPress={handleLogout} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Logout</Text>
-            </TouchableOpacity>
-            {isAdmin && (
-              <TouchableOpacity onPress={goToAdminDash} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Admin Dashboard</Text>
-              </TouchableOpacity>
-            )}
-            {isManager && (
-              <TouchableOpacity onPress={goToManDash} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Manager Dashboard</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          <View style={styles.accountCard}>
-            <Text style={styles.greeting}>Sign in to save preferences and reorder faster.</Text>
-            <TouchableOpacity onPress={goToLoginPage} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Login</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+         {isLoggedIn ? (
+           <View style={styles.accountCard}>
+             {name ? <Text style={styles.greeting}>Welcome back, {name}</Text> : null}
+             <TouchableOpacity onPress={handleLogout} style={styles.secondaryButton}>
+               <Text style={styles.secondaryButtonText}>Logout</Text>
+             </TouchableOpacity>
+             {isAdmin && (
+               <TouchableOpacity onPress={goToAdminDash} style={styles.secondaryButton}>
+                 <Text style={styles.secondaryButtonText}>Admin Dashboard</Text>
+               </TouchableOpacity>
+             )}
+             {isManager && (
+               <TouchableOpacity onPress={goToManDash} style={styles.secondaryButton}>
+                 <Text style={styles.secondaryButtonText}>Manager Dashboard</Text>
+               </TouchableOpacity>
+             )}
+           </View>
+         ) : isGuest ? (
+           <View style={styles.accountCard}>
+             <Text style={styles.greeting}>Browsing as Guest</Text>
+             <Text style={styles.guestSubtext}>Create custom drinks and orders anonymously</Text>
+             <TouchableOpacity onPress={goToLoginPage} style={styles.secondaryButton}>
+               <Text style={styles.secondaryButtonText}>Login</Text>
+             </TouchableOpacity>
+           </View>
+         ) : (
+           <View style={styles.accountCard}>
+             <Text style={styles.greeting}>Sign in to save preferences and reorder faster.</Text>
+             <TouchableOpacity onPress={goToLoginPage} style={styles.secondaryButton}>
+               <Text style={styles.secondaryButtonText}>Login</Text>
+             </TouchableOpacity>
+           </View>
+         )}
 
         <Text style={styles.dailyDrinksTitle}>Drinks of The Day</Text>
 
@@ -531,13 +545,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E1E5F2',
   },
-  greeting: {
-    fontSize: 16,
-    color: '#1c334d',
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  secondaryButton: {
+   greeting: {
+     fontSize: 16,
+     color: '#1c334d',
+     fontWeight: '700',
+     marginBottom: 8,
+   },
+   guestSubtext: {
+     fontSize: 13,
+     color: '#666',
+     marginBottom: 12,
+     fontStyle: 'italic',
+   },
+   secondaryButton: {
     marginTop: 8,
     paddingVertical: 12,
     borderRadius: 12,

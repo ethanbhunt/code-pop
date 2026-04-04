@@ -5,7 +5,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useFocusEffect, NavigationContainer } from '@react-navigation/native';
 import { useStripe, StripeProvider } from '@stripe/stripe-react-native';
 import CheckoutForm from './CheckoutForm';
-import {BASE_URL} from '../../ip_address'
+import {BASE_URL, setStoreAndUpdateURL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CartPage = () => {
@@ -72,27 +72,35 @@ const CartPage = () => {
      }
    };
 
-   const handleSelectStore = async (store) => {
-     try {
-       // Save store selection to AsyncStorage
-       await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
-       await AsyncStorage.setItem('selectedStoreName', store.name);
-       
-       // If store has database addresses, save them too
-       if (store.databases) {
-         await AsyncStorage.setItem('selectedStoreDbAddresses', JSON.stringify(store.databases));
-       }
+    const handleSelectStore = async (store) => {
+      try {
+        // Save store selection to AsyncStorage
+        await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
+        await AsyncStorage.setItem('selectedStoreName', store.name);
+        
+        // Update BASE_URL to use store-specific peer node
+        await setStoreAndUpdateURL(store.storeId);
+        
+        // If store has database addresses, save them too
+        if (store.databases) {
+          await AsyncStorage.setItem('selectedStoreDbAddresses', JSON.stringify(store.databases));
+        }
 
-       setStoreName(store.name);
-       setStoreModalVisible(false);
-       
-       // Proceed to payment after store selection
-       openPaymentSheet();
-     } catch (error) {
-       console.error('Error selecting store:', error);
-       Alert.alert('Error', 'Failed to select store. Please try again.');
-     }
-   };
+        setStoreName(store.name);
+        
+        // Close modal first
+        setStoreModalVisible(false);
+        
+        // Small delay to ensure modal closes before payment sheet opens
+        setTimeout(() => {
+          // Proceed to payment after store selection
+          openPaymentSheet();
+        }, 100);
+      } catch (error) {
+        console.error('Error selecting store:', error);
+        Alert.alert('Error', 'Failed to select store. Please try again.');
+      }
+    };
 
   const normalizeDrink = (rawDrink) => {
      if (!rawDrink) {
@@ -246,33 +254,44 @@ const CartPage = () => {
      navigation.navigate('Checkout');
    };
 
-   const handlePaymentWithStoreCheck = async () => {
-     try {
-       const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
-       const selectedStoreName = await AsyncStorage.getItem('selectedStoreName');
+    const handlePaymentWithStoreCheck = async () => {
+      try {
+        const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
+        const selectedStoreName = await AsyncStorage.getItem('selectedStoreName');
 
-       if (!selectedStoreId || selectedStoreId === '0' || storeName === 'Select Store') {
-         // Show store selection modal
-         await fetchStores();
-         setStoreModalVisible(true);
-         return;
-       }
+        if (!selectedStoreId || selectedStoreId === '0' || storeName === 'Select Store') {
+          // Fetch stores first, then show the modal
+          // The modal will show loading spinner while fetching
+          setStoreModalVisible(true);
+          await fetchStores();
+          return;
+        }
 
-       // Store is selected, proceed to payment
-       openPaymentSheet();
-     } catch (error) {
-       console.error('Error checking store selection:', error);
-       Alert.alert('Error', 'Failed to process checkout');
-     }
-   };
+        // Store is selected, proceed to payment
+        openPaymentSheet();
+      } catch (error) {
+        console.error('Error checking store selection:', error);
+        Alert.alert('Error', 'Failed to process checkout');
+      }
+    };
   
 
-   return (
-     <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
-         <View style={styles.container}>
-        <View style={styles.headerContainer}>
-            <Text style={styles.headerText}>Your Drinks</Text>
-          </View>
+    return (
+      <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
+          <View style={styles.container}>
+         <View style={styles.headerContainer}>
+             <Text style={styles.headerText}>Your Drinks</Text>
+             <TouchableOpacity 
+               onPress={() => {
+                 fetchStores();
+                 setStoreModalVisible(true);
+               }}
+               style={styles.storeButton}
+             >
+               <Icon name="storefront" size={16} color="#fff" />
+               <Text style={styles.storeButtonText}>{storeName}</Text>
+             </TouchableOpacity>
+           </View>
 
         {Array.isArray(drinks) && drinks.length === 0 ? (
           <Text style={styles.emptyCartText}>Your cart is empty</Text>

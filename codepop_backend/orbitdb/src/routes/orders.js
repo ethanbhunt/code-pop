@@ -69,6 +69,7 @@ router.post("/", asyncHandler(async (req, res) => {
     quantities,
     specialInstructions,
     estimatedPickupTime,
+    orderToken,  // New field for guest order tracking
     // Old format fields
     UserID,
     Drinks,
@@ -104,7 +105,8 @@ router.post("/", asyncHandler(async (req, res) => {
      finalDrinkIds,
      finalQuantities,
      specialInstructions,
-     estimatedPickupTime
+     estimatedPickupTime,
+     orderToken  // Pass order token to service
    )
   
   // Return response in a format that works with both old and new frontend

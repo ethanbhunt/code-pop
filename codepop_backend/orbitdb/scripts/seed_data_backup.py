@@ -32,9 +32,6 @@ from seed_config import (
     SEED_USERS, SEED_DRINKS, SEED_PREFERENCES, SEED_INVENTORY,
     TEST_CREDENTIALS, SEED_CONFIG
 )
-from peer_config import (
-    SEEDING_CONFIG, get_all_peer_urls, get_default_peer_url, print_peer_config
-)
 
 
 class CodePopSeeder:
@@ -338,173 +335,103 @@ class CodePopSeeder:
         print("\n" + "=" * 60)
 
 
-
-class MultiPeerSeeder:
-    """Seeds all peer nodes with identical data"""
-    
-    def __init__(self, peer_urls):
-        self.peer_urls = peer_urls
-        self.seeders = [CodePopSeeder(url) for url in peer_urls]
-    
-    def run_all(self):
-        print("=" * 70)
-        print(f"MULTI-PEER SEEDING: {len(self.peer_urls)} PEERS")
-        print("=" * 70)
-        
-        if not self.seeders[0].health_check():
-            print("ERROR: Backend is not running!")
-            return False
-        
-        # Step 1: Seed users ONLY on the first peer
-        # Users will automatically replicate to other peers via gossipsub
-        print(f"\nSTEP 1: Register users on Peer 1 (will replicate to other peers)")
-        print(f"{'='*70}")
-        try:
-            seeder_1 = self.seeders[0]
-            seeder_1.seed_users()
-            time.sleep(SEEDING_CONFIG["operation_delay"])
-            print(f"✓ Users registered on {seeder_1.base_url}")
-            print(f"  Users will replicate to other peers via gossipsub\n")
-        except Exception as e:
-            print(f"✗ Error registering users: {e}")
-            return False
-        
-        # Step 2: Seed drinks, preferences, and inventory to ALL peers
-        # This ensures all peers have identical non-user data
-        print(f"STEP 2: Seed drinks, preferences, and inventory to all peers")
-        print(f"{'='*70}\n")
-        
-        for i, seeder in enumerate(self.seeders, 1):
-            print(f"PEER {i}/{len(self.seeders)}: {seeder.base_url}")
-            try:
-                # Skip users on all peers (they exist from peer 1 registration + replication)
-                seeder.seed_drinks()
-                time.sleep(SEEDING_CONFIG["operation_delay"])
-                seeder.seed_preferences()
-                time.sleep(SEEDING_CONFIG["operation_delay"])
-                seeder.seed_inventory()
-                time.sleep(SEEDING_CONFIG["operation_delay"])
-                print(f"✓ Peer {i} seeded successfully (drinks, preferences, inventory)")
-                if i < len(self.seeders):
-                    time.sleep(SEEDING_CONFIG["peer_delay"])
-            except Exception as e:
-                print(f"✗ Error seeding peer {i}: {e}")
-                return False
-        
-        print(f"\n{'='*70}")
-        print(f"SUCCESS: All {len(self.seeders)} peers seeded!")
-        print(f"{'='*70}")
-        print(f"\nSeeding Summary:")
-        print(f"  Peer 1 ({self.peer_urls[0]}): Users + Drinks + Preferences + Inventory")
-        print(f"  Other Peers: Drinks + Preferences + Inventory")
-        print(f"  (Users replicate via gossipsub to ensure consistency)")
-        print(f"\nAll data is now available on all {len(self.seeders)} peer nodes!\n")
-        return True
-
-
 def main():
     parser = argparse.ArgumentParser(
-       description="CodePop Backend Seeding Script",
-       formatter_class=argparse.RawDescriptionHelpFormatter,
-       epilog="""
+        description="CodePop Backend Seeding Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
 Examples:
   python3 seed_data.py --all              Seed all data
   python3 seed_data.py --users            Seed only users
   python3 seed_data.py --drinks           Seed only drinks
   python3 seed_data.py --clear            Delete all test data
   python3 seed_data.py --reset            Clear and reseed all
-       """
+        """
     )
     
     parser.add_argument("--all", action="store_true", 
-                      help="Seed all data")
+                       help="Seed all data")
     parser.add_argument("--users", action="store_true",
-                      help="Seed only users")
+                       help="Seed only users")
     parser.add_argument("--drinks", action="store_true",
-                      help="Seed only drinks")
+                       help="Seed only drinks")
     parser.add_argument("--preferences", action="store_true",
-                      help="Seed only preferences")
+                       help="Seed only preferences")
     parser.add_argument("--inventory", action="store_true",
-                      help="Seed only inventory")
+                       help="Seed only inventory")
     parser.add_argument("--clear", action="store_true",
-                      help="Delete all test data")
+                       help="Delete all test data")
     parser.add_argument("--reset", action="store_true",
-                      help="Clear and reseed all data")
+                       help="Clear and reseed all data")
     parser.add_argument("--url", default="http://localhost:3001",
-                      help="Backend API URL (default: http://localhost:3001)")
-    parser.add_argument("--all-peers", action="store_true",
-                      help="Seed to all 3 peer nodes (3001, 3002, 3003) simultaneously")
+                       help="Backend API URL (default: http://localhost:3001)")
     
     args = parser.parse_args()
     
+    seeder = CodePopSeeder(args.url)
+    
     try:
-       if args.all_peers:
-           multi_seeder = MultiPeerSeeder(get_all_peer_urls())
-           multi_seeder.run_all()
-           sys.exit(0)
-       
-       seeder = CodePopSeeder(args.url)
-       if args.reset:
-           # Clear and reseed
-           print("\n" + "=" * 60)
-           print("RESET MODE: Clearing and reseeding all data")
-           print("=" * 60)
-           
-           # First, seed users to get admin token for cleanup
-           print("\nStep 1: Creating users for authentication...")
-           seeder.seed_users()
-           time.sleep(0.5)
-           
-           # Then clear existing test data
-           if seeder.admin_token:
-               print("\nStep 2: Clearing existing test data...")
-               seeder.clear_data()
-               time.sleep(0.5)
-               
-               print("\nStep 3: Reseeding all data...")
-               seeder.seed_users()
-               time.sleep(0.3)
-               seeder.seed_drinks()
-               time.sleep(0.3)
-               seeder.seed_preferences()
-               time.sleep(0.3)
-               seeder.seed_inventory()
-           
-           seeder.print_summary()
-           
-       elif args.clear:
-           seeder.seed_users()  # Need admin token
-           if seeder.admin_token:
-               seeder.clear_data()
-               
-       elif args.users:
-           seeder.seed_users()
-           print("\nUsers seeded successfully!")
-           
-       elif args.drinks:
-           seeder.seed_users()  # Need admin token
-           if seeder.admin_token:
-               seeder.seed_drinks()
-               
-       elif args.preferences:
-           seeder.seed_users()
-           seeder.seed_preferences()
-           
-       elif args.inventory:
-           seeder.seed_users()  # Need admin token
-           if seeder.admin_token:
-               seeder.seed_inventory()
-               
-       else:
-           # Default: seed all
-           seeder.run_all()
+        if args.reset:
+            # Clear and reseed
+            print("\n" + "=" * 60)
+            print("RESET MODE: Clearing and reseeding all data")
+            print("=" * 60)
+            
+            # First, seed users to get admin token for cleanup
+            print("\nStep 1: Creating users for authentication...")
+            seeder.seed_users()
+            time.sleep(0.5)
+            
+            # Then clear existing test data
+            if seeder.admin_token:
+                print("\nStep 2: Clearing existing test data...")
+                seeder.clear_data()
+                time.sleep(0.5)
+                
+                print("\nStep 3: Reseeding all data...")
+                seeder.seed_users()
+                time.sleep(0.3)
+                seeder.seed_drinks()
+                time.sleep(0.3)
+                seeder.seed_preferences()
+                time.sleep(0.3)
+                seeder.seed_inventory()
+            
+            seeder.print_summary()
+            
+        elif args.clear:
+            seeder.seed_users()  # Need admin token
+            if seeder.admin_token:
+                seeder.clear_data()
+                
+        elif args.users:
+            seeder.seed_users()
+            print("\nUsers seeded successfully!")
+            
+        elif args.drinks:
+            seeder.seed_users()  # Need admin token
+            if seeder.admin_token:
+                seeder.seed_drinks()
+                
+        elif args.preferences:
+            seeder.seed_users()
+            seeder.seed_preferences()
+            
+        elif args.inventory:
+            seeder.seed_users()  # Need admin token
+            if seeder.admin_token:
+                seeder.seed_inventory()
+                
+        else:
+            # Default: seed all
+            seeder.run_all()
     
     except KeyboardInterrupt:
-       print("\n\nSeeding cancelled by user")
-       sys.exit(1)
+        print("\n\nSeeding cancelled by user")
+        sys.exit(1)
     except Exception as e:
-       print(f"\nFatal error: {e}")
-       sys.exit(1)
+        print(f"\nFatal error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

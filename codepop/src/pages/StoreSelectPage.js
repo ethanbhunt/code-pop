@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, 
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { BASE_URL } from '../../ip_address';
+import { fetchStoresFromBootstrap, setStoreAndUpdateURL } from '../../ip_address';
 import NavBar from '../components/NavBar';
 
 const StoreSelectPage = () => {
@@ -31,31 +31,20 @@ const StoreSelectPage = () => {
   const fetchStores = async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
-
-      const headers = {
-        'Content-Type': 'application/json',
-      };
+      console.log('[StoreSelect] Fetching stores from bootstrap...');
       
-      // Only add authorization header if token exists
-      if (token) {
-        headers['Authorization'] = `Token ${token}`;
-      }
-
-      const response = await fetch(`${BASE_URL}/backend/stores`, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stores. Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setStores(data.data || []);
+      // Fetch stores from bootstrap node (not from peer)
+      const storesData = await fetchStoresFromBootstrap();
+      setStores(storesData);
+      
+      console.log(`[StoreSelect] Successfully loaded ${storesData.length} stores`);
     } catch (error) {
-      console.error('Error fetching stores:', error);
-      Alert.alert('Error', 'Failed to load stores. Please try again.');
+      console.error('[StoreSelect] Error fetching stores from bootstrap:', error);
+      Alert.alert(
+        'Connection Error',
+        'Could not connect to the bootstrap node. Please check your network connection and ensure the backend is running.',
+        [{ text: 'Retry', onPress: () => fetchStores() }]
+      );
     } finally {
       setLoading(false);
     }
@@ -63,8 +52,13 @@ const StoreSelectPage = () => {
 
   const handleSelectStore = async (store) => {
     try {
-      // Save store selection to AsyncStorage
-      await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
+      console.log(`[StoreSelect] User selected store: ${store.name} (ID: ${store.storeId})`);
+      
+      // Update BASE_URL to the selected store's peer
+      // This persists the store selection and updates the peer URL for future requests
+      await setStoreAndUpdateURL(store.storeId);
+      
+      // Also save store name for UI display
       await AsyncStorage.setItem('selectedStoreName', store.name);
       
       // If store has database addresses, save them too
@@ -73,14 +67,16 @@ const StoreSelectPage = () => {
       }
 
       setSelectedStoreId(store.storeId);
+      console.log(`[StoreSelect] Store selection complete, navigating to GeneralHome`);
+      
       Alert.alert('Success', `Selected ${store.name}`, [
         {
-          text: 'Continue Shopping',
+          text: 'Continue',
           onPress: () => navigation.navigate('GeneralHome'),
         },
       ]);
     } catch (error) {
-      console.error('Error selecting store:', error);
+      console.error('[StoreSelect] Error selecting store:', error);
       Alert.alert('Error', 'Failed to select store. Please try again.');
     }
   };

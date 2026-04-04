@@ -24,21 +24,27 @@ Before starting any scenario, ensure:
    npm run bootstrap
    
    # Terminal 2
-   npm run peer
+    PORT=3001 node peer-node.js
+   
+   # Terminal 3
+    PORT=3002 node peer-node.js
+    
+   # Terminal 4
+    PORT=3003 node peer-node.js
    ```
 
 2. Data is seeded:
    ```bash
-   # Terminal 3
-   python3 scripts/seed_data.py --all
+   # Terminal 5
+   python3 scripts/seed_data.py --all --all-peers
    ```
 
 3. Frontend is running:
    ```bash
-   # Terminal 4
+   # Terminal 6
    cd codepop
    npm start
-   # Press 'w' for web
+   # Press 'a' for android emulator
    ```
 
 4. You should have:

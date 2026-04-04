@@ -281,24 +281,71 @@ async function start() {
     })
 
     // Node info
-    app.get("/info", (req, res) => {
-      const dbInfo = {}
-      Object.entries(databases).forEach(([key, db]) => {
-        dbInfo[key] = {
-          address: db.address.toString(),
-          type: "keyvalue"
-        }
-      })
-      res.json({
-        nodeType: "bootstrap",
-        peerId: libp2p.peerId.toString(),
-        multiaddrs: libp2p.getMultiaddrs().map(a => a.toString()),
-        databases: dbInfo,
-        timestamp: new Date().toISOString()
-      })
-    })
+     app.get("/info", (req, res) => {
+       const dbInfo = {}
+       Object.entries(databases).forEach(([key, db]) => {
+         dbInfo[key] = {
+           address: db.address.toString(),
+           type: "keyvalue"
+         }
+       })
+       res.json({
+         nodeType: "bootstrap",
+         peerId: libp2p.peerId.toString(),
+         multiaddrs: libp2p.getMultiaddrs().map(a => a.toString()),
+         databases: dbInfo,
+         timestamp: new Date().toISOString()
+       })
+     })
 
-    // Generic get endpoint (for testing)
+     // Get list of stores with peer information
+     // Used by frontend to discover which peer serves each store
+     app.get("/backend/stores", async (req, res) => {
+       try {
+         const storesDb = databases.stores
+         if (!storesDb) {
+           return res.status(500).json({ error: "Stores database not available" })
+         }
+
+         const allStores = await storesDb.all()
+         
+         // Filter to only store entries (skip counters and metadata)
+         const stores = allStores
+           .filter(entry => entry.key.startsWith("store:"))
+           .map(entry => {
+             const store = entry.value
+             return {
+               storeId: store.storeId,
+               name: store.name,
+               address: store.address,
+               city: store.city,
+               region: store.region,
+               timezone: store.timezone,
+               coordinates: store.coordinates,
+               staffCount: store.staffCount,
+               status: store.status,
+               operatingHours: store.operatingHours,
+               createdAt: store.createdAt,
+               updatedAt: store.updatedAt,
+               // Add peer port mapping for this store
+               peerPort: store.storeId === 1 ? 3001 : (store.storeId === 2 ? 3002 : 3003),
+               databases: store.databases
+             }
+           })
+           .sort((a, b) => a.storeId - b.storeId)
+
+         res.json({
+           data: stores,
+           count: stores.length,
+           timestamp: new Date().toISOString()
+         })
+       } catch (err) {
+         console.error("Error fetching stores:", err)
+         res.status(500).json({ error: err.message })
+       }
+     })
+
+     // Generic get endpoint (for testing)
     app.get("/:dbName/get/:key", async (req, res) => {
       try {
         const { dbName, key } = req.params

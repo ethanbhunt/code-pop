@@ -79,7 +79,7 @@ export function validatePreference(preference) {
  */
 export function validateDrinkSize(size) {
   if (!size || typeof size !== "string") return false
-  const allowedSizes = ["16oz", "24oz", "32oz", "m", "l", "xl"]
+  const allowedSizes = ["16oz", "24oz", "32oz"]
   return allowedSizes.includes(size.toLowerCase())
 }
 

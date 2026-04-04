@@ -86,58 +86,71 @@ export default function CheckoutForm(totalPrice) {
     }
   };
 
-   // function to remove all drinks from cart list after sucessful checkout
-   const removeAllDrinks = async () => {
-     try {
-       const cartList = await AsyncStorage.getItem('checkoutList');
-       const currentList = cartList ? JSON.parse(cartList) : [];
-       
-        const userId = await AsyncStorage.getItem('userId');
-        const token = await AsyncStorage.getItem('userToken');
-        const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
-        
-        console.log(currentList);
+    // Generate UUID for order token (works for both guests and authenticated users)
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+            v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
 
-        // Extract drink IDs from the full drink objects
-        const drinkIds = currentList.map(drink => {
-          if (typeof drink === 'object' && drink.drinkId) {
-            return drink.drinkId;
-          }
-          return drink; // Fallback for backward compatibility with just IDs
+    // function to remove all drinks from cart list after sucessful checkout
+    const removeAllDrinks = async () => {
+      try {
+        const cartList = await AsyncStorage.getItem('checkoutList');
+        const currentList = cartList ? JSON.parse(cartList) : [];
+        
+         const userId = await AsyncStorage.getItem('userId');
+         const token = await AsyncStorage.getItem('userToken');
+         const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+         const orderToken = generateUUID(); // Generate unique token for tracking
+         
+         console.log(currentList);
+
+         // Extract drink IDs from the full drink objects
+         const drinkIds = currentList.map(drink => {
+           if (typeof drink === 'object' && drink.drinkId) {
+             return drink.drinkId;
+           }
+           return drink; // Fallback for backward compatibility with just IDs
+         });
+
+         const response = await fetch(`${BASE_URL}/backend/orders/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             ...(token && { 'Authorization': `Token ${token}` }),
+           },
+           body: JSON.stringify({
+             storeId: parseInt(selectedStoreId),
+             drinkIds: drinkIds,
+             UserID: userId,
+             orderToken: orderToken,  // Include order token for tracking
+             Drinks: drinkIds,
+             OrderStatus: 'pending',
+             PaymentStatus: 'paid',
+             StripeID: stripeNum || `demo_${Date.now()}`,
+           })
         });
 
-        const response = await fetch(`${BASE_URL}/backend/orders/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Token ${token}`,
-          },
-          body: JSON.stringify({
-            storeId: parseInt(selectedStoreId),
-            drinkIds: drinkIds,
-            UserID: userId,
-            Drinks: drinkIds,
-            OrderStatus: 'pending',
-            PaymentStatus: 'paid',
-            StripeID: stripeNum || `demo_${Date.now()}`,
-          })
-       });
-
-       // Check if the request was successful
-       if (response.ok) {
-         const data = await response.json(); // Parse JSON if returned
-         const createdOrderNum = data.OrderID || data.data?.orderId || data.data?.id;
-         if (!createdOrderNum) {
-           console.error('Failed to get order ID from response:', data);
-           return null;
-         }
-         console.log('Order Num:', createdOrderNum);
-         await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
-       } else {
-         const errorData = await response.json().catch(() => ({}));
-         console.error('Failed to create order:', response.status, errorData);
-         return null;
-       }
+        // Check if the request was successful
+        if (response.ok) {
+          const data = await response.json(); // Parse JSON if returned
+          const createdOrderNum = data.OrderID || data.data?.orderId || data.data?.id;
+          if (!createdOrderNum) {
+            console.error('Failed to get order ID from response:', data);
+            return null;
+          }
+          console.log('Order Num:', createdOrderNum);
+          console.log('Order Token:', orderToken);
+          await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
+          await AsyncStorage.setItem("orderToken", orderToken);  // Store token for tracking
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to create order:', response.status, errorData);
+          return null;
+        }
 
  
        // Update the local state to remove the drink from the cart page
@@ -157,28 +170,28 @@ export default function CheckoutForm(totalPrice) {
     }
   };
 
-   const addRevenue = async () => {
-     try {
-       const orderNum = await AsyncStorage.getItem("orderNum");
-     
-        const token = await AsyncStorage.getItem('userToken');
-        const headers = {
-          'Content-Type': 'application/json',
-        };
-        
-        // Only add authorization header if token exists
-        if (token) {
-          headers['Authorization'] = `Token ${token}`;
-        }
+    const addRevenue = async () => {
+      try {
+        const orderNum = await AsyncStorage.getItem("orderNum");
+      
+         const token = await AsyncStorage.getItem('userToken');
+         const headers = {
+           'Content-Type': 'application/json',
+         };
+         
+         // Only add authorization header if token exists
+         if (token) {
+           headers['Authorization'] = `Token ${token}`;
+         }
 
-        const response = await fetch(`${BASE_URL}/backend/revenues/`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            OrderID: Number(orderNum),
-            TotalAmount: Number(totalPrice),
-          }),
-       });
+         const response = await fetch(`${BASE_URL}/backend/revenues/`, {
+           method: 'POST',
+           headers,
+           body: JSON.stringify({
+             orderId: Number(orderNum),
+             amount: Number(totalPrice),
+           }),
+        });
     
       if (response.ok) {
         const data = await response.json(); // Parse the response if needed

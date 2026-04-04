@@ -232,51 +232,53 @@ async function start() {
       }
     })
     
-    // GET /backend/generate - Generate random drink (public endpoint, no authentication required)
-    app.get("/backend/generate", (req, res) => {
-      try {
-        // Return a random AI-generated drink with complete information
-        const drinks = [
-          { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
-          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "24oz", ice: "light" },
-          { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
-          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "24oz", ice: "extra" },
-          { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
-        ]
-        
-        const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
-        res.json(randomDrink)
-      } catch (error) {
-        console.error("Error generating drink:", error)
-        res.status(500).json({
-          error: "Failed to generate drink",
-          code: "GENERATION_ERROR"
-        })
-      }
-    })
+     // GET /backend/generate - Generate random drink (public endpoint, no authentication required)
+     app.get("/backend/generate", (req, res) => {
+       try {
+         // Return a random AI-generated drink with complete information
+         // Valid sizes: 16oz, 24oz, 32oz
+         const drinks = [
+           { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
+           { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "16oz", ice: "light" },
+           { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
+           { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "32oz", ice: "extra" },
+           { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
+         ]
+         
+         const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
+         res.json(randomDrink)
+       } catch (error) {
+         console.error("Error generating drink:", error)
+         res.status(500).json({
+           error: "Failed to generate drink",
+           code: "GENERATION_ERROR"
+         })
+       }
+     })
     
-    // GET /backend/generate/:userId - Generate user-specific AI drink
-    app.get("/backend/generate/:userId", authenticate, (req, res) => {
-      try {
-        const userId = req.params.userId
-        
-        // Return a random AI-generated drink based on user preferences with complete information
-        const drinks = [
-          { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
-          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "20oz", ice: "light" },
-          { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
-          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "20oz", ice: "extra" },
-          { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
-        ]
-        
-        const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
-        res.json(randomDrink)
-      } catch (error) {
-        console.error("Error generating user-specific drink:", error)
-        res.status(500).json({
-          error: "Failed to generate drink",
-          code: "GENERATION_ERROR"
-        })
+     // GET /backend/generate/:userId - Generate user-specific AI drink
+     app.get("/backend/generate/:userId", authenticate, (req, res) => {
+       try {
+         const userId = req.params.userId
+         
+         // Return a random AI-generated drink based on user preferences with complete information
+         // Valid sizes: 16oz, 24oz, 32oz
+         const drinks = [
+           { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
+           { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "16oz", ice: "light" },
+           { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
+           { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "32oz", ice: "extra" },
+           { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
+         ]
+         
+         const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
+         res.json(randomDrink)
+       } catch (error) {
+         console.error("Error generating user-specific drink:", error)
+         res.status(500).json({
+           error: "Failed to generate drink",
+           code: "GENERATION_ERROR"
+         })
       }
     })
     

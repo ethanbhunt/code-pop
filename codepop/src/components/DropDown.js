@@ -16,14 +16,15 @@ function contrastTextForBackground(hexColor) {
 }
 
 const DropDown = ({
-  title,
-  options = [],
-  onSelect,
-  isOpen,
-  setOpen,
-  selectedValues = [],
-  tintByFlavor = false,
-}) => {
+   title,
+   options = [],
+   onSelect,
+   isOpen,
+   setOpen,
+   selectedValues = [],
+   tintByFlavor = false,
+   inventoryMap = {},
+ }) => {
   const toggleItemSelection = (item) => {
     onSelect(item);
   };
@@ -70,7 +71,15 @@ const DropDown = ({
                       </Text>
                     )}
                   </TouchableOpacity>
-                  {option.image && <Text style={styles.buttonLabel}>{option.label}</Text>}
+                   {option.image && <Text style={styles.buttonLabel}>{option.label}</Text>}
+                   {inventoryMap[option.label] && (
+                     <Text style={[
+                       styles.inventoryText,
+                       inventoryMap[option.label].lowStock && styles.lowStockText
+                     ]}>
+                       {inventoryMap[option.label].lowStock ? '⚠️' : '✓'} {inventoryMap[option.label].quantity}
+                     </Text>
+                   )}
                 </View>
               );
             })}
@@ -171,10 +180,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  selectedOption: {
-    backgroundColor: '#8DF1D3',
-    color: '#fff', // Change text color for selected options
-  }
-});
+   selectedOption: {
+     backgroundColor: '#8DF1D3',
+     color: '#fff', // Change text color for selected options
+   },
+   inventoryText: {
+     marginTop: 4,
+     fontSize: 9,
+     color: '#2ecc71',
+     fontWeight: '600',
+     textAlign: 'center',
+   },
+   lowStockText: {
+     color: '#e74c3c',
+   }
+ });
 
-export default DropDown;
+ export default DropDown;
