@@ -17,12 +17,16 @@ export default function CheckoutForm(totalPrice) {
   const [loading, setLoading] = useState(false);
 
   const fetchPaymentSheetParams = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: totalPrice }), // amount in dollars
-      });
+     try {
+       const token = await AsyncStorage.getItem('userToken');
+       const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
+         method: 'POST',
+         headers: { 
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+         body: JSON.stringify({ amount: totalPrice }), // amount in dollars
+       });
 
       const payload = await response.json();
       if (!response.ok) {
@@ -82,15 +86,17 @@ export default function CheckoutForm(totalPrice) {
       const cartList = await AsyncStorage.getItem('checkoutList');
       const currentList = cartList ? JSON.parse(cartList) : [];
       
-      const userId = await AsyncStorage.getItem('userId');
-      
-      console.log(currentList);
+       const userId = await AsyncStorage.getItem('userId');
+       const token = await AsyncStorage.getItem('userToken');
+       
+       console.log(currentList);
 
-      const response = await fetch(`${BASE_URL}/backend/orders/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+       const response = await fetch(`${BASE_URL}/backend/orders/`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
         body: JSON.stringify({
           UserID: userId,
           Drinks: currentList,
@@ -164,16 +170,18 @@ export default function CheckoutForm(totalPrice) {
       return;
     }
 
-    await addRevenue();
-    const savedOrderNum = await AsyncStorage.getItem("orderNum");
-    if (savedOrderNum) {
-      await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-    }
+     await addRevenue();
+     const savedOrderNum = await AsyncStorage.getItem("orderNum");
+     if (savedOrderNum) {
+       const token = await AsyncStorage.getItem('userToken');
+       await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
+         method: 'GET',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         },
+       });
+     }
     navigation.navigate('PostCheckout');
   };
 

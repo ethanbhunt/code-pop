@@ -46,11 +46,18 @@ const GeneralHomePage = () => {
         }
       };
 
-      const fetchOneDrink = async () => {
-        const res = await fetch(`${BASE_URL}/backend/generate/`);
-        if (!res.ok) return null;
-        return res.json();
-      };
+       const fetchOneDrink = async () => {
+         const token = await AsyncStorage.getItem('userToken');
+         const res = await fetch(`${BASE_URL}/backend/generate/`, {
+           method: 'GET',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           }
+         });
+         if (!res.ok) return null;
+         return res.json();
+       };
 
       const fetchDailyDrinks = async () => {
         setDrinksLoading(true);

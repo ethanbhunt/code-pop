@@ -48,18 +48,20 @@ const CreateDrinkPage = () => {
   };
   
   const addToCart = async () => {
-    try {
-      // check if ice and size have been selected
-      if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
+     try {
+       // check if ice and size have been selected
+       if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
 
-        Alert.alert("Choose soda, size, and ice before adding your drink.")
+         Alert.alert("Choose soda, size, and ice before adding your drink.")
 
-      }else{
-        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+       }else{
+         const token = await AsyncStorage.getItem('userToken');
+         const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Token ${token}`,
+           },
           body: JSON.stringify({ 
             Name: "Drink in User Cart",  // Example name for the drink
             SodaUsed: SodaUsed,  // Default value if SodaUsed is null
@@ -163,21 +165,23 @@ const CreateDrinkPage = () => {
   // function for generate drink button which generates a drink with AI   
     
   const GenerateAI = async () => {
-    setIsGenerating(true);
-    try {
-      const user_id = await AsyncStorage.getItem('userId');
-      let url = `${BASE_URL}/backend/generate/`;
+     setIsGenerating(true);
+     try {
+       const user_id = await AsyncStorage.getItem('userId');
+       const token = await AsyncStorage.getItem('userToken');
+       let url = `${BASE_URL}/backend/generate/`;
 
-      if (user_id) {
-        url = `${BASE_URL}/backend/generate/${user_id}/`;
-      }
+       if (user_id) {
+         url = `${BASE_URL}/backend/generate/${user_id}/`;
+       }
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+       const response = await fetch(url, {
+         method: 'GET',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         }
+       });
 
       if (!response.ok) {
         throw new Error(`Error when trying to generate AI drink. Status: ${response.status}`);
