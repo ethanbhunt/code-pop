@@ -74,6 +74,8 @@ class CodePopSeeder:
                 raise Exception(f"API Error ({e.code}): {error_data.get('error', 'Unknown')}")
             except json.JSONDecodeError:
                 raise Exception(f"API Error ({e.code}): {error_body}")
+        except urllib.error.URLError as e:
+            raise Exception(f"Connection Error: {e.reason}")
     
     def health_check(self):
         """Check if backend is running"""
@@ -104,7 +106,7 @@ class CodePopSeeder:
                 # Check if this is a test user
                 if any(tu["username"] == user.get("username") for tu in SEED_USERS):
                     try:
-                        self._make_request("DELETE", f"/backend/users/{user['userId']}", 
+                        self._make_request("DELETE", f"/backend/users/delete/{user['userId']}", 
                                          token=self.admin_token)
                         deleted_count += 1
                         print(f"  Deleted user: {user['username']}")
@@ -131,19 +133,38 @@ class CodePopSeeder:
                 token = user_info.get("token")
                 user_id = user_info.get("userId")
                 
-                self.user_tokens[user_data["username"]] = token
-                self.user_ids[user_data["username"]] = user_id
-                
-                print(f"  Created user: {user_data['username']} (ID: {user_id})")
-                created_count += 1
-                
-                # Set admin token for later operations
-                if user_data["username"] == "admin_alex":
-                    self.admin_token = token
+                if token and user_id:
+                    self.user_tokens[user_data["username"]] = token
+                    self.user_ids[user_data["username"]] = user_id
+                    
+                    print(f"  Created user: {user_data['username']} (ID: {user_id})")
+                    created_count += 1
+                    
+                    # Set admin token for later operations (use first admin role found)
+                    if user_data.get("role") in ["admin", "superadmin"] and not self.admin_token:
+                        self.admin_token = token
+                else:
+                    print(f"  Error creating {user_data['username']}: Invalid response format")
                     
             except Exception as e:
-                if "already exists" in str(e):
+                error_msg = str(e)
+                if "already exists" in error_msg or "Username already exists" in error_msg:
                     print(f"  User {user_data['username']} already exists (skipping)")
+                    # Try to login to get token
+                    try:
+                        login_response = self._make_request("POST", "/backend/auth/login",
+                                                          data={"username": user_data["username"],
+                                                               "password": user_data["password"]})
+                        login_data = login_response.get("data", {})
+                        token = login_data.get("token")
+                        user_id = login_data.get("userId")
+                        if token and user_id:
+                            self.user_tokens[user_data["username"]] = token
+                            self.user_ids[user_data["username"]] = user_id
+                            if user_data.get("role") in ["admin", "superadmin"] and not self.admin_token:
+                                self.admin_token = token
+                    except:
+                        pass
                 else:
                     print(f"  Error creating {user_data['username']}: {e}")
         
@@ -164,7 +185,9 @@ class CodePopSeeder:
                 response = self._make_request("POST", "/backend/drinks", 
                                             data=drink_data, token=self.admin_token)
                 drink = response.get("data", {})
-                print(f"  Created drink: {drink.get('name', 'Unknown')} (ID: {drink.get('drinkId')})")
+                drink_id = drink.get("drinkId", "?")
+                drink_name = drink.get("name", drink_data.get("name", "Unknown"))
+                print(f"  Created drink: {drink_name} (ID: {drink_id})")
                 created_count += 1
                 
             except Exception as e:
@@ -182,7 +205,7 @@ class CodePopSeeder:
         
         created_count = 0
         for pref_data in SEED_PREFERENCES:
-            username = pref_data.pop("username")
+            username = pref_data["username"]
             
             if username not in self.user_tokens:
                 print(f"  Warning: User {username} not found, skipping preference")
@@ -191,35 +214,29 @@ class CodePopSeeder:
             try:
                 token = self.user_tokens[username]
                 
-                # Build preference request based on type
-                pref_type = pref_data.get("preference_type")
-                request_data = {"preferenceType": pref_type}
+                # Build preference request - API expects 'preference' as main field
+                request_data = {
+                    "preference": pref_data["preference"]
+                }
                 
-                if "drink_name" in pref_data:
-                    # Find drink by name
-                    drink_name = pref_data.pop("drink_name")
-                    for drink in SEED_DRINKS:
-                        if drink["name"] == drink_name:
-                            # Use a dummy ID - the service should handle it
-                            request_data["drinkId"] = 1
-                            break
-                
-                if "ingredient_name" in pref_data:
-                    request_data["ingredientName"] = pref_data.pop("ingredient_name")
+                # Add optional fields if present
+                if "preferenceType" in pref_data:
+                    request_data["preferenceType"] = pref_data["preferenceType"]
                 
                 if "sweetness" in pref_data:
-                    request_data["sweetness"] = pref_data.pop("sweetness")
+                    request_data["sweetness"] = pref_data["sweetness"]
                 
                 if "temperature" in pref_data:
-                    request_data["temperature"] = pref_data.pop("temperature")
+                    request_data["temperature"] = pref_data["temperature"]
                 
-                if "details" in pref_data:
-                    request_data["details"] = pref_data.pop("details")
+                if "ingredientName" in pref_data:
+                    request_data["ingredientName"] = pref_data["ingredientName"]
                 
                 response = self._make_request("POST", "/backend/preferences", 
                                             data=request_data, token=token)
                 pref = response.get("data", {})
-                print(f"  Created preference for {username}: {pref_type}")
+                pref_type = pref.get("preferenceType", "preference")
+                print(f"  Created preference for {username}: {pref_data['preference']} ({pref_type})")
                 created_count += 1
                 
             except Exception as e:
@@ -242,11 +259,15 @@ class CodePopSeeder:
                 response = self._make_request("POST", "/backend/inventory", 
                                             data=inv_data, token=self.admin_token)
                 item = response.get("data", {})
-                print(f"  Created inventory: {item.get('itemName', 'Unknown')} ({item.get('quantity')} {item.get('unit')})")
+                item_name = item.get("itemName", inv_data.get("itemName", "Unknown"))
+                quantity = item.get("quantity", inv_data.get("quantity", "?"))
+                item_type = item.get("itemType", inv_data.get("itemType", ""))
+                print(f"  Created inventory: {item_name} ({quantity} units, type: {item_type})")
                 created_count += 1
                 
             except Exception as e:
-                if "already exists" in str(e):
+                error_str = str(e)
+                if "already exists" in error_str:
                     print(f"  Inventory {inv_data['itemName']} already exists (skipping)")
                 else:
                     print(f"  Error creating {inv_data['itemName']}: {e}")
@@ -352,16 +373,30 @@ Examples:
     try:
         if args.reset:
             # Clear and reseed
-            seeder.clear_data()
+            print("\n" + "=" * 60)
+            print("RESET MODE: Clearing and reseeding all data")
+            print("=" * 60)
+            
+            # First, seed users to get admin token for cleanup
+            print("\nStep 1: Creating users for authentication...")
             seeder.seed_users()
             time.sleep(0.5)
+            
+            # Then clear existing test data
             if seeder.admin_token:
+                print("\nStep 2: Clearing existing test data...")
                 seeder.clear_data()
                 time.sleep(0.5)
+                
+                print("\nStep 3: Reseeding all data...")
                 seeder.seed_users()
+                time.sleep(0.3)
                 seeder.seed_drinks()
+                time.sleep(0.3)
                 seeder.seed_preferences()
+                time.sleep(0.3)
                 seeder.seed_inventory()
+            
             seeder.print_summary()
             
         elif args.clear:

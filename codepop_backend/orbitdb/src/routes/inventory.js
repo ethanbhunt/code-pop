@@ -14,22 +14,22 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   if (req.query.storeId) {
     const storeId = parseInt(req.query.storeId)
     
-    // Verify access
-    if (req.user.enum !== "super_admin") {
-      if (req.user.enum !== "customer" && !req.user.assignedStores.includes(storeId)) {
-        return res.status(403).json({
-          error: "Access denied to this store",
-          code: "STORE_ACCESS_DENIED"
-        })
-      }
+    // Verify access - admins can access all stores, customers can access any store
+    const userRole = String(req.user.role || "").toLowerCase()
+    if (userRole !== "admin" && userRole !== "customer") {
+      return res.status(403).json({
+        error: "Access denied to this store",
+        code: "STORE_ACCESS_DENIED"
+      })
     }
     
     const result = await inventoryService.getStoreInventory(storeId, offset, limit)
     return res.json({ status: "success", storeId, count: result.count, data: result.data })
   }
   
-  // Otherwise return all inventory (admin/super_admin only)
-  if (req.user.enum !== "super_admin" && req.user.enum !== "admin") {
+  // Otherwise return all inventory (admin only)
+  const userRole = String(req.user.role || "").toLowerCase()
+  if (userRole !== "admin") {
     return res.status(403).json({
       error: "Not authorized to view all inventory",
       code: "NOT_AUTHORIZED"
@@ -51,13 +51,8 @@ router.post("/", authenticate, requireAdmin, asyncHandler(async (req, res) => {
     })
   }
   
-  // Verify store access
-  if (req.user.enum !== "super_admin" && !req.user.assignedStores.includes(storeId)) {
-    return res.status(403).json({
-      error: "Access denied to this store",
-      code: "STORE_ACCESS_DENIED"
-    })
-  }
+  // Admin role already verified by requireAdmin middleware
+  // Allow all admin users to create inventory for any store
   
   const item = await inventoryService.createInventoryItem(
     storeId,

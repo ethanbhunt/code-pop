@@ -6,11 +6,12 @@ Used by seed_data.py to populate the OrbitDB backend.
 """
 
 # Test Users - 3 accounts with different roles
+# Note: Passwords must be at least 8 characters
 SEED_USERS = [
     {
         "username": "superadmin",
         "email": "superadmin@example.com",
-        "password": "superadmin",
+        "password": "SuperAdmin123",
         "firstName": "Superadmin",
         "lastName": "Superadmin",
         "role": "superadmin"
@@ -18,7 +19,7 @@ SEED_USERS = [
     {
         "username": "manager",
         "email": "manager@example.com",
-        "password": "manager",
+        "password": "Manager123",
         "firstName": "Manager",
         "lastName": "Manager",
         "role": "manager"
@@ -26,7 +27,7 @@ SEED_USERS = [
     {
         "username": "admin",
         "email": "admin@example.com",
-        "password": "admin",
+        "password": "Admin123",
         "firstName": "Admin",
         "lastName": "Admin",
         "role": "admin"
@@ -34,170 +35,163 @@ SEED_USERS = [
 ]
 
 # Drinks Menu - 8 drinks covering major categories
+# Note: API expects name, sodas, price, and optional fields: syrups, addIns, ingredients, description, isVegan, isGlutenFree, calories, rating
 SEED_DRINKS = [
     {
         "name": "Vanilla Latte",
-        "category": "coffee",
         "description": "Smooth espresso with steamed milk and vanilla syrup",
         "price": 4.50,
+        "sodas": [],
+        "syrups": ["vanilla"],
+        "addIns": [],
+        "ingredients": ["espresso", "milk", "vanilla syrup"],
         "isVegan": False,
         "isGlutenFree": True,
         "calories": 190,
-        "ingredients": ["espresso", "milk", "vanilla syrup"],
-        "syrups": ["vanilla"],
-        "sodas": [],
         "rating": 4.7
     },
     {
         "name": "Iced Americano",
-        "category": "coffee",
         "description": "Bold espresso shots with cold water and ice",
         "price": 3.50,
+        "sodas": [],
+        "syrups": [],
+        "addIns": [],
+        "ingredients": ["espresso", "water", "ice"],
         "isVegan": True,
         "isGlutenFree": True,
         "calories": 10,
-        "ingredients": ["espresso", "water", "ice"],
-        "syrups": [],
-        "sodas": [],
         "rating": 4.5
     },
     {
         "name": "Oat Milk Cappuccino",
-        "category": "coffee",
         "description": "Creamy cappuccino with vegan oat milk and foam",
         "price": 5.00,
+        "sodas": [],
+        "syrups": [],
+        "addIns": ["foam"],
+        "ingredients": ["espresso", "oat milk", "foam"],
         "isVegan": True,
         "isGlutenFree": True,
         "calories": 120,
-        "ingredients": ["espresso", "oat milk", "foam"],
-        "syrups": [],
-        "sodas": [],
         "rating": 4.8
     },
     {
         "name": "Green Tea Latte",
-        "category": "tea",
         "description": "Smooth green tea with creamy milk and a touch of vanilla",
         "price": 4.00,
+        "sodas": [],
+        "syrups": ["vanilla"],
+        "addIns": [],
+        "ingredients": ["green tea", "milk", "vanilla"],
         "isVegan": False,
         "isGlutenFree": True,
         "calories": 100,
-        "ingredients": ["green tea", "milk", "vanilla"],
-        "syrups": ["vanilla"],
-        "sodas": [],
         "rating": 4.3
     },
     {
         "name": "Berry Smoothie",
-        "category": "smoothie",
         "description": "Fresh strawberry and blueberry blend with yogurt",
         "price": 6.00,
+        "sodas": [],
+        "syrups": [],
+        "addIns": [],
+        "ingredients": ["strawberry", "blueberry", "yogurt", "banana"],
         "isVegan": False,
         "isGlutenFree": True,
         "calories": 250,
-        "ingredients": ["strawberry", "blueberry", "yogurt", "banana"],
-        "syrups": [],
-        "sodas": [],
         "rating": 4.6
     },
     {
         "name": "Tropical Smoothie",
-        "category": "smoothie",
         "description": "Exotic mango and pineapple with coconut milk",
         "price": 6.50,
+        "sodas": [],
+        "syrups": [],
+        "addIns": [],
+        "ingredients": ["mango", "pineapple", "coconut milk"],
         "isVegan": True,
         "isGlutenFree": True,
         "calories": 280,
-        "ingredients": ["mango", "pineapple", "coconut milk"],
-        "syrups": [],
-        "sodas": [],
         "rating": 4.4
     },
     {
         "name": "Fresh Orange Juice",
-        "category": "juice",
         "description": "Freshly squeezed orange juice with ice",
         "price": 5.00,
+        "sodas": [],
+        "syrups": [],
+        "addIns": [],
+        "ingredients": ["fresh oranges", "ice"],
         "isVegan": True,
         "isGlutenFree": True,
         "calories": 120,
-        "ingredients": ["fresh oranges", "ice"],
-        "syrups": [],
-        "sodas": [],
         "rating": 4.5
     },
     {
         "name": "Caramel Macchiato",
-        "category": "coffee",
         "description": "Espresso with velvety milk and rich caramel drizzle",
         "price": 5.50,
+        "sodas": [],
+        "syrups": ["caramel"],
+        "addIns": ["whip"],
+        "ingredients": ["espresso", "milk", "caramel syrup"],
         "isVegan": False,
         "isGlutenFree": True,
         "calories": 220,
-        "ingredients": ["espresso", "milk", "caramel syrup"],
-        "syrups": ["caramel"],
-        "sodas": [],
         "rating": 4.9
     }
 ]
 
 # User Preferences - 2-3 preferences per user
+# Note: API expects "preference" field from the allowed list (sodas, syrups, creams, fruits, etc.)
+# Valid preferences include: mtn. dew, sprite, coke, pepsi, vanilla, caramel, chocolate, strawberry, whip, sprinkles, etc.
 SEED_PREFERENCES = [
-    # Jane's preferences
+    # Superadmin's preferences
     {
-        "username": "customer_jane",
-        "preference_type": "favorite",
-        "drink_name": "Vanilla Latte",
+        "username": "superadmin",
+        "preference": "vanilla",
+        "preferenceType": "favorite",
         "sweetness": "medium",
-        "temperature": "hot",
-        "details": "My regular order"
+        "temperature": "hot"
     },
     {
-        "username": "customer_jane",
-        "preference_type": "dislike",
-        "ingredient_name": "coconut milk",
-        "details": "Too strong of a taste"
+        "username": "superadmin",
+        "preference": "coconut",
+        "preferenceType": "dislike"
     },
+    # Manager's preferences
     {
-        "username": "customer_jane",
-        "preference_type": "allergic",
-        "drink_name": "Berry Smoothie",
-        "details": "Dairy sensitivity"
-    },
-    # Bob's preferences
-    {
-        "username": "staff_bob",
-        "preference_type": "favorite",
-        "drink_name": "Iced Americano",
-        "temperature": "cold",
-        "details": "Perfect for work"
-    },
-    {
-        "username": "staff_bob",
-        "preference_type": "ingredient_preference",
-        "ingredient_name": "extra ice",
-        "details": "Always extra ice"
-    },
-    # Alex's preferences
-    {
-        "username": "admin_alex",
-        "preference_type": "favorite",
-        "drink_name": "Caramel Macchiato",
+        "username": "manager",
+        "preference": "salted caramel",
+        "preferenceType": "favorite",
         "sweetness": "high",
-        "temperature": "hot",
-        "details": "My favorite indulgence"
+        "temperature": "hot"
     },
     {
-        "username": "admin_alex",
-        "preference_type": "recommended",
-        "drink_name": "Oat Milk Cappuccino",
-        "details": "Great vegan option"
+        "username": "manager",
+        "preference": "whip",
+        "preferenceType": "favorite"
+    },
+    # Admin's preferences
+    {
+        "username": "admin",
+        "preference": "chocolate",
+        "preferenceType": "favorite"
+    },
+    {
+        "username": "admin",
+        "preference": "mtn. dew",
+        "preferenceType": "recommended"
     }
 ]
 
 # Inventory Items - Stock levels for admin testing
+# Note: API expects itemName, itemType, quantity, thresholdLevel (not minThreshold), storeId (required), and optional: costPerUnit, supplier
+# itemType values: 'Soda', 'Syrup', 'Add In', 'Physical'
 SEED_INVENTORY = [
     {
+        "storeId": 1,
         "itemName": "Vanilla Syrup",
         "itemType": "Syrup",
         "quantity": 30,
@@ -206,6 +200,7 @@ SEED_INVENTORY = [
         "costPerUnit": 8.50
     },
     {
+        "storeId": 1,
         "itemName": "Caramel Syrup",
         "itemType": "Syrup",
         "quantity": 25,
@@ -214,6 +209,7 @@ SEED_INVENTORY = [
         "costPerUnit": 9.00
     },
     {
+        "storeId": 1,
         "itemName": "Oat Milk",
         "itemType": "Add In",
         "quantity": 40,
@@ -222,6 +218,7 @@ SEED_INVENTORY = [
         "costPerUnit": 3.50
     },
     {
+        "storeId": 1,
         "itemName": "Whole Milk",
         "itemType": "Add In",
         "quantity": 50,
@@ -230,6 +227,7 @@ SEED_INVENTORY = [
         "costPerUnit": 2.75
     },
     {
+        "storeId": 1,
         "itemName": "Espresso Beans",
         "itemType": "Physical",
         "quantity": 20,
@@ -250,22 +248,22 @@ SEED_CONFIG = {
 
 # Test Credentials for reference
 TEST_CREDENTIALS = {
-    "customer": {
-        "username": "customer_jane",
-        "email": "jane@example.com",
-        "password": "Customer123!",
-        "description": "Regular customer - can browse, order, and rate"
+    "superadmin": {
+        "username": "superadmin",
+        "email": "superadmin@example.com",
+        "password": "SuperAdmin123",
+        "description": "Super Administrator - full access across all stores"
     },
-    "staff": {
-        "username": "staff_bob",
-        "email": "bob@example.com",
-        "password": "Staff123!",
-        "description": "Staff member - can prepare orders, manage inventory"
+    "manager": {
+        "username": "manager",
+        "email": "manager@example.com",
+        "password": "Manager123",
+        "description": "Store Manager - can manage store operations and staff"
     },
     "admin": {
-        "username": "admin_alex",
-        "email": "alex@example.com",
-        "password": "Admin123!",
+        "username": "admin",
+        "email": "admin@example.com",
+        "password": "Admin123",
         "description": "Administrator - full access to all features"
     }
 }
