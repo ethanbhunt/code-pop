@@ -32,11 +32,11 @@ const App = () => {
   // initialize cart list 
   const initCart = async () => {
     try{
-      const checkoutList = await AsyncStorage.getItem('checkoutList')
-      if (checkoutList === null){
-        const initialList = [];
-        await AsyncStorage.setItem("checkoutList", JSON.stringify(initialList));
-      }
+      // Always start with empty cart on app startup
+      const initialList = [];
+      await AsyncStorage.setItem("checkoutList", JSON.stringify(initialList));
+      // Also clear purchased drinks from previous sessions
+      await AsyncStorage.removeItem("purchasedDrinks");
     }catch(error){
       console.error("error with initializing cart list", error);
     }

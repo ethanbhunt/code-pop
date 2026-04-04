@@ -126,20 +126,24 @@ const GeneralHomePage = () => {
         },
       });
 
-      if (response.status === 200) {
-        // Clear AsyncStorage
-        await AsyncStorage.removeItem('userToken');
-        await AsyncStorage.removeItem('userId');
-        await AsyncStorage.removeItem('first_name');
-        await AsyncStorage.removeItem('userRole');
-        
-        setIsLoggedIn(false);
-        setName(null);
-        
-        Alert.alert('Logout successful!');
-      } else {
-        Alert.alert('Logout failed, please try again.');
-      }
+       if (response.status === 200) {
+         // Clear AsyncStorage
+         await AsyncStorage.removeItem('userToken');
+         await AsyncStorage.removeItem('userId');
+         await AsyncStorage.removeItem('first_name');
+         await AsyncStorage.removeItem('userRole');
+         
+         // Clear cart when logging out
+         await AsyncStorage.removeItem('checkoutList');
+         await AsyncStorage.removeItem('purchasedDrinks');
+         
+         setIsLoggedIn(false);
+         setName(null);
+         
+         Alert.alert('Logout successful!');
+       } else {
+         Alert.alert('Logout failed, please try again.');
+       }
     } catch (error) {
       console.error('Error during logout:', error);
       Alert.alert('Logout failed, please try again later.');

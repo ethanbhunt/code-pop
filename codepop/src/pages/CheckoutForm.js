@@ -140,15 +140,16 @@ export default function CheckoutForm(totalPrice) {
        }
 
  
-      // Update the local state to remove the drink from the cart page
-      setDrinks(null);
-  
-      // Update the AsyncStorage to remove the drink ID from the checkout list
-      await AsyncStorage.removeItem("checkoutList");
-      
+       // Update the local state to remove the drink from the cart page
+       setDrinks(null);
+   
+       // Update the AsyncStorage to remove the drink ID from the checkout list and purchased drinks
+       await AsyncStorage.removeItem("checkoutList");
+       await AsyncStorage.removeItem("purchasedDrinks");
+       
 
-      console.log("cart cleared sucessfully");
-      return true;
+       console.log("cart cleared sucessfully");
+       return true;
       
     } catch (error) {
       console.error('Error removing drinks from cart:', error);
