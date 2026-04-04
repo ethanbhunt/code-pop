@@ -9,7 +9,8 @@ The seed data scripts have been completely updated to correctly reflect and use 
 #### 1. **seed_config.py - Configuration Data**
 
 **Users**
-- Updated to match actual roles in system: `superadmin`, `manager`, `admin`
+- Updated to match actual roles in system: `superadmin`, `manager`, `admin`, `customer`
+- Added a customer account for regular user testing
 - Removed unused user variations (`customer_jane`, `staff_bob`, `admin_alex`)
 
 **Drinks**
@@ -147,9 +148,9 @@ GET  /health                     - Health check
 
 ### Data Created
 
-- **Users**: 3 (with different roles)
+- **Users**: 4 (superadmin, manager, admin, customer with different roles)
 - **Drinks**: 8 (coffee, tea, smoothie, juice varieties)
-- **Preferences**: 6 (2-3 per user covering favorites, dislikes, allergies, recommendations)
+- **Preferences**: 9 (2-3 per user covering favorites, dislikes, recommendations)
 - **Inventory**: 5 items (syrups, milk options, espresso beans)
 
 ### Backward Compatibility Notes

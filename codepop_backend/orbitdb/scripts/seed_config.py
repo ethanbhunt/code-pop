@@ -5,7 +5,7 @@ This file defines all test data: users, drinks, preferences, and inventory.
 Used by seed_data.py to populate the OrbitDB backend.
 """
 
-# Test Users - 3 accounts with different roles
+# Test Users - 4 accounts with different roles
 # Note: Passwords must be at least 8 characters
 SEED_USERS = [
     {
@@ -31,6 +31,14 @@ SEED_USERS = [
         "firstName": "Admin",
         "lastName": "Admin",
         "role": "admin"
+    },
+    {
+        "username": "customer",
+        "email": "customer@example.com",
+        "password": "Customer123",
+        "firstName": "John",
+        "lastName": "Doe",
+        "role": "customer"
     },
 ]
 
@@ -183,6 +191,24 @@ SEED_PREFERENCES = [
         "username": "admin",
         "preference": "mtn. dew",
         "preferenceType": "recommended"
+    },
+    # Customer's preferences
+    {
+        "username": "customer",
+        "preference": "strawberry",
+        "preferenceType": "favorite",
+        "sweetness": "medium",
+        "temperature": "cold"
+    },
+    {
+        "username": "customer",
+        "preference": "whip",
+        "preferenceType": "favorite"
+    },
+    {
+        "username": "customer",
+        "preference": "pepsi",
+        "preferenceType": "dislike"
     }
 ]
 
@@ -265,5 +291,11 @@ TEST_CREDENTIALS = {
         "email": "admin@example.com",
         "password": "Admin123",
         "description": "Administrator - full access to all features"
+    },
+    "customer": {
+        "username": "customer",
+        "email": "customer@example.com",
+        "password": "Customer123",
+        "description": "Regular customer - can browse drinks, place orders, manage preferences"
     }
 }

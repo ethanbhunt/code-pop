@@ -48,9 +48,9 @@ The seed data scripts and backend have been fully corrected and are production-r
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Users** | ✅ Working | 3 test users (superadmin, manager, admin) |
+| **Users** | ✅ Working | 4 test users (superadmin, manager, admin, customer) |
 | **Drinks** | ✅ Working | 8 menu items with correct field names |
-| **Preferences** | ✅ Working | 6 preferences with valid whitelist values |
+| **Preferences** | ✅ Working | 9 preferences with valid whitelist values |
 | **Inventory** | ✅ Working | 5 items (backend bug fixed) |
 
 ## Test Credentials
@@ -59,6 +59,7 @@ The seed data scripts and backend have been fully corrected and are production-r
 Superadmin:  superadmin / SuperAdmin123
 Manager:     manager / Manager123
 Admin:       admin / Admin123
+Customer:    customer / Customer123
 ```
 
 ## How to Use
@@ -85,9 +86,9 @@ python3 seed_data.py --clear
 
 ## Data Created
 
-- **Users**: 3 with different roles
+- **Users**: 4 with different roles (superadmin, manager, admin, customer)
 - **Drinks**: 8 menu items (coffee, tea, smoothies, juice)
-- **Preferences**: 6 total (2-3 per user)
+- **Preferences**: 9 total (2-3 per user)
 - **Inventory**: 5 items (syrups, milk, beans)
 
 ## Documentation
