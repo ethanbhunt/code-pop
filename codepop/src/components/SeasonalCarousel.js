@@ -93,16 +93,16 @@ const SeasonalCarousel = () => {
                    'Content-Type': 'application/json',
                    'Authorization': `Token ${token}`,
                  },
-                body: JSON.stringify({ 
-                  name: item.name,  // Example name for the drink
-                  sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
-                  syrupsUsed: item.syrupsUsed,
-                  addIns: item.addIns,
-                  price: item.price,
-                  userCreated: true,    // Assuming the user is creating the drink
-                  size: '24oz',
-                  ice: 'normal',
-                })
+                 body: JSON.stringify({ 
+                   name: item.name,  // Example name for the drink
+                   sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
+                   syrupsUsed: item.syrupsUsed,
+                   addIns: item.addIns,
+                   price: item.price,
+                   userCreated: true,    // Assuming the user is creating the drink
+                   size: '24oz',
+                   ice: 'regular',
+                 })
               });
             
               if (!response.ok) {

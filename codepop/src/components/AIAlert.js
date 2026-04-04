@@ -37,7 +37,7 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
            price: 2.00,
            userCreated: true,
            size: drinkDict.size || "24oz", // Default size
-           ice: (drinkDict.ice || "normal").toLowerCase(), // Default ice amount, convert to lowercase
+            ice: (drinkDict.ice || "regular").toLowerCase(), // Default ice amount, convert to lowercase
          }),
        });
   
@@ -119,13 +119,18 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     return layers;
   };
 
-  const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
-  const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
-  const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
+   // Normalize drink data - support both camelCase and PascalCase
+   const sodaUsed = drinkDict.sodaUsed || drinkDict.SodaUsed || [drinkDict.soda] || [];
+   const syrupsUsed = drinkDict.syrupsUsed || drinkDict.SyrupsUsed || drinkDict.syrups || [];
+   const addIns = drinkDict.addIns || drinkDict.AddIns || [];
+   const size = drinkDict.size || drinkDict.Size || "24oz";
+   const ice = drinkDict.ice || drinkDict.Ice || "regular";
 
-  
-
-  const layers = getLayers(sodaUsed, syrupsUsed, addIns);
+   const layers = getLayers(
+     Array.isArray(sodaUsed) ? sodaUsed : [sodaUsed],
+     Array.isArray(syrupsUsed) ? syrupsUsed : [],
+     Array.isArray(addIns) ? addIns : []
+   );
   console.log(layers);
 
 
@@ -144,13 +149,13 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
-            <View style={styles.ingredientsCard}>
-              <Text style={styles.ingredientsText}>Size: {drinkDict.Size}</Text>
-              <Text style={styles.ingredientsText}>Ice: {drinkDict.Ice}</Text>
-              <Text style={styles.ingredientsText}>Soda: {sodaUsed.join(", ")}</Text>
-              <Text style={styles.ingredientsText}>Syrups: {syrupsUsed.join(", ")}</Text>
-              <Text style={styles.ingredientsText}>Add-ins: {addIns.join(", ")}</Text>
-            </View>
+             <View style={styles.ingredientsCard}>
+               <Text style={styles.ingredientsText}>Size: {size}</Text>
+               <Text style={styles.ingredientsText}>Ice: {ice}</Text>
+               <Text style={styles.ingredientsText}>Soda: {Array.isArray(sodaUsed) ? sodaUsed.join(", ") : sodaUsed}</Text>
+               <Text style={styles.ingredientsText}>Syrups: {Array.isArray(syrupsUsed) ? syrupsUsed.join(", ") : (syrupsUsed || "None")}</Text>
+               <Text style={styles.ingredientsText}>Add-ins: {Array.isArray(addIns) ? addIns.join(", ") : (addIns || "None")}</Text>
+             </View>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity style={styles.primaryButton} onPress={() => (AddToCart(), toggleModal())}>
                 <Text style={styles.primaryButtonText}>Add to Cart</Text>

@@ -229,22 +229,28 @@ const GeneralHomePage = () => {
          {drinksLoading ? (
            <ActivityIndicator size="large" color="#1F7A8C" style={{ marginTop: 16 }} />
          ) : (
-           dailyDrinks.map((drink, index) => {
-             const soda = Array.isArray(drink.sodaUsed || drink.SodaUsed || drink.sodas) ? (drink.sodaUsed || drink.SodaUsed || drink.sodas) : [(drink.sodaUsed || drink.SodaUsed || drink.sodas)];
-             const syrups = Array.isArray(drink.syrupsUsed || drink.SyrupsUsed || drink.syrups) ? (drink.syrupsUsed || drink.SyrupsUsed || drink.syrups) : [];
-             const addIns = Array.isArray(drink.addIns || drink.AddIns) ? (drink.addIns || drink.AddIns) : [];
+            dailyDrinks.map((drink, index) => {
+              // Handle AI-generated drinks which use camelCase field names
+              const soda = drink.sodaUsed || drink.SodaUsed || drink.sodas || [];
+              const syrups = drink.syrupsUsed || drink.SyrupsUsed || drink.syrups || [];
+              const addIns = drink.addIns || drink.AddIns || [];
+              
+              // Ensure fields are arrays
+              const sodaArray = Array.isArray(soda) ? soda : (soda ? [soda] : []);
+              const syrupsArray = Array.isArray(syrups) ? syrups : [];
+              const addInsArray = Array.isArray(addIns) ? addIns : [];
 
-             return (
-               <View key={index} style={styles.dailyDrinkCard}>
-                 <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
-                 <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(soda)}</Text>
-                 <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrups)}</Text>
-                 <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addIns)}</Text>
-                 <Text style={styles.dailyDrinkDetail}>Size: {drink.size || drink.Size || '24oz'}</Text>
-                 <Text style={styles.dailyDrinkDetail}>Ice: {drink.ice || drink.Ice || 'regular'}</Text>
-               </View>
-             );
-           })
+              return (
+                <View key={index} style={styles.dailyDrinkCard}>
+                  <Text style={styles.dailyDrinkNumber}>Drink #{index + 1}</Text>
+                  <Text style={styles.dailyDrinkDetail}>Soda: {formatDrinkField(sodaArray)}</Text>
+                  <Text style={styles.dailyDrinkDetail}>Syrups: {formatDrinkField(syrupsArray)}</Text>
+                  <Text style={styles.dailyDrinkDetail}>Add-ins: {formatDrinkField(addInsArray)}</Text>
+                  <Text style={styles.dailyDrinkDetail}>Size: {drink.size || drink.Size || '24oz'}</Text>
+                  <Text style={styles.dailyDrinkDetail}>Ice: {drink.ice || drink.Ice || 'regular'}</Text>
+                </View>
+              );
+            })
          )}
 
       </ScrollView>

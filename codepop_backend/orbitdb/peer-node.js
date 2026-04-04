@@ -235,13 +235,13 @@ async function start() {
     // GET /backend/generate - Generate random drink or user-specific AI drink
     app.get("/backend/generate", authenticate, (req, res) => {
       try {
-        // Return a random AI-generated drink
+        // Return a random AI-generated drink with complete information
         const drinks = [
-          { name: "Tropical Sunrise", syrups: ["Mango", "Orange"], soda: "Sprite", addins: ["Lime"], price: 3.50 },
-          { name: "Berry Blast", syrups: ["Strawberry", "Blueberry"], soda: "Lemonade", addins: ["Mint"], price: 3.75 },
-          { name: "Vanilla Sky", syrups: ["Vanilla"], soda: "Ginger Ale", addins: ["Whipped Cream"], price: 3.25 },
-          { name: "Cherry Cola Dream", syrups: ["Cherry"], soda: "Cola", addins: ["Vanilla"], price: 3.50 },
-          { name: "Citrus Punch", syrups: ["Lemon", "Lime"], soda: "Sprite", addins: ["Mint"], price: 3.50 }
+          { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
+          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "20oz", ice: "light" },
+          { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
+          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "20oz", ice: "extra" },
+          { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
         ]
         
         const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]
@@ -260,13 +260,13 @@ async function start() {
       try {
         const userId = req.params.userId
         
-        // Return a random AI-generated drink based on user preferences
+        // Return a random AI-generated drink based on user preferences with complete information
         const drinks = [
-          { name: "Tropical Sunrise", syrups: ["Mango", "Orange"], soda: "Sprite", addins: ["Lime"], price: 3.50 },
-          { name: "Berry Blast", syrups: ["Strawberry", "Blueberry"], soda: "Lemonade", addins: ["Mint"], price: 3.75 },
-          { name: "Vanilla Sky", syrups: ["Vanilla"], soda: "Ginger Ale", addins: ["Whipped Cream"], price: 3.25 },
-          { name: "Cherry Cola Dream", syrups: ["Cherry"], soda: "Cola", addins: ["Vanilla"], price: 3.50 },
-          { name: "Citrus Punch", syrups: ["Lemon", "Lime"], soda: "Sprite", addins: ["Mint"], price: 3.50 }
+          { name: "Tropical Sunrise", syrupsUsed: ["Mango", "Orange"], sodaUsed: ["Sprite"], addIns: ["Lime"], price: 3.50, size: "24oz", ice: "regular" },
+          { name: "Berry Blast", syrupsUsed: ["Strawberry", "Blueberry"], sodaUsed: ["Lemonade"], addIns: ["Mint"], price: 3.75, size: "20oz", ice: "light" },
+          { name: "Vanilla Sky", syrupsUsed: ["Vanilla"], sodaUsed: ["Ginger Ale"], addIns: ["Whipped Cream"], price: 3.25, size: "24oz", ice: "regular" },
+          { name: "Cherry Cola Dream", syrupsUsed: ["Cherry"], sodaUsed: ["Cola"], addIns: ["Vanilla"], price: 3.50, size: "20oz", ice: "extra" },
+          { name: "Citrus Punch", syrupsUsed: ["Lemon", "Lime"], sodaUsed: ["Sprite"], addIns: ["Mint"], price: 3.50, size: "24oz", ice: "regular" }
         ]
         
         const randomDrink = drinks[Math.floor(Math.random() * drinks.length)]

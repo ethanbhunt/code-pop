@@ -88,7 +88,7 @@ export function validateDrinkSize(size) {
  */
 export function validateDrinkIce(ice) {
   if (!ice || typeof ice !== "string") return false
-  const allowedIce = ["light", "normal", "extra"]
+  const allowedIce = ["light", "regular", "extra"]
   return allowedIce.includes(ice.toLowerCase())
 }
 

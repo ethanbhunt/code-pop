@@ -129,15 +129,23 @@ const PostCheckout = () => {
            }
          });
 
-        const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const inventoryData = await inventoryResponse.json();
+         const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
+           method: 'GET',
+           headers: { 'Content-Type': 'application/json' },
+         });
+         const inventoryData = await inventoryResponse.json();
 
-        const matchingInventoryIDs = inventoryData.inventory_items
-          .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
-          .map(item => item.InventoryID);
+         // Handle both response formats: {inventory_items: [...]} and {status, data: {inventory_items: [...]}}
+         const inventoryItems = inventoryData.inventory_items || inventoryData.data?.inventory_items || [];
+         
+         if (!inventoryItems || inventoryItems.length === 0) {
+           console.warn('No inventory items found in response');
+           return; // Exit early if no inventory to update
+         }
+
+         const matchingInventoryIDs = inventoryItems
+           .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
+           .map(item => item.InventoryID);
 
         for (const id of matchingInventoryIDs) {
           try {
