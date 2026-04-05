@@ -3,6 +3,7 @@
 
 import { getInventoryDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateInventoryItemType, validatePositiveInteger } from "../utils/validation.js"
+import { assertInvariants, validateInventoryInvariants } from "./conflictResolver.js"
 import * as reorderService from "./reorderService.js"
 import * as auditService from "./auditService.js"
 
@@ -89,6 +90,13 @@ export async function updateInventoryQuantity(itemId, newQuantity, actor = null)
   const beforeValue = { ...item }
   item.quantity = parseInt(newQuantity, 10)
   item.lastUpdated = getTimestamp()
+
+  // Validate invariants before write
+  const validation = validateInventoryInvariants(item)
+  if (!validation.valid) {
+    throw new Error(`Inventory invariant violation: ${validation.errors.join("; ")}`)
+  }
+
   await inventoryDb.put(`inventory:${itemId}`, item)
 
   await auditService.recordAuditLog({

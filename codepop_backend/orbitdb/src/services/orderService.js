@@ -3,6 +3,7 @@
 
 import { getOrdersDb, getNextId, getTimestamp } from "../utils/db.js"
 import { validateOrderStatus, validatePaymentStatus } from "../utils/validation.js"
+import { assertInvariants, validateOrderInvariants } from "./conflictResolver.js"
 import * as drinkService from "./drinkService.js"
 import * as inventoryService from "./inventoryService.js"
 
@@ -49,6 +50,12 @@ export async function createOrder(userId, storeId, drinkIds = [], quantities = {
     creationTime: getTimestamp(),
     lockerCombo: null,
     stripeId: null
+  }
+
+  // Validate invariants before write
+  const validation = validateOrderInvariants(order)
+  if (!validation.valid) {
+    throw new Error(`Order invariant violation: ${validation.errors.join("; ")}`)
   }
 
   await ordersDb.put(`order:${orderId}`, order)
@@ -146,6 +153,12 @@ export async function updateOrder(orderId, updates) {
   }
   if (updates.stripeId !== undefined) {
     order.stripeId = updates.stripeId
+  }
+
+  // Validate invariants before write
+  const validation = validateOrderInvariants(order)
+  if (!validation.valid) {
+    throw new Error(`Order invariant violation: ${validation.errors.join("; ")}`)
   }
 
   await ordersDb.put(`order:${orderId}`, order)

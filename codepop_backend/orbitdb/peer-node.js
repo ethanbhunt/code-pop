@@ -22,6 +22,9 @@ import fs from "fs"
 import { initializeOrbitDB, getAllDatabaseInfo } from "./src/utils/db.js"
 import { errorHandler } from "./src/middleware/errorHandler.js"
 import { authenticate, requireAdmin, optionalAuth } from "./src/middleware/auth.js"
+import { registerPeer, heartbeatPeer, startCleanupInterval } from "./src/services/registryService.js"
+import BootstrapCoordinator from "./src/services/bootstrapCoordination.js"
+import peerRoutes from "./src/routes/peers.js"
 import authRoutes from "./src/routes/auth.js"
 import userRoutes from "./src/routes/users.js"
 import preferenceRoutes from "./src/routes/preferences.js"
@@ -77,6 +80,7 @@ app.use((req, res, next) => {
 
 let libp2p = null
 let orbitdb = null
+let bootstrapCoordinator = null
 
 async function start() {
   console.log(`\n[ ^ ] Starting CodePop Peer Node (port ${HTTP_PORT})...\n`)
@@ -145,6 +149,53 @@ async function start() {
     await new Promise(r => setTimeout(r, 2000))
     console.log("[ ^ ] Databases synchronized with bootstrap\n")
 
+    // ── Peer Registry Registration with Multi-Bootstrap Failover ───────────────
+    console.log("[ ^ ] Initializing multi-bootstrap failover...")
+    
+    // Load bootstrap addresses from environment variable
+    // Format: 'http://localhost:3000,http://10.0.0.1:3000,http://10.0.0.2:3000'
+    const bootstrapAddressesEnv = process.env.BOOTSTRAP_ADDRESSES || "http://localhost:3000"
+    const bootstrapAddresses = bootstrapAddressesEnv.split(",").map(a => a.trim())
+    
+    bootstrapCoordinator = new BootstrapCoordinator(bootstrapAddresses)
+    bootstrapCoordinator.startHealthChecks()
+    console.log(`[ ^ ] Bootstrap coordinator initialized with ${bootstrapAddresses.length} node(s)`)
+    console.log(`  Nodes: ${bootstrapAddresses.join(", ")}`)
+    
+    // Register peer with failover support
+    const peerId = libp2p.peerId.toString()
+    const peerRole = process.env.PEER_ROLE || "store"
+    const peerRegion = process.env.PEER_REGION || "unknown"
+
+    try {
+      const registrationResult = await bootstrapCoordinator.registerPeerWithFailover(peerId, {
+        role: peerRole,
+        region: peerRegion,
+        apiPort: HTTP_PORT,
+        multiaddrs: libp2p.getMultiaddrs().map(a => a.toString())
+      })
+      console.log(`[ ^ ] Registered as ${peerRole} peer in region ${peerRegion}`)
+      console.log(`  Bootstrap: ${registrationResult.bootstrapUrl}`)
+    } catch (err) {
+      console.error(`[ ! ] Failed to register in bootstrap registry: ${err.message}`)
+      // Continue anyway - heartbeat will fail but peer can still operate
+    }
+
+    // Heartbeat loop with failover support - sends heartbeat every 30 seconds
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        await bootstrapCoordinator.heartbeatPeerWithFailover(peerId)
+      } catch (err) {
+        console.error(`[ ! ] Heartbeat failed: ${err.message}`)
+      }
+    }, 30000)
+
+    // Clean up on shutdown
+    process.on("SIGINT", () => {
+      clearInterval(heartbeatInterval)
+      bootstrapCoordinator.stopHealthChecks()
+    })
+
     // ── Peer connection events ────────────────────────────────────────────────
     libp2p.addEventListener("peer:connect", (evt) => {
       console.log(`  [peer:connect] ${evt.detail}`)
@@ -152,6 +203,9 @@ async function start() {
 
     // ── REST API Endpoints ────────────────────────────────────────────────────
     console.log("[ ^ ] Setting up REST API endpoints...\n")
+
+    // Mount peer discovery routes (before other routes)
+    app.use("/peers", peerRoutes)
 
     // Health check (no auth required)
     app.get("/health", (req, res) => {

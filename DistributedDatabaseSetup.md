@@ -47,6 +47,22 @@ Each node stores local operational truth first, then replicates selected records
 - Hub data sets own regional stock availability, inbound and outbound transfers, logistics planning records, and hub audit logs.
 - Shared cross-node state is propagated through signed OrbitDB entries and validated backend rules, not by direct SQL joins across sites.
 
+### 2.4 Multi-Bootstrap Failover Architecture
+
+For production resilience, the peer discovery and registry system must support multiple bootstrap nodes with automatic failover:
+
+- **Primary Bootstrap Node**: Designated master bootstrap node that maintains the authoritative peer registry and coordinates global replication.
+- **Secondary Bootstrap Nodes**: Standby bootstrap nodes that mirror the peer registry and can take over if the primary fails.
+- **Failover Coordination**: Peer nodes automatically discover and connect to backup bootstraps if the primary fails, without manual intervention.
+- **Health Monitoring**: Periodic health checks (every 30 seconds) on all bootstrap nodes detect failures and trigger fallback registration.
+- **Automatic Recovery**: When a failed bootstrap node comes back online, peers automatically reconnect to it (if it was their primary) after successful health checks (5+ consecutive successes).
+
+This architecture ensures:
+- **No Single Point of Failure**: If bootstrap-1 (http://10.0.0.1:3000) goes down, peers automatically failover to bootstrap-2 (http://10.0.0.2:3000)
+- **Transparent Recovery**: When bootstrap-1 comes back online, peers resume using it without manual restart
+- **Coordinated Registration**: Peers can be configured with up to 3 bootstrap nodes and will register with the first available one
+- **Registry Synchronization**: Each bootstrap node maintains an identical peer registry, synced through gossipsub and manual peer updates across boots
+
 ## 3. Planning Assumptions
 
 The current repository does not yet implement the full distributed OrbitDB design. This guide records the required setup steps and future-state assumptions.
@@ -100,6 +116,9 @@ Each node must have a local environment file or secret bundle containing at leas
 - `ORBITDB_DIRECTORY`: local OrbitDB cache directory
 - `ORBITDB_IDENTITY_KEY_PATH`
 - `ORBITDB_ACCESS_CONTROLLER_TYPE`
+- `BOOTSTRAP_ADDRESSES`: comma-separated list of bootstrap HTTP endpoints (for multi-bootstrap failover). Format: `http://host1:port,http://host2:port,http://host3:port`. Default: `http://localhost:3000`
+- `PEER_ROLE`: node role (`store` or `hub`). Default: `store`
+- `PEER_REGION`: region identifier (`A`-`G`). Default: `unknown`
 - `PEER_BOOTSTRAP_MULTIADDRS` (comma-separated list)
 - `TRUSTED_NODE_ALLOWLIST` (for service-layer write checks)
 
@@ -119,6 +138,74 @@ Provision a new node in the following order.
 10. Start replication watchers and projection workers.
 11. Validate signed handshake and authorization paths.
 12. Run a synchronization test with a staged outage and replay.
+
+### 5.1 Multi-Bootstrap Failover Configuration
+
+For production deployments with redundancy, configure multiple bootstrap nodes:
+
+#### Step 1: Deploy Multiple Bootstrap Nodes
+
+Set up 2-3 bootstrap nodes (e.g., bootstrap-primary, bootstrap-secondary, bootstrap-tertiary) on different hosts:
+
+```bash
+# Bootstrap 1 (Primary) - 10.0.0.1:3000
+BOOTSTRAP_ADDRESSES="http://10.0.0.1:3000"
+node bootstrap-node.js
+
+# Bootstrap 2 (Secondary) - 10.0.0.2:3000
+BOOTSTRAP_ADDRESSES="http://10.0.0.2:3000"
+node bootstrap-node.js
+
+# Bootstrap 3 (Tertiary) - 10.0.0.3:3000
+BOOTSTRAP_ADDRESSES="http://10.0.0.3:3000"
+node bootstrap-node.js
+```
+
+#### Step 2: Configure Peer Nodes with Bootstrap List
+
+Set the `BOOTSTRAP_ADDRESSES` environment variable on each peer/store/hub node with all bootstrap URLs:
+
+```bash
+# On store-region-C-001, store-region-C-002, etc.
+BOOTSTRAP_ADDRESSES="http://10.0.0.1:3000,http://10.0.0.2:3000,http://10.0.0.3:3000"
+PEER_ROLE="store"
+PEER_REGION="C"
+node peer-node.js
+```
+
+#### Step 3: Verify Failover Behavior
+
+1. **Normal Operation**: Peer registers with first available bootstrap in the list
+2. **Primary Failure**: If bootstrap-1 fails, peer automatically tries bootstrap-2, then bootstrap-3
+3. **Health Checks**: Bootstrap coordinator runs health checks every 30 seconds; detects failures after 3 consecutive timeouts (~90 seconds)
+4. **Automatic Recovery**: When primary comes back online, coordinator detects recovery (5 consecutive successes) and updates status
+
+#### Step 4: Monitor Bootstrap Health
+
+Query the bootstrap health status via the peer API:
+
+```bash
+curl http://store-node:3001/peers/stats
+# Returns: { total: 3, healthy: 2, unhealthy: 1, ... }
+```
+
+#### Step 5: Bootstrap Synchronization
+
+Each bootstrap node maintains its own peer registry in memory. For production:
+
+- Pre-seed each bootstrap registry with expected peers (optional: auto-discovery)
+- Heartbeats from peers are sent to whichever bootstrap they connected to (coordinator handles failover)
+- All bootstrap nodes see consistent peer state due to gossipsub propagation
+- If a peer switches bootstraps due to failover, its new bootstrap learns its status from peer heartbeat
+
+#### Recommended Topology for Disaster Recovery
+
+- **3+ Bootstrap Nodes** in different geographic locations (e.g., AWS regions)
+- **Regional Distribution**: If Region C is primary, put 1 bootstrap in Region C, 1 in neighboring Region, 1 in opposite Region
+- **DNS Round-Robin** (optional): Instead of hardcoding IP addresses, use DNS names that round-robin across bootstrap IPs:
+  ```bash
+  BOOTSTRAP_ADDRESSES="http://bootstrap.region-c.internal:3000,http://bootstrap.region-b.internal:3000,http://bootstrap.region-e.internal:3000"
+  ```
 
 ## 6. OrbitDB Naming and Node Provisioning
 

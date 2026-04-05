@@ -2,6 +2,7 @@
 // Revenue tracking service
 
 import { getRevenuesDb, getNextId, getTimestamp } from "../utils/db.js"
+import { validateRevenueInvariants } from "./conflictResolver.js"
 
 export async function createRevenue(orderId, amount, description = "") {
   if (!orderId || !amount) {
@@ -22,6 +23,12 @@ export async function createRevenue(orderId, amount, description = "") {
     amount: parsedAmount,
     timestamp: getTimestamp(),
     description
+  }
+
+  // Validate invariants before write
+  const validation = validateRevenueInvariants(revenue)
+  if (!validation.valid) {
+    throw new Error(`Revenue invariant violation: ${validation.errors.join("; ")}`)
   }
 
   await revenuesDb.put(`revenue:${revenueId}`, revenue)

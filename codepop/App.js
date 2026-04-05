@@ -9,13 +9,12 @@ import AdminDash from './src/pages/AdminDash';
 import AuthPage from './src/pages/AuthPage';
 import CartPage from './src/pages/CartPage';
 import CheckoutForm from './src/pages/CheckoutForm';
+import CheckoutSuccessPage from './src/pages/CheckoutSuccessPage';
 import ComplaintsPage from './src/pages/ComplaintsPage';
-import CompletePage from './src/pages/CompletePage';
 import CreateAccountPage from './src/pages/CreateAccountPage';
 import CreateDrinkPage from './src/pages/CreateDrinkPage';
 import GeneralHomePage from './src/pages/GeneralHomePage';
 import ManagerDash from './src/pages/ManagerDash';
-import PaymentPage from './src/pages/PaymentPage';
 import PostCheckout from './src/pages/PostCheckout';
 import PreferencesPage from './src/pages/PreferencesPage';
 import UpdateDrink from './src/pages/UpdateDrink';
@@ -143,7 +142,6 @@ const App = () => {
         <Stack.Screen name="ComplaintsPage" component={ComplaintsPage} />
         <Stack.Screen name="Preferences" component={PreferencesPage} />
         <Stack.Screen name="GeneralHome" component={GeneralHomePage} />
-        <Stack.Screen name="payment" component={PaymentPage} />
         <Stack.Screen name="UpdateDrink" component={UpdateDrink} />
         <Stack.Screen
           name="ManagerDash"
@@ -157,6 +155,7 @@ const App = () => {
         />
         <Stack.Screen name="Complete" component={CompletePage} />
         <Stack.Screen name="Checkout" component={CheckoutForm} />
+        <Stack.Screen name="CheckoutSuccessPage" component={CheckoutSuccessPage} />
         <Stack.Screen name="PostCheckout" component={PostCheckout} />
       </Stack.Navigator>
     </NavigationContainer>

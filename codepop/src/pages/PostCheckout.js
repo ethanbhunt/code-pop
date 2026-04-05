@@ -6,6 +6,7 @@ import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
 import NavBar from '../components/NavBar';
 import GeoMap from '../components/map';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const ORDER_POLL_INTERVAL_MS = 5000;
 
@@ -31,6 +32,7 @@ const PostCheckout = () => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
   const [pollFailures, setPollFailures] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const statusTimeline = ['pending', 'processing', 'completed'];
 
@@ -336,6 +338,39 @@ const PostCheckout = () => {
     setIsNearby(true);
   };
 
+  // Manual refresh function for impatient users
+  const handleManualRefresh = async () => {
+    if (isRefreshing || !orderNum) return;
+    setIsRefreshing(true);
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Token ${token}` } : {}),
+        },
+      });
+      if (response.ok) {
+        const orderData = normalizeOrderPayload(await response.json());
+        setOrderStatus(orderData.status);
+        setEstimatedReadyTime(orderData.pickupTime);
+        if (orderData.lockerCombo) {
+          setLockerCombo(orderData.lockerCombo);
+        }
+        setLastUpdateText(`Last updated: ${new Date().toLocaleTimeString()}`);
+        setPollFailures(0);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+      setPollFailures(prev => prev + 1);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const goHomePage = () => {
     navigation.navigate('GeneralHome');  // Navigate to the login page
   };
@@ -376,10 +411,34 @@ const PostCheckout = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerEyebrow}>Live Tracking</Text>
-          <Text style={styles.headerTitle}>Order #{orderNum || '---'}</Text>
+          <View style={styles.headerTitleRow}>
+            <View style={{flex: 1}}>
+              <Text style={styles.headerEyebrow}>Live Tracking</Text>
+              <Text style={styles.headerTitle}>Order #{orderNum || '---'}</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={handleManualRefresh} 
+              disabled={isRefreshing}
+              style={styles.refreshButton}
+            >
+              {isRefreshing ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <Icon name="refresh" size={24} color="#007AFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.headerStatus}>Status: {getStatusLabel(orderStatus)}</Text>
-          <Text style={styles.headerEta}>ETA: {minutes}:{seconds}</Text>
+          <View style={styles.statusDescriptionRow}>
+            <Text style={styles.statusDescription}>
+              {orderStatus === 'pending' && '⏳ Your order is queued. We are preparing other drinks first.'}
+              {orderStatus === 'processing' && '🥤 We are currently mixing your drink!'}
+              {orderStatus === 'completed' && '✅ Your drink is ready for pickup!'}
+            </Text>
+          </View>
+          
+          <Text style={styles.headerEta}>Ready in: {minutes}:{seconds}</Text>
           <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
           {pollFailures > 0 ? (
             <Text style={styles.pollWarning}>
@@ -406,9 +465,21 @@ const PostCheckout = () => {
 
         <View style={styles.nearbySection}>
           {isNearby ? (
-            <Text style={styles.nearbyText}>You are close by. The team is preparing your drink now.</Text>
+            <View style={[styles.proximityCard, styles.proximityNearby]}>
+              <Text style={styles.proximityEmoji}>📍</Text>
+              <View style={{flex: 1}}>
+                <Text style={styles.proximityTitle}>You're Here!</Text>
+                <Text style={styles.proximityDescription}>The team is preparing your drink now.</Text>
+              </View>
+            </View>
           ) : (
-            <Text style={styles.nearbyText}>Arrive within 500 yards and we will start making your drink.</Text>
+            <View style={[styles.proximityCard, styles.proximityFar]}>
+              <Text style={styles.proximityEmoji}>📍</Text>
+              <View style={{flex: 1}}>
+                <Text style={styles.proximityTitle}>Come Closer</Text>
+                <Text style={styles.proximityDescription}>Arrive within 500 yards and we'll start making your drink.</Text>
+              </View>
+            </View>
           )}
         </View>
 
@@ -642,6 +713,70 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1c334d',
     textAlign: 'center',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusDescriptionRow: {
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1F7A8C',
+  },
+  statusDescriptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1c334d',
+    lineHeight: 18,
+  },
+  proximityCard: {
+    marginTop: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    padding: 14,
+    paddingVertical: 12,
+  },
+  proximityNearby: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4caf50',
+    borderLeftWidth: 4,
+    borderLeftColor: '#4caf50',
+  },
+  proximityFar: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#ff9800',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff9800',
+  },
+  proximityEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  proximityTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1c334d',
+    marginBottom: 2,
+  },
+  proximityDescription: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#49627d',
+    lineHeight: 16,
   },
 });
 

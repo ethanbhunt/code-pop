@@ -180,7 +180,7 @@ export default function CheckoutForm(totalPrice) {
         },
       });
     }
-    navigation.navigate('PostCheckout');
+    navigation.navigate('CheckoutSuccessPage');
   };
 
   const openPaymentSheet = async () => {

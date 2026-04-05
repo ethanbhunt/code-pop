@@ -1,0 +1,55 @@
+{
+  "description": "Trusted peer allowlist for CodePop OrbitDB cluster",
+  "version": "1.0",
+  "updatedAt": "2026-04-05T00:00:00Z",
+  "trustedPeers": {
+    "bootstrap": {
+      "description": "Bootstrap/Coordinator node",
+      "roles": ["bootstrap"],
+      "regions": ["central"],
+      "writePermissions": ["*"]
+    },
+    "hub-central": {
+      "description": "Central supply hub",
+      "roles": ["hub"],
+      "regions": ["central"],
+      "writePermissions": ["inventory", "transfers", "audit"]
+    },
+    "hub-north": {
+      "description": "North region supply hub",
+      "roles": ["hub"],
+      "regions": ["north"],
+      "writePermissions": ["inventory", "transfers", "audit"]
+    },
+    "hub-south": {
+      "description": "South region supply hub",
+      "roles": ["hub"],
+      "regions": ["south"],
+      "writePermissions": ["inventory", "transfers", "audit"]
+    },
+    "hub-east": {
+      "description": "East region supply hub",
+      "roles": ["hub"],
+      "regions": ["east"],
+      "writePermissions": ["inventory", "transfers", "audit"]
+    },
+    "hub-west": {
+      "description": "West region supply hub",
+      "roles": ["hub"],
+      "regions": ["west"],
+      "writePermissions": ["inventory", "transfers", "audit"]
+    },
+    "store-*": {
+      "description": "Store nodes (wildcard pattern)",
+      "roles": ["store"],
+      "regions": ["north", "south", "east", "west", "central", "northeast", "southwest"],
+      "writePermissions": ["orders", "inventory", "audit", "notifications"]
+    }
+  },
+  "notes": [
+    "Peer IDs can be exact matches or patterns with '*' wildcard",
+    "writePermissions specifies which database this peer can write to",
+    "If a peer is not listed, it can still read/replicate but cannot write",
+    "Update this file and restart bootstrap node to apply changes"
+  ]
+}

@@ -18,6 +18,8 @@ import { LevelBlockstore } from "blockstore-level"
 import { LevelDatastore } from "datastore-level"
 import { createOrbitDB, OrbitDBAccessController } from "@orbitdb/core"
 import fs from "fs"
+import { registerPeer, startCleanupInterval, getRegistryStats, loadAllowlist, checkPeerAllowed } from "./src/services/registryService.js"
+import peerRoutes from "./src/routes/peers.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3000")
 const LIBP2P_PORT = parseInt(process.env.LIBP2P_PORT || "4000")
@@ -211,6 +213,27 @@ async function start() {
     console.log(`[ ^ ] Peer information written to ${PEER_INFO_FILE}`)
     console.log(`   Peer ID: ${libp2p.peerId.toString()}\n`)
 
+    // ── Peer Registry Initialization ──────────────────────────────────────────
+    console.log("[ ^ ] Initializing peer registry...")
+    
+    // Load allowlist if it exists
+    const allowlistPath = process.env.ORBITDB_ALLOWLIST_FILE || "./peers/allowlist.json"
+    try {
+      loadAllowlist(allowlistPath)
+      console.log("[ ^ ] Peer allowlist loaded")
+    } catch (err) {
+      console.log("[ ^ ] No allowlist found - all peers will be accepted")
+    }
+
+    registerPeer(libp2p.peerId.toString(), {
+      role: "bootstrap",
+      region: "central",
+      apiPort: HTTP_PORT,
+      multiaddrs: libp2p.getMultiaddrs().map(a => a.toString())
+    })
+    startCleanupInterval(30000) // Check every 30 seconds
+    console.log("[ ^ ] Peer registry ready (cleanup interval: 30s)\n")
+
     // Set up event listeners for all databases
     console.log("[ ^ ] Setting up database replication listeners...")
     Object.entries(databases).forEach(([key, db]) => {
@@ -220,8 +243,11 @@ async function start() {
     })
     console.log()
 
-    // REST API Endpoints
+    // ── REST API Routes ──────────────────────────────────────────────────────────
     console.log("[ ^ ] Setting up REST API endpoints...\n")
+
+    // Mount peer discovery routes
+    app.use("/peers", peerRoutes)
 
     // Health check
     app.get("/health", (req, res) => {
@@ -301,16 +327,25 @@ async function start() {
 
     // Start HTTP server
     app.listen(HTTP_PORT, () => {
+      const stats = getRegistryStats()
       console.log(`[ ^ ] Bootstrap node is ready!`)
       console.log(`[ ^ ] HTTP API: http://localhost:${HTTP_PORT}`)
       console.log(`[ ^ ] libp2p: /ip4/0.0.0.0/tcp/${LIBP2P_PORT}`)
       console.log(`\n[ ^ ] API Endpoints:`)
-      console.log(`   GET  /health              - Health check`)
-      console.log(`   GET  /info                - Node info with all DB addresses`)
-      console.log(`   GET  /:dbName/get/:key   - Get value from database`)
-      console.log(`   POST /:dbName/set        - Set key/value in database`)
-      console.log(`   GET  /:dbName/all        - List all entries in database`)
-      console.log(`\n[ ^ ]  Database names: ${Object.values(DB_NAMES).join(", ")}\n`)
+      console.log(`   GET  /health                    - Health check`)
+      console.log(`   GET  /info                      - Node info with all DB addresses`)
+      console.log(`   GET  /peers/list                - List all active peers`)
+      console.log(`   GET  /peers/stats               - Registry statistics`)
+      console.log(`   GET  /peers/info                - Peer registry snapshot (debug)`)
+      console.log(`   POST /peers/register            - Register a peer`)
+      console.log(`   POST /peers/heartbeat/:peerId   - Peer heartbeat`)
+      console.log(`   GET  /peers/by-role/:role       - Get peers by role`)
+      console.log(`   GET  /peers/by-region/:region   - Get peers by region`)
+      console.log(`   GET  /:dbName/get/:key          - Get value from database`)
+      console.log(`   POST /:dbName/set               - Set key/value in database`)
+      console.log(`   GET  /:dbName/all               - List all entries in database`)
+      console.log(`\n[ ^ ]  Peer Registry: ${stats.active} active, ${stats.dead} dead`)
+      console.log(`[ ^ ]  Database names: ${Object.values(DB_NAMES).join(", ")}\n`)
       console.log(`[ ^ ]  Initial stores seeded: Downtown Café (1), Uptown Hub (2), Westside Lounge (3)\n`)
     })
 
