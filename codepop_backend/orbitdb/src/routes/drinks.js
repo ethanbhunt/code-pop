@@ -13,8 +13,8 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", count: drinks.length, data: drinks })
 }))
 
-// POST /backend/drinks - Create drink
-router.post("/", authenticate, asyncHandler(async (req, res) => {
+// POST /backend/drinks - Create drink (public endpoint, no authentication required)
+router.post("/", asyncHandler(async (req, res) => {
   const drink = await drinkService.createDrink(req.body)
   res.status(201).json({ status: "created", data: drink })
 }))
@@ -33,7 +33,16 @@ router.put("/:id", authenticate, asyncHandler(async (req, res) => {
 
 // DELETE /backend/drinks/:id - Delete drink
 router.delete("/:id", authenticate, asyncHandler(async (req, res) => {
-  await drinkService.deleteDrink(parseInt(req.params.id, 10))
+  try {
+    await drinkService.deleteDrink(parseInt(req.params.id, 10))
+  } catch (error) {
+    // Return success even if drink doesn't exist (idempotent delete)
+    if (error.message === "Drink not found") {
+      console.warn(`Attempted to delete non-existent drink ID: ${req.params.id}`)
+      return res.json({ status: "deleted", note: "Drink not found but delete considered successful" })
+    }
+    throw error
+  }
   res.json({ status: "deleted" })
 }))
 

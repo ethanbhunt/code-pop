@@ -109,10 +109,10 @@ const AdminDash = () => {
         Alert.alert('Error: You cannot delete yourself')
         closePopup();
       }
-      else {
-        console.log("Deleting user...");
-        const response = await fetch(`${BASE_URL}/backend/users/delete/${user.id}/`, {
-          method: 'DELETE',
+       else {
+         console.log("Deleting user...");
+         const response = await fetch(`${BASE_URL}/backend/users/${user.id}`, {
+           method: 'DELETE',
           headers: {
             'Authorization': `Token ${token}`,
             'Content-Type': 'application/json',
@@ -174,9 +174,9 @@ const AdminDash = () => {
         edits["role"] = userInfo.role;
       }
       
-      console.log("Updating user...");
-      const response = await fetch(`${BASE_URL}/backend/users/edit/${user.id}/`, {
-        method: 'POST',
+       console.log("Updating user...");
+       const response = await fetch(`${BASE_URL}/backend/users/${user.id}`, {
+         method: 'PUT',
         headers: {
           'Authorization': `Token ${token}`,
           'Content-Type': 'application/json',

@@ -23,12 +23,18 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
          console.warn('sodaUsed is empty, setting to default soda.');
        }
    
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       // Only add authorization header if token exists
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
          method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
+         headers,
          body: JSON.stringify({
            name: "AI drink", // Example name for the drink
            sodaUsed: sodaUsed, // Make sure it's an array with at least one item
@@ -37,7 +43,7 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
            price: 2.00,
            userCreated: true,
            size: drinkDict.size || "24oz", // Default size
-           ice: (drinkDict.ice || "normal").toLowerCase(), // Default ice amount, convert to lowercase
+            ice: (drinkDict.ice || "regular").toLowerCase(), // Default ice amount, convert to lowercase
          }),
        });
   
@@ -50,17 +56,17 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
       }
   
       const responseData = await response.json();
-      const data = responseData.data;
+      const drinkObject = responseData.data || responseData;
       // gets list of out of storage on your phone
       let cartList = await AsyncStorage.getItem("checkoutList");
       const currentList = cartList ? JSON.parse(cartList) : [];
   
-      const drinkID = data.drinkId; // assuming the response contains drinkId
-      const updatedList = [...currentList, drinkID];
+      // Store the full drink object, not just the ID
+      const updatedList = [...currentList, drinkObject];
       await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
 
       console.log("created drink obj")
-      return data; // Return the created drink object
+      return drinkObject; // Return the created drink object
   
     } catch (error) {
       console.error('Error in createObj:', error); // Log any other errors
@@ -119,13 +125,18 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
     return layers;
   };
 
-  const sodaUsed = Array.isArray(drinkDict.SodaUsed) && drinkDict.SodaUsed.length > 0 ? drinkDict.SodaUsed : [drinkDict.SodaUsed];
-  const syrupsUsed = Array.isArray(drinkDict.SyrupsUsed) ? drinkDict.SyrupsUsed : [];
-  const addIns = Array.isArray(drinkDict.AddIns) ? drinkDict.AddIns : [];
+   // Normalize drink data - support both camelCase and PascalCase
+   const sodaUsed = drinkDict.sodaUsed || drinkDict.SodaUsed || [drinkDict.soda] || [];
+   const syrupsUsed = drinkDict.syrupsUsed || drinkDict.SyrupsUsed || drinkDict.syrups || [];
+   const addIns = drinkDict.addIns || drinkDict.AddIns || [];
+   const size = drinkDict.size || drinkDict.Size || "24oz";
+   const ice = drinkDict.ice || drinkDict.Ice || "regular";
 
-  
-
-  const layers = getLayers(sodaUsed, syrupsUsed, addIns);
+   const layers = getLayers(
+     Array.isArray(sodaUsed) ? sodaUsed : [sodaUsed],
+     Array.isArray(syrupsUsed) ? syrupsUsed : [],
+     Array.isArray(addIns) ? addIns : []
+   );
   console.log(layers);
 
 
@@ -144,13 +155,13 @@ const AIAlert = ({ isModalVisible, toggleModal, drinkDict, onRegenerate }) => {
         <View style={styles.body}>
           {/* Ingredients List */}
           <View style={styles.textNbuttons}>
-            <View style={styles.ingredientsCard}>
-              <Text style={styles.ingredientsText}>Size: {drinkDict.Size}</Text>
-              <Text style={styles.ingredientsText}>Ice: {drinkDict.Ice}</Text>
-              <Text style={styles.ingredientsText}>Soda: {sodaUsed.join(", ")}</Text>
-              <Text style={styles.ingredientsText}>Syrups: {syrupsUsed.join(", ")}</Text>
-              <Text style={styles.ingredientsText}>Add-ins: {addIns.join(", ")}</Text>
-            </View>
+             <View style={styles.ingredientsCard}>
+               <Text style={styles.ingredientsText}>Size: {size}</Text>
+               <Text style={styles.ingredientsText}>Ice: {ice}</Text>
+               <Text style={styles.ingredientsText}>Soda: {Array.isArray(sodaUsed) ? sodaUsed.join(", ") : sodaUsed}</Text>
+               <Text style={styles.ingredientsText}>Syrups: {Array.isArray(syrupsUsed) ? syrupsUsed.join(", ") : (syrupsUsed || "None")}</Text>
+               <Text style={styles.ingredientsText}>Add-ins: {Array.isArray(addIns) ? addIns.join(", ") : (addIns || "None")}</Text>
+             </View>
             <View style={styles.buttonsContainer}>
               <TouchableOpacity style={styles.primaryButton} onPress={() => (AddToCart(), toggleModal())}>
                 <Text style={styles.primaryButtonText}>Add to Cart</Text>

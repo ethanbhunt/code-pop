@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
 import NavBar from '../components/NavBar';
 import DropDown from '../components/DropDown';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import Gif from '../components/Gif';
 import { sodaOptions, syrupOptions, AddInOptions } from '../components/Ingredients';
-import {BASE_URL} from '../../ip_address'
+import {BASE_URL, setStoreAndUpdateURL} from '../../ip_address'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AIAlert from '../components/AIAlert';
 
@@ -26,18 +27,204 @@ const CreateDrinkPage = () => {
   });
 
   // variables to add to drink object
-  const [SodaUsed, setSoda] = useState([]);
-  const [SyrupsUsed, setSyrups] = useState([]);
-  const [AddIns, setAddIns] = useState([]);
-  const [selectedSize, setSize] = useState(null);
-  const [selectedIce, setIce] = useState(null);
+   const [SodaUsed, setSoda] = useState([]);
+   const [SyrupsUsed, setSyrups] = useState([]);
+   const [AddIns, setAddIns] = useState([]);
+   const [selectedSize, setSize] = useState(null);
+   const [selectedIce, setIce] = useState(null);
+   
+   // Store selection and inventory
+   const [selectedStoreId, setSelectedStoreId] = useState(null);
+   const [selectedStoreName, setSelectedStoreName] = useState('Select Store');
+   const [storeModalVisible, setStoreModalVisible] = useState(false);
+   const [stores, setStores] = useState([]);
+   const [storesLoading, setStoresLoading] = useState(false);
+   const [storeInventory, setStoreInventory] = useState({});
 
-  useFocusEffect(
-    React.useCallback(() => {
-      // Auto-generation disabled; user must manually click Random Drink or enter a prompt
-      resetDrinkForm();
-    }, [route.params?.fromGenerateButton, route.params?.fromCartPage])
-  );
+   useFocusEffect(
+     React.useCallback(() => {
+       // Auto-generation disabled; user must manually click Random Drink or enter a prompt
+       resetDrinkForm();
+       loadStoreSelection();
+     }, [route.params?.fromGenerateButton, route.params?.fromCartPage])
+   );
+
+   const loadStoreSelection = async () => {
+     try {
+       const storeId = await AsyncStorage.getItem('selectedStoreId');
+       const storeName = await AsyncStorage.getItem('selectedStoreName');
+       
+       if (storeId) {
+         setSelectedStoreId(storeId);
+         setSelectedStoreName(storeName || 'Select Store');
+         await fetchStoreInventory(storeId);
+       }
+     } catch (error) {
+       console.error('Error loading store selection:', error);
+     }
+   };
+
+   const fetchStores = async () => {
+     try {
+       setStoresLoading(true);
+       const token = await AsyncStorage.getItem('userToken');
+
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
+       const response = await fetch(`${BASE_URL}/backend/stores`, {
+         method: 'GET',
+         headers,
+       });
+
+       if (!response.ok) {
+         throw new Error(`Failed to fetch stores. Status: ${response.status}`);
+       }
+
+       const data = await response.json();
+       setStores(data.data || []);
+     } catch (error) {
+       console.error('Error fetching stores:', error);
+     } finally {
+       setStoresLoading(false);
+     }
+   };
+
+   const fetchStoreInventory = async (storeId) => {
+     try {
+       const token = await AsyncStorage.getItem('userToken');
+       const headers = {
+         'Content-Type': 'application/json',
+       };
+       
+       if (token) {
+         headers['Authorization'] = `Token ${token}`;
+       }
+
+       const response = await fetch(`${BASE_URL}/backend/inventory/?storeId=${storeId}`, {
+         method: 'GET',
+         headers,
+       });
+
+       if (!response.ok) {
+         throw new Error(`Failed to fetch inventory. Status: ${response.status}`);
+       }
+
+       const data = await response.json();
+       const inventoryArray = data.data || [];
+       
+       // Create a map of inventory items by name
+       const inventoryMap = {};
+       inventoryArray.forEach(item => {
+         inventoryMap[item.itemName] = {
+           quantity: item.quantity,
+           thresholdLevel: item.thresholdLevel,
+           lowStock: item.quantity <= item.thresholdLevel
+         };
+       });
+       
+       setStoreInventory(inventoryMap);
+     } catch (error) {
+       console.error('Error fetching inventory:', error);
+     }
+   };
+
+    const handleSelectStore = async (store) => {
+      try {
+        await AsyncStorage.setItem('selectedStoreId', store.storeId.toString());
+        await AsyncStorage.setItem('selectedStoreName', store.name);
+        
+        // Update BASE_URL to use store-specific peer node
+        await setStoreAndUpdateURL(store.storeId);
+        
+        setSelectedStoreId(store.storeId.toString());
+        setSelectedStoreName(store.name);
+        setStoreModalVisible(false);
+        
+        // Fetch inventory for selected store
+        await fetchStoreInventory(store.storeId.toString());
+        
+        // If coming from addToCart flow, proceed with adding to cart
+        // We'll check if ice and size are selected first
+        if (selectedIce && selectedSize && SodaUsed.length > 0) {
+          await proceedWithAddToCart();
+        }
+      } catch (error) {
+        console.error('Error selecting store:', error);
+        Alert.alert('Error', 'Failed to select store.');
+      }
+    };
+
+    const promptStoreSelection = async () => {
+      try {
+        if (!selectedStoreId) {
+          await fetchStores();
+          setStoreModalVisible(true);
+          return false; // Indicates store selection is needed
+        }
+        return true; // Store is already selected
+      } catch (error) {
+        console.error('Error checking store selection:', error);
+        return false;
+      }
+    };
+
+    const proceedWithAddToCart = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            name: "Drink in User Cart",
+            sodaUsed: SodaUsed,
+            syrupsUsed: SyrupsUsed,
+            addIns: AddIns,
+            price: 2.00,
+            userCreated: true,
+            size: selectedSize,
+            ice: selectedIce,
+          })
+       });
+   
+       if (!response.ok) {
+         throw new Error(`Failed to add drink. Status: ${response.status}`);
+       }
+        // add drink item (full drink object) to the checkout list from App.js
+         try{
+           // gets list of out of storage on your phone
+           let cartList = await AsyncStorage.getItem("checkoutList");
+           const currentList = cartList ? JSON.parse(cartList) : [];
+           // takes the response (what we get after we create a drink) and extracts the full drink object
+           const data = await response.json();
+           const drinkObject = data.data || data;
+           // add the full drink object to the checkoutList
+           const updatedList = [...currentList, drinkObject]
+           // Saves the checkoutlist back into the storage on the phone
+           await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+         }catch (error){
+           console.log(error)
+         }
+
+       navigation.navigate('Cart');
+     } catch (error) {
+       console.error('Error adding drink to cart:', error);
+     }
+    };
 
   const resetDrinkForm = () => {
     setSoda([]);  // Clear selected sodas
@@ -47,56 +234,22 @@ const CreateDrinkPage = () => {
     setSize(null);  // Clear selected size
   };
   
-  const addToCart = async () => {
-    try {
-      // check if ice and size have been selected
-      if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
-
-        Alert.alert("Choose soda, size, and ice before adding your drink.")
-
-      }else{
-        const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            Name: "Drink in User Cart",  // Example name for the drink
-            SodaUsed: SodaUsed,  // Default value if SodaUsed is null
-            SyrupsUsed: SyrupsUsed,
-            AddIns: AddIns,
-            Price: 2.00,
-            User_Created: true,    // Assuming the user is creating the drink
-            Size: selectedSize,
-            Ice: selectedIce,
-          })
-        });
-    
-        if (!response.ok) {
-          throw new Error(`Failed to add drink. Status: ${response.status}`);
+   const addToCart = async () => {
+      try {
+        // check if ice and size have been selected
+        if(selectedIce == null || selectedSize == null || SodaUsed.length == 0){
+          Alert.alert("Choose soda, size, and ice before adding your drink.")
+        } else if (!selectedStoreId) {
+          // Prompt store selection if not selected
+          await promptStoreSelection();
+        } else {
+          // Store is selected, proceed with adding to cart
+          await proceedWithAddToCart();
         }
-        // add drink item (the drinks ID) to the checkout list from App.js
-        try{
-          // gets list of out of storage on your phone
-          let cartList = await AsyncStorage.getItem("checkoutList");
-          const currentList = cartList ? JSON.parse(cartList) : [];
-          // takes the response (what we get after we create a drink) and extracts the drinkID
-          const data = await response.json();
-          const drinkID = data.DrinkID;
-          // add the drinkID to the checkoutList
-          const updatedList = [...currentList, drinkID]
-          // Saves the checkoutlist back into the storage on the phone
-          await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-        }catch (error){
-          console.log(error)
-        }
-
-        navigation.navigate('Cart');
+      } catch (error) {
+        console.error('Error adding drink to cart:', error);
       }
-    } catch (error) {
-      console.error('Error adding drink to cart:', error);
-    }
-  };  
+   };
   
 
   const handleSizeSelection = (size) => {
@@ -144,14 +297,29 @@ const CreateDrinkPage = () => {
     });
   };
   
-  // search and list stiff
-  const filterOptions = (options = []) => {
-    return options.filter((option) =>
-      option.label.toLowerCase().includes(searchText.toLowerCase())
-    );
-  };
+   // search and list stiff
+   const filterOptions = (options = []) => {
+     return options.filter((option) =>
+       option.label.toLowerCase().includes(searchText.toLowerCase())
+     );
+   };
 
-  const handleSearch = (text) => {
+   // Filter ingredient options based on store inventory availability
+   const filterInventoryOptions = (options = []) => {
+     if (!selectedStoreId || Object.keys(storeInventory).length === 0) {
+       // If no store selected or no inventory data, return all options
+       return filterOptions(options);
+     }
+     
+     // Filter to only include items that are in inventory
+     return filterOptions(options).filter((option) => {
+       // Check if this ingredient is available in the store's inventory
+       return storeInventory.hasOwnProperty(option.label) && 
+              storeInventory[option.label].quantity > 0;
+     });
+   };
+
+   const handleSearch = (text) => {
     setSearchText(text);
     setOpenDropdown({
       sodas: !!text,
@@ -163,21 +331,23 @@ const CreateDrinkPage = () => {
   // function for generate drink button which generates a drink with AI   
     
   const GenerateAI = async () => {
-    setIsGenerating(true);
-    try {
-      const user_id = await AsyncStorage.getItem('userId');
-      let url = `${BASE_URL}/backend/generate/`;
+     setIsGenerating(true);
+     try {
+       const user_id = await AsyncStorage.getItem('userId');
+       const token = await AsyncStorage.getItem('userToken');
+       let url = `${BASE_URL}/backend/generate/`;
 
-      if (user_id) {
-        url = `${BASE_URL}/backend/generate/${user_id}/`;
-      }
+       if (user_id) {
+         url = `${BASE_URL}/backend/generate/${user_id}/`;
+       }
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+       const response = await fetch(url, {
+         method: 'GET',
+         headers: {
+           'Content-Type': 'application/json',
+           'Authorization': `Token ${token}`,
+         }
+       });
 
       if (!response.ok) {
         throw new Error(`Error when trying to generate AI drink. Status: ${response.status}`);
@@ -270,9 +440,24 @@ const CreateDrinkPage = () => {
   const formatSelection = (list) => (list.length ? list.join(', ') : 'None');
   
 
-  return (
-    <View style={styles.wholePage}>
-      <ScrollView style={styles.padding} contentContainerStyle={styles.contentContainer}>
+   return (
+     <View style={styles.wholePage}>
+       {/* Store Selection Header */}
+       <View style={styles.headerContainer}>
+         <Text style={styles.headerText}>Create Drink</Text>
+         <TouchableOpacity 
+           onPress={() => {
+             fetchStores();
+             setStoreModalVisible(true);
+           }}
+           style={styles.storeButton}
+         >
+           <Icon name="storefront" size={16} color="#fff" />
+           <Text style={styles.storeButtonText}>{selectedStoreName}</Text>
+         </TouchableOpacity>
+       </View>
+
+       <ScrollView style={styles.padding} contentContainerStyle={styles.contentContainer}>
         <View style={styles.aiHeroCard}>
           <Text style={styles.heroLabel}>AI Mixologist</Text>
           <Text style={styles.heroTitle}>Randomize your drink!</Text>
@@ -368,32 +553,35 @@ const CreateDrinkPage = () => {
             placeholderTextColor="#6f7f91"
           />
 
-          <DropDown
-            title="Sodas"
-            options={filterOptions(sodaOptions)}
-            onSelect={handleSodaSelection}
-            isOpen={openDropdown.sodas}
-            setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
-            selectedValues={SodaUsed}
-          />
-          <DropDown
-            title="Syrups"
-            options={filterOptions(syrupOptions)}
-            onSelect={handleSyrupSelection}
-            isOpen={openDropdown.syrups}
-            setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
-            selectedValues={SyrupsUsed}
-            tintByFlavor
-          />
-          <DropDown
-            title="AddIns"
-            options={filterOptions(AddInOptions)}
-            onSelect={handleAddInSelection}
-            isOpen={openDropdown.addins}
-            setOpen={() => setOpenDropdown(prev => ({ ...prev, addins: !prev.addins }))}
-            selectedValues={AddIns}
-            tintByFlavor
-          />
+           <DropDown
+             title="Sodas"
+             options={filterInventoryOptions(sodaOptions)}
+             onSelect={handleSodaSelection}
+             isOpen={openDropdown.sodas}
+             setOpen={() => setOpenDropdown(prev => ({ ...prev, sodas: !prev.sodas }))}
+             selectedValues={SodaUsed}
+             inventoryMap={storeInventory}
+           />
+           <DropDown
+             title="Syrups"
+             options={filterInventoryOptions(syrupOptions)}
+             onSelect={handleSyrupSelection}
+             isOpen={openDropdown.syrups}
+             setOpen={() => setOpenDropdown(prev => ({ ...prev, syrups: !prev.syrups }))}
+             selectedValues={SyrupsUsed}
+             tintByFlavor
+             inventoryMap={storeInventory}
+           />
+           <DropDown
+             title="AddIns"
+             options={filterInventoryOptions(AddInOptions)}
+             onSelect={handleAddInSelection}
+             isOpen={openDropdown.addins}
+             setOpen={() => setOpenDropdown(prev => ({ ...prev, addins: !prev.addins }))}
+             selectedValues={AddIns}
+             tintByFlavor
+             inventoryMap={storeInventory}
+           />
         </View>
 
         <View style={styles.summaryCard}>
@@ -409,13 +597,56 @@ const CreateDrinkPage = () => {
             <Text style={styles.buttonText}>Add to Cart</Text>
           </TouchableOpacity>
 
-      </ScrollView>
-      <NavBar/>
-    </View>
-  );
-};
+       </ScrollView>
 
-const styles = StyleSheet.create({
+       {/* Store Selection Modal */}
+       <Modal
+         visible={storeModalVisible}
+         transparent={true}
+         animationType="fade"
+         onRequestClose={() => setStoreModalVisible(false)}
+       >
+         <View style={styles.modalOverlay}>
+           <View style={styles.modalContent}>
+             <View style={styles.modalHeader}>
+               <Text style={styles.modalTitle}>Select a Store</Text>
+               <TouchableOpacity onPress={() => setStoreModalVisible(false)}>
+                 <Icon name="close" size={24} color="#1c334d" />
+               </TouchableOpacity>
+             </View>
+
+             {storesLoading ? (
+               <ActivityIndicator size="large" color="#1F7A8C" style={styles.loadingContainer} />
+             ) : (
+               <ScrollView style={styles.storesList}>
+                 {stores.map((store) => (
+                   <TouchableOpacity
+                     key={store.storeId}
+                     style={styles.storeOption}
+                     onPress={() => handleSelectStore(store)}
+                   >
+                     <View style={styles.storeInfo}>
+                       <Icon name="storefront" size={20} color="#1F7A8C" />
+                       <View style={styles.storeDetails}>
+                         <Text style={styles.storeName}>{store.name}</Text>
+                         <Text style={styles.storeAddress}>{store.address || 'Address not available'}</Text>
+                       </View>
+                     </View>
+                     <Icon name="chevron-forward" size={20} color="#1F7A8C" />
+                   </TouchableOpacity>
+                 ))}
+               </ScrollView>
+             )}
+           </View>
+         </View>
+       </Modal>
+
+       <NavBar/>
+     </View>
+   );
+ };
+
+ const styles = StyleSheet.create({
   wholePage: {
     flex: 1,
     backgroundColor: '#ffffff',
@@ -607,11 +838,104 @@ const styles = StyleSheet.create({
     borderColor: '#ffffff',
     padding: 12,
   },
-  ingredientsTitle: {
-    color: '#1c334d',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-});
+   ingredientsTitle: {
+     color: '#1c334d',
+     fontSize: 18,
+     fontWeight: '800',
+   },
+   headerContainer: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 16,
+     paddingTop: 12,
+     paddingBottom: 12,
+     backgroundColor: '#f9f9f9',
+     borderBottomWidth: 1,
+     borderBottomColor: '#eee',
+   },
+   headerText: {
+     fontSize: 24,
+     fontWeight: '800',
+     color: '#1c334d',
+     flex: 1,
+   },
+   storeButton: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     backgroundColor: '#1F7A8C',
+     paddingHorizontal: 12,
+     paddingVertical: 8,
+     borderRadius: 8,
+     gap: 6,
+   },
+   storeButtonText: {
+     color: '#fff',
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   modalOverlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     justifyContent: 'flex-end',
+   },
+   modalContent: {
+     backgroundColor: '#fff',
+     borderTopLeftRadius: 20,
+     borderTopRightRadius: 20,
+     paddingTop: 16,
+     maxHeight: '80%',
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingHorizontal: 16,
+     paddingBottom: 12,
+     borderBottomWidth: 1,
+     borderBottomColor: '#eee',
+   },
+   modalTitle: {
+     fontSize: 18,
+     fontWeight: '800',
+     color: '#1c334d',
+   },
+   storesList: {
+     paddingHorizontal: 12,
+     paddingVertical: 12,
+   },
+   storeOption: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     paddingVertical: 12,
+     paddingHorizontal: 12,
+     marginVertical: 4,
+     backgroundColor: '#f9f9f9',
+     borderRadius: 12,
+   },
+   storeInfo: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1,
+     gap: 12,
+   },
+   storeDetails: {
+     flex: 1,
+   },
+   storeName: {
+     fontSize: 14,
+     fontWeight: '700',
+     color: '#1c334d',
+     marginBottom: 2,
+   },
+   storeAddress: {
+     fontSize: 12,
+     color: '#7b8da1',
+   },
+   loadingContainer: {
+     paddingVertical: 40,
+   },
+ });
 
-export default CreateDrinkPage;
+ export default CreateDrinkPage;
