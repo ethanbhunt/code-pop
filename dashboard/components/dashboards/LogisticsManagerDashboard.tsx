@@ -50,7 +50,8 @@ type OrbitInventoryItem = {
   itemName: string;
   itemType: string;
   quantity: number;
-  thresholdLevel: number;
+  thresholdLevel?: number;
+  minThreshold?: number;
 };
 
 type OrbitTransfer = {
@@ -90,6 +91,7 @@ export function LogisticsManagerDashboard() {
     null
   );
   const [loadingInv, setLoadingInv] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
 
   const [aiPrediction, setAiPrediction] = useState<AiDemandPrediction | null>(null);
   const [forecastComparison, setForecastComparison] =
@@ -118,12 +120,26 @@ export function LogisticsManagerDashboard() {
   const region = ctx?.region ?? "Region C";
   const storeId = ctx?.storeId ?? "1";
 
+  function itemThreshold(row: OrbitInventoryItem): number {
+    if (typeof row.thresholdLevel === "number") return row.thresholdLevel;
+    if (typeof row.minThreshold === "number") return row.minThreshold;
+    return 0;
+  }
+
   const loadInventory = useCallback(async () => {
     setLoadingInv(true);
+    setInventoryError(null);
     try {
-      const res = await fetch("/api/orbit/inventory");
+      const res = await fetch(
+        `/api/orbit/inventory?storeId=${encodeURIComponent(storeId)}&limit=100`
+      );
       if (!res.ok) {
         setOrbitInventory(null);
+        setInventoryError(
+          res.status === 403
+            ? "Inventory forbidden for this session."
+            : (await res.text().catch(() => res.statusText)) || `Error ${res.status}`
+        );
         return;
       }
       const json = (await res.json()) as { data?: OrbitInventoryItem[] };
@@ -131,7 +147,7 @@ export function LogisticsManagerDashboard() {
     } finally {
       setLoadingInv(false);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
     void loadInventory();
@@ -153,8 +169,13 @@ export function LogisticsManagerDashboard() {
         setTransfers(j.data ?? []);
       } else {
         setTransfers(null);
-        if (trRes.status !== 403) {
-          setLogisticsApiError(await trRes.text().catch(() => trRes.statusText));
+        const body = await trRes.text().catch(() => trRes.statusText);
+        if (trRes.status === 403) {
+          setLogisticsApiError(
+            "Transfers blocked (403). Sign in with an Orbit staff/manager user; the dashboard role must include Logistics Manager, Manager, or Admin."
+          );
+        } else if (body) {
+          setLogisticsApiError(body);
         }
       }
       if (asgRes.ok) {
@@ -162,6 +183,16 @@ export function LogisticsManagerDashboard() {
         setAssignments(j.data ?? []);
       } else {
         setAssignments(null);
+        if (asgRes.status === 403 && trRes.ok) {
+          setLogisticsApiError(
+            (p) =>
+              p ??
+              "Delivery assignments blocked (403) while transfers succeeded—check Orbit logistics permissions."
+          );
+        } else if (asgRes.status !== 403) {
+          const msg = await asgRes.text().catch(() => asgRes.statusText);
+          if (msg) setLogisticsApiError((p) => p ?? msg);
+        }
       }
       if (roRes.ok) {
         const j = (await roRes.json()) as { data?: ReorderNotificationRow[] };
@@ -379,9 +410,10 @@ export function LogisticsManagerDashboard() {
     downloadTextFile(`demand-summary-${storeId}.csv`, rowsToCsv(rows));
   }
 
-  const lowStockItems = (orbitInventory ?? []).filter(
-    (i) => i.quantity < i.thresholdLevel
-  );
+  const lowStockItems = (orbitInventory ?? []).filter((i) => {
+    const thr = itemThreshold(i);
+    return thr > 0 && i.quantity < thr;
+  });
   const lowStockNames = new Set(lowStockItems.map((i) => i.itemName));
 
   return (
@@ -392,9 +424,9 @@ export function LogisticsManagerDashboard() {
         <CardHeader>
           <CardTitle>Logistics Manager Dashboard</CardTitle>
           <CardDescription>
-            Transfers, delivery assignments, and reorder notifications use live Orbit proxies when
-            your session is manager/logistics tier. Global inventory list is still{" "}
-            <span className="font-medium">unscoped</span>.{" "}
+            Inventory is loaded{" "}
+            <span className="font-medium">per selected store</span> (Orbit staff cannot list global
+            inventory). Transfers and assignments require an Orbit staff/manager account.{" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -421,12 +453,15 @@ export function LogisticsManagerDashboard() {
                   ) : !orbitInventory?.length ? (
                     <tr>
                       <td className="p-2 text-muted-foreground" colSpan={4}>
-                        No inventory rows.
+                        {inventoryError
+                          ? inventoryError
+                          : "No inventory rows for this store."}
                       </td>
                     </tr>
                   ) : (
                     orbitInventory.map((inv) => {
-                      const low = inv.quantity < inv.thresholdLevel;
+                      const thr = itemThreshold(inv);
+                      const low = thr > 0 && inv.quantity < thr;
                       return (
                         <tr key={inv.inventoryId} className="border-t">
                           <td className="p-2">{inv.itemName}</td>
@@ -451,7 +486,16 @@ export function LogisticsManagerDashboard() {
                 Refresh inventory
               </Button>
             </div>
+            {inventoryError && orbitInventory && orbitInventory.length > 0 ? (
+              <p className="text-xs text-destructive">{inventoryError}</p>
+            ) : null}
           </div>
+
+          {logisticsApiError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {logisticsApiError}
+            </p>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
@@ -655,9 +699,6 @@ export function LogisticsManagerDashboard() {
                   {loadingLogisticsApi ? "Refreshing…" : "Refresh"}
                 </Button>
               </div>
-              {logisticsApiError ? (
-                <p className="mt-2 text-xs text-destructive">{logisticsApiError}</p>
-              ) : null}
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/30">
@@ -910,7 +951,7 @@ export function LogisticsManagerDashboard() {
                       >
                         <span className="text-destructive">{i.itemName}</span>
                         <span className="text-muted-foreground">
-                          {i.quantity} / {i.thresholdLevel} (threshold)
+                          {i.quantity} / {itemThreshold(i) || "—"} (threshold)
                         </span>
                       </li>
                     ))}

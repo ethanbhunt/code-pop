@@ -28,12 +28,20 @@ function normalizeAssignedStores(raw) {
 }
 
 /**
+ * When `assignedStores` is empty on the user doc, logistics/manager routes still need store scope.
+ * Broad numeric range matches multi-store seeds; tighten per user via PUT /users/edit when needed.
+ */
+const DEFAULT_COORDINATOR_STORE_IDS = Array.from({ length: 128 }, (_, i) => i + 1)
+
+/**
  * Default store access when the document has no `assignedStores` (dev / migration).
  * @param {string} userRole
  * @returns {number[]}
  */
 function fallbackAssignedStores(userRole) {
-  if (userRole === "manager" || userRole === "admin" || userRole === "super_admin") return [1]
+  if (userRole === "manager" || userRole === "admin" || userRole === "super_admin") {
+    return DEFAULT_COORDINATOR_STORE_IDS
+  }
   return []
 }
 
@@ -64,14 +72,14 @@ export function mergeAccessFromUserRecord(user) {
     return {
       userRole: "super_admin",
       enum: "super_admin",
-      assignedStores: rawStores.length > 0 ? rawStores : [1],
+      assignedStores: rawStores.length > 0 ? rawStores : DEFAULT_COORDINATOR_STORE_IDS,
     }
   }
   if (r === "staff") {
     return {
       userRole: "manager",
       enum: "manager",
-      assignedStores: rawStores.length > 0 ? rawStores : [1],
+      assignedStores: rawStores.length > 0 ? rawStores : DEFAULT_COORDINATOR_STORE_IDS,
     }
   }
   if (r === "repair") {

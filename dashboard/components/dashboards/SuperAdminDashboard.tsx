@@ -359,7 +359,7 @@ export function SuperAdminDashboard() {
                 {loadingReports ? "…" : machinesNeedingRepair}
               </p>
               <p className="text-xs text-muted-foreground">
-                Placeholder until maintenance API exists
+                From system report when Orbit maintenance data is available
               </p>
             </div>
             <div className="rounded-lg border p-3">

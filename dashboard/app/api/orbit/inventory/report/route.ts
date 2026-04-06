@@ -2,8 +2,15 @@ import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
 import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
 
-/** Orbit allows unauthenticated store listing; the BFF requires admin-tier dashboard session. */
-export async function GET(request: Request) {
+function unwrapOrbitData<T>(body: unknown): T | null {
+  if (!body || typeof body !== "object") return null;
+  if ("data" in body && (body as { data: T }).data !== undefined) {
+    return (body as { data: T }).data;
+  }
+  return body as T;
+}
+
+export async function GET() {
   const session = await auth();
   const token = getAccessToken(session);
   if (!token) {
@@ -19,12 +26,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const u = new URL(request.url);
-  const qs = u.searchParams.toString();
-  const path = `/stores${qs ? `?${qs}` : ""}`;
-  const result = await orbitJson<unknown>(token, path, { method: "GET" });
+  const result = await orbitJson<unknown>(token, "/inventory/report", { method: "GET" });
   if (!result.ok) {
     return new Response(result.body, { status: result.status });
   }
-  return Response.json(result.data);
+  const payload = unwrapOrbitData<unknown>(result.data);
+  return Response.json(payload ?? result.data);
 }
