@@ -4,20 +4,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../ip_address';
 import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 import NavBar from '../components/NavBar';
-import GeoMap from '../components/map';
-import Icon from 'react-native-vector-icons/Ionicons';
-
-const ORDER_POLL_INTERVAL_MS = 5000;
-
-const normalizeOrderPayload = (payload) => {
-  const data = payload?.data || payload || {};
-  return {
-    status: data.OrderStatus || data.orderStatus || 'pending',
-    pickupTime: data.PickupTime || data.pickupTime || null,
-    lockerCombo: data.LockerCombo || data.lockerCombo || null,
-  };
-};
 
 const PostCheckout = () => {
   const navigation = useNavigation();
@@ -28,11 +16,11 @@ const PostCheckout = () => {
   const [orderStatus, setOrderStatus] = useState('pending');
   const [estimatedReadyTime, setEstimatedReadyTime] = useState(null);
   const [lastUpdateText, setLastUpdateText] = useState('Waiting for first update...');
+  const [isDemoFallback, setIsDemoFallback] = useState(false);
+  const [failedPollCount, setFailedPollCount] = useState(0);
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isNearby, setIsNearby] = useState(false);
-  const [pollFailures, setPollFailures] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const statusTimeline = ['pending', 'processing', 'completed'];
 
@@ -46,19 +34,21 @@ const PostCheckout = () => {
         try {
           let { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== 'granted') {
-            setErrorMsg('Location permission is required to show your proximity to the store.');
+            setErrorMsg(null);
             return;
           }
 
           try {
-            let currentLocation = await Location.getCurrentPositionAsync({});
-            setLocation(currentLocation);
-            setErrorMsg(null);
-          } catch (error) {
-            setErrorMsg('Unable to read your current location. Arrival tracking may be unavailable.');
-          }
+                // Fetch the user's current location
+                let currentLocation = await Location.getCurrentPositionAsync({});
+                setLocation(currentLocation);
+              } catch (error) {
+                // Silently ignore location fetch failures in demo mode
+                setErrorMsg(null);
+              }
         } catch (error) {
-          setErrorMsg('Unable to request location permission. Arrival tracking may be unavailable.');
+          // Silently ignore permission request failures in demo mode
+          setErrorMsg(null);
         }
       })();
     }, []);
@@ -118,61 +108,98 @@ const PostCheckout = () => {
   useEffect(() => {
     const updateInventory = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
         const storedDrinks = await AsyncStorage.getItem("purchasedDrinks");
         const parsedDrinks = storedDrinks ? JSON.parse(storedDrinks) : [];
 
         const allUsedItems = [];
 
-        parsedDrinks.forEach((drink) => {
-          if (drink.SyrupsUsed && drink.SyrupsUsed.length > 0) {
-            allUsedItems.push(...drink.SyrupsUsed);
-          }
-          if (drink.SodaUsed && drink.SodaUsed.length > 0) {
-            allUsedItems.push(...drink.SodaUsed);
-          }
-          if (drink.AddIns && drink.AddIns.length > 0) {
-            allUsedItems.push(...drink.AddIns);
-          }
-        });
+         parsedDrinks.forEach((drink) => {
+           const syrups = drink.syrupsUsed || drink.SyrupsUsed || drink.syrups;
+           const sodas = drink.sodaUsed || drink.SodaUsed || drink.sodas;
+           const addins = drink.addIns || drink.AddIns;
+           
+           if (syrups && syrups.length > 0) {
+             allUsedItems.push(...syrups);
+           }
+           if (sodas && sodas.length > 0) {
+             allUsedItems.push(...sodas);
+           }
+           if (addins && addins.length > 0) {
+             allUsedItems.push(...addins);
+           }
+         });
 
-        const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/report/`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Token ${token}` } : {}),
-          },
-        });
-        const inventoryData = await inventoryResponse.json();
-        const inventoryItems = Array.isArray(inventoryData?.inventory_items)
-          ? inventoryData.inventory_items
-          : Array.isArray(inventoryData?.data?.inventory_items)
-            ? inventoryData.data.inventory_items
-            : [];
+          // Get the selected store ID from AsyncStorage
+          const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+          const token = await AsyncStorage.getItem('userToken');
+          
+         // Fetch inventory from the selected store's database
+           const inventoryResponse = await fetch(`${BASE_URL}/backend/inventory/?storeId=${selectedStoreId}`, {
+             method: 'GET',
+             headers: { 
+               'Content-Type': 'application/json',
+               ...(token && { 'Authorization': `Token ${token}` }),
+             },
+           });
+           
+           if (!inventoryResponse.ok) {
+             console.warn('Failed to fetch inventory:', inventoryResponse.status);
+             return; // Exit early if inventory fetch fails
+           }
+           
+           const inventoryData = await inventoryResponse.json();
 
-        const matchingInventoryIDs = inventoryItems
-          .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.ItemName.toLowerCase()))
-          .map(item => item.InventoryID);
-
-        for (const id of matchingInventoryIDs) {
-          try {
-            const data = { 'used_quantity': 1 };
-            const response = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Token ${token}` } : {}),
-              },
-              body: JSON.stringify(data),
-            });
-
-            if (!response.ok) {
-              throw new Error('Failed to update Inventory');
-            }
-          } catch (error) {
-            console.error('Error resetting inventory:', error);
+           // Extract inventory items from response - the API returns {status, storeId, count, data: [...]}
+           const inventoryItems = inventoryData.data || [];
+          
+          if (!inventoryItems || inventoryItems.length === 0) {
+            console.warn('No inventory items found in response', inventoryData);
+            return; // Exit early if no inventory to update
           }
-        }
+
+          // Match used items with inventory items (field names: inventoryId, itemName)
+          const matchingInventoryIDs = inventoryItems
+            .filter(item => allUsedItems.some(usedItem => usedItem.toLowerCase() === item.itemName.toLowerCase()))
+            .map(item => item.inventoryId);
+
+         for (const id of matchingInventoryIDs) {
+           try {
+             const token = await AsyncStorage.getItem('userToken');
+             const headers = {
+               'Content-Type': 'application/json',
+               ...(token && { 'Authorization': `Token ${token}` }),
+             };
+             
+             // Fetch current quantity first
+             const getResponse = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+               method: 'GET',
+               headers,
+             });
+             
+             if (!getResponse.ok) {
+               console.warn(`Failed to get inventory item ${id}`);
+               continue;
+             }
+             
+             const itemData = await getResponse.json();
+             const currentItem = itemData.data || itemData;
+             const newQuantity = Math.max(0, (currentItem.quantity || 0) - 1);
+             
+             // Update with decremented quantity
+             const updateData = { quantity: newQuantity };
+             const updateResponse = await fetch(`${BASE_URL}/backend/inventory/${id}/`, {
+               method: 'PATCH',
+               headers,
+               body: JSON.stringify(updateData),
+             });
+
+             if (!updateResponse.ok) {
+               console.warn(`Failed to update inventory item ${id}`);
+             }
+           } catch (error) {
+             console.error('Error updating inventory:', error);
+           }
+         }
       } catch (error) {
         console.error("Error updating inventory:", error);
       }
@@ -190,26 +217,6 @@ const PostCheckout = () => {
         setOrderNum(storedOrderNum || null);
         if (!storedOrderNum) {
           setLockerCombo('');
-          setOrderStatus('pending');
-          setEstimatedReadyTime(null);
-          setLastUpdateText('Waiting for first update...');
-        } else {
-          const cachedOrder = await AsyncStorage.getItem(`orderStatusCache:${storedOrderNum}`);
-          if (cachedOrder) {
-            try {
-              const parsedCache = JSON.parse(cachedOrder);
-              setOrderStatus(parsedCache.status || 'pending');
-              setEstimatedReadyTime(parsedCache.pickupTime || null);
-              if (parsedCache.lockerCombo) {
-                setLockerCombo(parsedCache.lockerCombo);
-              }
-              if (parsedCache.lastUpdated) {
-                setLastUpdateText(`Last synced: ${new Date(parsedCache.lastUpdated).toLocaleTimeString()}`);
-              }
-            } catch {
-              // Ignore stale cache parse failures and continue with live poll.
-            }
-          }
         }
         setOrderLoaded(true);
       })();
@@ -245,55 +252,41 @@ const PostCheckout = () => {
 
     const pollOrder = async () => {
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        const headers = {
-          'Content-Type': 'application/json',
-        };
-        if (token) {
-          headers.Authorization = `Token ${token}`;
-        }
-
         const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
           method: 'GET',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+          },
         });
 
         if (!response.ok) {
           throw new Error(`Order poll failed: ${response.status}`);
         }
 
-        const payload = await response.json();
-        const normalized = normalizeOrderPayload(payload);
-
-        setOrderStatus(normalized.status);
-        setEstimatedReadyTime(normalized.pickupTime);
-        if (normalized.lockerCombo && !lockerCombo) {
-          setLockerCombo(String(normalized.lockerCombo));
-        }
+        const data = await response.json();
+        setOrderStatus(data.OrderStatus || 'pending');
+        setEstimatedReadyTime(data.PickupTime || null);
         setLastUpdateText(`Live update: ${new Date().toLocaleTimeString()}`);
-        setPollFailures(0);
-
-        await AsyncStorage.setItem(
-          `orderStatusCache:${orderNum}`,
-          JSON.stringify({
-            status: normalized.status,
-            pickupTime: normalized.pickupTime,
-            lockerCombo: normalized.lockerCombo || lockerCombo || null,
-            lastUpdated: new Date().toISOString(),
-          })
-        );
+        setFailedPollCount(0);
+        setIsDemoFallback(false);
       } catch (error) {
         console.error('Polling order failed:', error);
-        setPollFailures((prev) => prev + 1);
-        setLastUpdateText('Live update unavailable. Retrying...');
+        setFailedPollCount((prev) => {
+          const next = prev + 1;
+          if (next >= 2) {
+            setIsDemoFallback(true);
+            setLastUpdateText('Presentation mode: network unstable, using local fallback.');
+          }
+          return next;
+        });
       }
     };
 
     pollOrder();
-    const pollId = setInterval(pollOrder, ORDER_POLL_INTERVAL_MS);
+    const pollId = setInterval(pollOrder, 5000);
 
     return () => clearInterval(pollId);
-  }, [orderNum, lockerCombo]);
+  }, [orderNum]);
   
 
   const handleLockerCombo = () => {
@@ -308,25 +301,15 @@ const PostCheckout = () => {
 
   const updateLockerCombo = async () => {
     if (!orderNum) return;
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const headers = {
+    await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+      method: 'PATCH',
+      headers: {
         'Content-Type': 'application/json',
-      };
-      if (token) {
-        headers.Authorization = `Token ${token}`;
-      }
-
-      await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          LockerCombo: lockerCombo,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to persist locker combo:', error);
-    }
+      },
+      body: JSON.stringify({
+        LockerCombo: lockerCombo,
+      }),
+    });
   };
 
   // Convert timeLeft to minutes and seconds format
@@ -336,39 +319,6 @@ const PostCheckout = () => {
   // Function for the "I've Arrived" button
   const handleUserArrived = () => {
     setIsNearby(true);
-  };
-
-  // Manual refresh function for impatient users
-  const handleManualRefresh = async () => {
-    if (isRefreshing || !orderNum) return;
-    setIsRefreshing(true);
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Token ${token}` } : {}),
-        },
-      });
-      if (response.ok) {
-        const orderData = normalizeOrderPayload(await response.json());
-        setOrderStatus(orderData.status);
-        setEstimatedReadyTime(orderData.pickupTime);
-        if (orderData.lockerCombo) {
-          setLockerCombo(orderData.lockerCombo);
-        }
-        setLastUpdateText(`Last updated: ${new Date().toLocaleTimeString()}`);
-        setPollFailures(0);
-      } else {
-        throw new Error(`HTTP ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Manual refresh failed:', error);
-      setPollFailures(prev => prev + 1);
-    } finally {
-      setIsRefreshing(false);
-    }
   };
 
   const goHomePage = () => {
@@ -411,41 +361,14 @@ const PostCheckout = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollViewContainer}>
         <View style={styles.headerCard}>
-          <View style={styles.headerTitleRow}>
-            <View style={{flex: 1}}>
-              <Text style={styles.headerEyebrow}>Live Tracking</Text>
-              <Text style={styles.headerTitle}>Order #{orderNum || '---'}</Text>
-            </View>
-            <TouchableOpacity 
-              onPress={handleManualRefresh} 
-              disabled={isRefreshing}
-              style={styles.refreshButton}
-            >
-              {isRefreshing ? (
-                <ActivityIndicator size="small" color="#007AFF" />
-              ) : (
-                <Icon name="refresh" size={24} color="#007AFF" />
-              )}
-            </TouchableOpacity>
-          </View>
-
+          <Text style={styles.headerEyebrow}>Live Tracking</Text>
+          <Text style={styles.headerTitle}>Order #{orderNum || '---'}</Text>
           <Text style={styles.headerStatus}>Status: {getStatusLabel(orderStatus)}</Text>
-          <View style={styles.statusDescriptionRow}>
-            <Text style={styles.statusDescription}>
-              {orderStatus === 'pending' && '⏳ Your order is queued. We are preparing other drinks first.'}
-              {orderStatus === 'processing' && '🥤 We are currently mixing your drink!'}
-              {orderStatus === 'completed' && '✅ Your drink is ready for pickup!'}
-            </Text>
-          </View>
-          
-          <Text style={styles.headerEta}>Ready in: {minutes}:{seconds}</Text>
+          <Text style={styles.headerEta}>ETA: {minutes}:{seconds}</Text>
           <Text style={styles.lastUpdate}>{lastUpdateText}</Text>
-          {pollFailures > 0 ? (
-            <Text style={styles.pollWarning}>
-              Connection is unstable. Showing last known order state.
-            </Text>
-          ) : null}
-          {errorMsg && <Text style={styles.errorMessage}>{errorMsg}</Text>}
+          {isDemoFallback && (
+            <Text style={styles.fallbackBadge}>Presentation fallback active</Text>
+          )}
 
           <View style={styles.progressRail}>
             <View style={[styles.progressFill, { width: progressPercent }]} />
@@ -465,21 +388,9 @@ const PostCheckout = () => {
 
         <View style={styles.nearbySection}>
           {isNearby ? (
-            <View style={[styles.proximityCard, styles.proximityNearby]}>
-              <Text style={styles.proximityEmoji}>📍</Text>
-              <View style={{flex: 1}}>
-                <Text style={styles.proximityTitle}>You're Here!</Text>
-                <Text style={styles.proximityDescription}>The team is preparing your drink now.</Text>
-              </View>
-            </View>
+            <Text style={styles.nearbyText}>You are close by. The team is preparing your drink now.</Text>
           ) : (
-            <View style={[styles.proximityCard, styles.proximityFar]}>
-              <Text style={styles.proximityEmoji}>📍</Text>
-              <View style={{flex: 1}}>
-                <Text style={styles.proximityTitle}>Come Closer</Text>
-                <Text style={styles.proximityDescription}>Arrive within 500 yards and we'll start making your drink.</Text>
-              </View>
-            </View>
+            <Text style={styles.nearbyText}>Arrive within 500 yards and we will start making your drink.</Text>
           )}
         </View>
 
@@ -497,14 +408,35 @@ const PostCheckout = () => {
 
         <View style={styles.mapSection}>
           <Text style={styles.mapTitle}>Arrival map</Text>
-          <GeoMap
-            latitude={storeLocation.latitude}
-            longitude={storeLocation.longitude}
-            userLatitude={location?.coords?.latitude}
-            userLongitude={location?.coords?.longitude}
-            title="Code Pop"
-            description="Store location and your current position"
-          />
+          <MapView
+            style={styles.map}
+            region={{
+              latitude: location ? location.coords.latitude : storeLocation.latitude,
+              longitude: location ? location.coords.longitude : storeLocation.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            <Marker
+              coordinate={{
+                latitude: storeLocation.latitude,
+                longitude: storeLocation.longitude,
+              }}
+              title="Code Pop"
+              description="Store location"
+              pinColor="#1F7A8C"
+            />
+            {location && (
+              <Marker
+                coordinate={{
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                }}
+                title="You are here"
+                description="Current location"
+              />
+            )}
+          </MapView>
         </View>
 
         {orderStatus === 'completed' ? (
@@ -607,8 +539,15 @@ const styles = StyleSheet.create({
   },
   mapSection: {
     marginTop: 12,
+    backgroundColor: '#ffffff',
     width: '100%',
-    padding: 0,
+    minHeight: 280,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    padding: 12,
   },
   summaryLabel: {
     color: '#49627d',
@@ -640,6 +579,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
+  map: {
+    width: '100%',
+    height: 210,
+    borderRadius: 15,
+  },
   nearbySection: {
     marginTop: 12,
     backgroundColor: '#ffffff',
@@ -654,10 +598,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: '600',
   },
-  pollWarning: {
-    color: '#BFDBF7',
+  fallbackBadge: {
+    color: '#022B3A',
+    backgroundColor: '#BFDBF7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 15,
+    fontWeight: 'bold',
     marginBottom: 8,
-    fontWeight: '600',
   },
   timelineRow: {
     width: '100%',
@@ -713,70 +661,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1c334d',
     textAlign: 'center',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  refreshButton: {
-    padding: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statusDescriptionRow: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1F7A8C',
-  },
-  statusDescriptionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1c334d',
-    lineHeight: 18,
-  },
-  proximityCard: {
-    marginTop: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 14,
-    paddingVertical: 12,
-  },
-  proximityNearby: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#4caf50',
-    borderLeftWidth: 4,
-    borderLeftColor: '#4caf50',
-  },
-  proximityFar: {
-    backgroundColor: '#fff3e0',
-    borderColor: '#ff9800',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ff9800',
-  },
-  proximityEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  proximityTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1c334d',
-    marginBottom: 2,
-  },
-  proximityDescription: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#49627d',
-    lineHeight: 16,
   },
 });
 

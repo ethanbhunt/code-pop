@@ -193,10 +193,58 @@ async function start() {
       }
     ]
 
+    // Create store-scoped databases and seed store data
+    console.log("[ ^ ] Creating store-scoped databases...")
+    const storeDbAddresses = {}
+    
     for (const store of initialStores) {
-      await storesDb.put(`store:${store.storeId}`, store)
+      // Create store-specific databases
+      const storeOrdersDb = await orbitdb.open(`store-${store.storeId}-orders-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-orders-db`, { type: "keyvalue" }))
+      
+      const storeInventoryDb = await orbitdb.open(`store-${store.storeId}-inventory-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-inventory-db`, { type: "keyvalue" }))
+      
+      const storeRevenuesDb = await orbitdb.open(`store-${store.storeId}-revenues-db`, {
+        type: "keyvalue",
+        AccessController: OrbitDBAccessController({
+          write: ["*"]
+        })
+      }).catch(() => orbitdb.open(`store-${store.storeId}-revenues-db`, { type: "keyvalue" }))
+      
+      // Store database addresses for peer distribution
+      storeDbAddresses[`store-${store.storeId}-orders`] = storeOrdersDb.address.toString()
+      storeDbAddresses[`store-${store.storeId}-inventory`] = storeInventoryDb.address.toString()
+      storeDbAddresses[`store-${store.storeId}-revenues`] = storeRevenuesDb.address.toString()
+      
+      console.log(`  [ ^ ] Created databases for store ${store.storeId}: ${store.name}`)
+      
+      // Add database addresses to store metadata
+      const storeWithDatabases = {
+        ...store,
+        databases: {
+          orders: storeOrdersDb.address.toString(),
+          inventory: storeInventoryDb.address.toString(),
+          revenues: storeRevenuesDb.address.toString()
+        }
+      }
+      
+      await storesDb.put(`store:${store.storeId}`, storeWithDatabases)
       console.log(`  [ ^ ] Seeded store ${store.storeId}: ${store.name}`)
     }
+    
+    console.log()
+
+    // Merge store-scoped database addresses into main dbAddresses
+    Object.assign(dbAddresses, storeDbAddresses)
 
     // Initialize counter for next store ID
     await storesDb.put("counter:store", 3)
@@ -260,24 +308,71 @@ async function start() {
     })
 
     // Node info
-    app.get("/info", (req, res) => {
-      const dbInfo = {}
-      Object.entries(databases).forEach(([key, db]) => {
-        dbInfo[key] = {
-          address: db.address.toString(),
-          type: "keyvalue"
-        }
-      })
-      res.json({
-        nodeType: "bootstrap",
-        peerId: libp2p.peerId.toString(),
-        multiaddrs: libp2p.getMultiaddrs().map(a => a.toString()),
-        databases: dbInfo,
-        timestamp: new Date().toISOString()
-      })
-    })
+     app.get("/info", (req, res) => {
+       const dbInfo = {}
+       Object.entries(databases).forEach(([key, db]) => {
+         dbInfo[key] = {
+           address: db.address.toString(),
+           type: "keyvalue"
+         }
+       })
+       res.json({
+         nodeType: "bootstrap",
+         peerId: libp2p.peerId.toString(),
+         multiaddrs: libp2p.getMultiaddrs().map(a => a.toString()),
+         databases: dbInfo,
+         timestamp: new Date().toISOString()
+       })
+     })
 
-    // Generic get endpoint (for testing)
+     // Get list of stores with peer information
+     // Used by frontend to discover which peer serves each store
+     app.get("/backend/stores", async (req, res) => {
+       try {
+         const storesDb = databases.stores
+         if (!storesDb) {
+           return res.status(500).json({ error: "Stores database not available" })
+         }
+
+         const allStores = await storesDb.all()
+         
+         // Filter to only store entries (skip counters and metadata)
+         const stores = allStores
+           .filter(entry => entry.key.startsWith("store:"))
+           .map(entry => {
+             const store = entry.value
+             return {
+               storeId: store.storeId,
+               name: store.name,
+               address: store.address,
+               city: store.city,
+               region: store.region,
+               timezone: store.timezone,
+               coordinates: store.coordinates,
+               staffCount: store.staffCount,
+               status: store.status,
+               operatingHours: store.operatingHours,
+               createdAt: store.createdAt,
+               updatedAt: store.updatedAt,
+               // Add peer port mapping for this store
+               peerPort: store.storeId === 1 ? 3001 : (store.storeId === 2 ? 3002 : 3003),
+               databases: store.databases
+             }
+           })
+           .sort((a, b) => a.storeId - b.storeId)
+
+         res.json({
+           data: stores,
+           count: stores.length,
+           timestamp: new Date().toISOString()
+         })
+       } catch (err) {
+         console.error("Error fetching stores:", err)
+         res.status(500).json({ error: err.message })
+       }
+     })
+
+     // Generic get endpoint (for testing)
     app.get("/:dbName/get/:key", async (req, res) => {
       try {
         const { dbName, key } = req.params

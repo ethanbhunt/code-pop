@@ -27,7 +27,7 @@ export default async function Page({
       </p>
       <SignOutButton />
 
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-screen-2xl">
         <RoleDashboard roles={roles} preview={sp.preview} />
       </div>
     </div>

@@ -10,14 +10,15 @@ const { width: windowWidth } = Dimensions.get('window');
 const SeasonalCarousel = () => {
     const navigation = useNavigation();
     const [data, setData] = useState([]);
-    const [errorMessage, setErrorMessage] = useState('');
 
       useEffect(() => {
           const fetchData = async () => {
                try {
                   const token = await AsyncStorage.getItem('userToken');
+                  
+                  // Skip fetching drinks if user is not logged in
                   if (!token) {
-                      setErrorMessage('Sign in to view seasonal drinks.');
+                      console.log('No token found, skipping drinks fetch');
                       setData([]);
                       return;
                   }
@@ -37,7 +38,6 @@ const SeasonalCarousel = () => {
                   } else {
                       console.warn(`Failed to fetch drinks. Status: ${response.status}`);
                   }
-                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
                   return;
               }
@@ -47,7 +47,6 @@ const SeasonalCarousel = () => {
               // Check if response has error or data is missing
               if (!drinksResponse.data || !Array.isArray(drinksResponse.data)) {
                   console.warn('No drinks data available or invalid response:', drinksResponse);
-                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
                   return;
               }
@@ -67,66 +66,70 @@ const SeasonalCarousel = () => {
               }));
               console.log('parsed')
               console.log(parsedDrinks);
-              setErrorMessage('');
               setData(parsedDrinks);
               } catch (error) {
                   console.error('Error fetching drinks:', error);
-                  setErrorMessage('Seasonal drinks are temporarily unavailable.');
                   setData([]);
               } 
           };
           fetchData();
       }, []);
     
-     const createDrink = async (item) => {
-         console.log('creating drinks...');
-         try {
-             const token = await AsyncStorage.getItem('userToken');
-             // Get the list from AsyncStorage, or initialize as an empty array
-             const cartList = await AsyncStorage.getItem("checkoutList");
-             const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
-             const cleanedList = currentList.filter(item => item !== null && item !== undefined);
+      const createDrink = async (item) => {
+          console.log('creating drinks...');
+          try {
+              const token = await AsyncStorage.getItem('userToken');
+              // Get the list from AsyncStorage, or initialize as an empty array
+              cartList = await AsyncStorage.getItem("checkoutList");
+              const currentList = cartList && cartList !== 'null' ? JSON.parse(cartList) : [];
+              const cleanedList = currentList.filter(item => item !== null && item !== undefined);
 
-             // Log the item to ensure it has the correct structure
-             console.log(item);
+              // Log the item to ensure it has the correct structure
+              console.log(item);
 
-             const response = await fetch(`${BASE_URL}/backend/drinks/`, {
-                 method: 'POST',
-                 headers: {
-                   'Content-Type': 'application/json',
-                   'Authorization': `Token ${token}`,
-                 },
-                body: JSON.stringify({ 
-                  name: item.name,  // Example name for the drink
-                  sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
-                  syrupsUsed: item.syrupsUsed,
-                  addIns: item.addIns,
-                  price: item.price,
-                  userCreated: true,    // Assuming the user is creating the drink
-                  size: '24oz',
-                  ice: 'normal',
-                })
-              });
+              const headers = {
+                'Content-Type': 'application/json',
+              };
+              
+              // Only add authorization header if token exists
+              if (token) {
+                headers['Authorization'] = `Token ${token}`;
+              }
+
+              const response = await fetch(`${BASE_URL}/backend/drinks/`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({ 
+                    name: item.name,  // Example name for the drink
+                    sodaUsed: item.sodaUsed,  // Default value if sodaUsed is null
+                    syrupsUsed: item.syrupsUsed,
+                    addIns: item.addIns,
+                    price: item.price,
+                    userCreated: true,    // Assuming the user is creating the drink
+                    size: '24oz',
+                    ice: 'regular',
+                  })
+               });
             
               if (!response.ok) {
                 throw new Error(`Failed to add drink. Status: ${response.status}`);
               }
-              // add drink item (the drinks ID) to the checkout list from App.js
-              try{
-                // gets list of out of storage on your phone
-                cartList = await AsyncStorage.getItem("checkoutList");
-                const currentList = cartList ? JSON.parse(cartList) : [];
-                // takes the response (what we get after we create a drink) and extracts the drinkID
-                const responseData = await response.json();
-                const drinkID = responseData.data.drinkId;
-                // add the drinkID to the checkoutList
-                const updatedList = [...currentList, drinkID]
-                // Saves the checkoutlist back into the storage on the phone
-                await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
-                navigation.navigate('Cart');
-              }catch (error){
-                console.log(error)
-              }
+               // add drink item (full drink object) to the checkout list from App.js
+               try{
+                 // gets list of out of storage on your phone
+                 cartList = await AsyncStorage.getItem("checkoutList");
+                 const currentList = cartList ? JSON.parse(cartList) : [];
+                 // takes the response (what we get after we create a drink) and extracts the full drink object
+                 const responseData = await response.json();
+                 const drinkObject = responseData.data || responseData;
+                 // add the full drink object to the checkoutList
+                 const updatedList = [...currentList, drinkObject]
+                 // Saves the checkoutlist back into the storage on the phone
+                 await AsyncStorage.setItem('checkoutList', JSON.stringify(updatedList));
+                 navigation.navigate('Cart');
+               }catch (error){
+                 console.log(error)
+               }
           
             // Optionally, verify the save operation
             const savedList = await AsyncStorage.getItem('checkoutList');
@@ -152,7 +155,6 @@ const SeasonalCarousel = () => {
 
     return (
         <View style={{ height: 250 }}>
-            {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
             <Carousel
                 width={250}
                 sliderWidth={windowWidth}
@@ -192,12 +194,6 @@ const styles = StyleSheet.create({
     },
     drinkPrice: {
         fontSize: 16,
-    },
-    errorMessage: {
-        marginBottom: 8,
-        textAlign: 'center',
-        color: '#7a4a00',
-        fontWeight: '700',
     },
     image: {
         width: 150,

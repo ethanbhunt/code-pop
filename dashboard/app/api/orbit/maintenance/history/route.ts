@@ -12,13 +12,15 @@ export async function GET(req: Request) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!getOrbitBaseUrl()) {
-    return Response.json({ error: "ORBITDB_API_URL is not configured" }, { status: 503 });
+    return Response.json(
+      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { status: 503 }
+    );
   }
 
-  const url = new URL(req.url);
-  const query = url.searchParams.toString();
-  const path = query ? `/maintenance/history?${query}` : "/maintenance/history";
-
+  const u = new URL(req.url);
+  const qs = u.searchParams.toString();
+  const path = `/maintenance/history${qs ? `?${qs}` : ""}`;
   const result = await orbitJson<unknown>(token, path, { method: "GET" });
   if (!result.ok) {
     return new Response(result.body, { status: result.status });

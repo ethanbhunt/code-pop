@@ -1,0 +1,26 @@
+param(
+    [switch]$Detached = $true,
+    [switch]$SkipBuild = $false
+)
+
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$scriptPath = Join-Path $repoRoot "scripts\start-local-stack.js"
+
+$nodeCandidates = @(
+    (Get-Command node -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }),
+    "C:\Program Files\nodejs\node.exe"
+) | Where-Object { $_ -and (Test-Path $_) }
+
+if (-not $nodeCandidates -or $nodeCandidates.Count -eq 0) {
+    throw "Node.js is required to run the cross-platform startup script."
+}
+
+$nodeExe = $nodeCandidates[0]
+$nodeArgs = @($scriptPath)
+if (-not $Detached) { $nodeArgs += "--foreground" }
+if ($SkipBuild) { $nodeArgs += "--skip-build" }
+
+& $nodeExe @nodeArgs
+exit $LASTEXITCODE

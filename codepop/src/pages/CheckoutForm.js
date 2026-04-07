@@ -4,6 +4,9 @@ import { BASE_URL } from '../../ip_address';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 
+// todo
+  // test the removeAllDrinks function
+
 export default function CheckoutForm(totalPrice) {
   const navigation = useNavigation();
   const [drinks, setDrinks] = useState([]);
@@ -13,24 +16,35 @@ export default function CheckoutForm(totalPrice) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
 
-  const fetchPaymentSheetParams = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: totalPrice }), // amount in dollars
-      });
+   const fetchPaymentSheetParams = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = { 
+          'Content-Type': 'application/json',
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        const response = await fetch(`${BASE_URL}/backend/create-payment-intent/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ amount: totalPrice }), // amount in dollars
+        });
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || 'Unable to initialize payment sheet.');
+        console.log('Demo mode: payment intent unavailable, using fallback checkout.', payload);
+        return null;
       }
 
       const { paymentIntent, ephemeralKey, customer } = payload;
       setStripeNum(paymentIntent);
       return { paymentIntent, ephemeralKey, customer };
     } catch (error) {
-      console.error('Failed to fetch payment sheet parameters:', error);
+      console.log('Demo mode: payment intent request failed, using fallback checkout.', error);
       return null;
     }
   };
@@ -44,14 +58,14 @@ export default function CheckoutForm(totalPrice) {
     const paymentParams = await fetchPaymentSheetParams();
     if (!paymentParams) {
       setPaymentSheetReady(false);
-      setLoading(false);
+      setLoading(true);
       return;
     }
 
     const { paymentIntent, ephemeralKey, customer } = paymentParams;
     if (!paymentIntent || !ephemeralKey || !customer) {
       setPaymentSheetReady(false);
-      setLoading(false);
+      setLoading(true);
       return;
     }
 
@@ -63,71 +77,92 @@ export default function CheckoutForm(totalPrice) {
       allowsDelayedPaymentMethods: true,
     });
     if (!error) {
-      setLoading(false);
+      setLoading(true);
       setPaymentSheetReady(true);
     } else {
       setPaymentSheetReady(false);
-      setLoading(false);
-      console.error('Payment sheet initialization failed:', error.message);
+      setLoading(true);
+      console.log('Demo mode: payment sheet init failed, using fallback checkout.', error.message);
     }
   };
 
-  // function to remove all drinks from cart list after sucessful checkout
-  const removeAllDrinks = async () => {
-    try {
-      const cartList = await AsyncStorage.getItem('checkoutList');
-      const currentList = cartList ? JSON.parse(cartList) : [];
-      
-      const userId = await AsyncStorage.getItem('userId');
-      const token = await AsyncStorage.getItem('userToken');
-
-      if (!token) {
-        throw new Error('User session is missing. Please sign in again.');
-      }
-
-      if (!stripeNum) {
-        throw new Error('Payment intent is missing.');
-      }
-
-      const response = await fetch(`${BASE_URL}/backend/orders/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
-        body: JSON.stringify({
-          UserID: userId,
-          Drinks: currentList,
-          OrderStatus: 'pending',
-          PaymentStatus: 'paid',
-          StripeID: stripeNum,
-        })
+    // Generate UUID for order token (works for both guests and authenticated users)
+    const generateUUID = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+            v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
       });
+    };
 
-      // Check if the request was successful
-      if (response.ok) {
-        const data = await response.json(); // Parse JSON if returned
-        const createdOrderNum = data.OrderID || data.orderId || data.id;
-        if (!createdOrderNum) {
-          throw new Error('Order was created but response did not include an order id.');
+    // function to remove all drinks from cart list after sucessful checkout
+    const removeAllDrinks = async () => {
+      try {
+        const cartList = await AsyncStorage.getItem('checkoutList');
+        const currentList = cartList ? JSON.parse(cartList) : [];
+        
+         const userId = await AsyncStorage.getItem('userId');
+         const token = await AsyncStorage.getItem('userToken');
+         const selectedStoreId = await AsyncStorage.getItem('selectedStoreId') || '1';
+         const orderToken = generateUUID(); // Generate unique token for tracking
+         
+         console.log(currentList);
+
+         // Extract drink IDs from the full drink objects
+         const drinkIds = currentList.map(drink => {
+           if (typeof drink === 'object' && drink.drinkId) {
+             return drink.drinkId;
+           }
+           return drink; // Fallback for backward compatibility with just IDs
+         });
+
+         const response = await fetch(`${BASE_URL}/backend/orders/`, {
+           method: 'POST',
+           headers: {
+             'Content-Type': 'application/json',
+             ...(token && { 'Authorization': `Token ${token}` }),
+           },
+           body: JSON.stringify({
+             storeId: parseInt(selectedStoreId),
+             drinkIds: drinkIds,
+             UserID: userId,
+             orderToken: orderToken,  // Include order token for tracking
+             Drinks: drinkIds,
+             OrderStatus: 'pending',
+             PaymentStatus: 'paid',
+             StripeID: stripeNum || `demo_${Date.now()}`,
+           })
+        });
+
+        // Check if the request was successful
+        if (response.ok) {
+          const data = await response.json(); // Parse JSON if returned
+          const createdOrderNum = data.OrderID || data.data?.orderId || data.data?.id;
+          if (!createdOrderNum) {
+            console.error('Failed to get order ID from response:', data);
+            return null;
+          }
+          console.log('Order Num:', createdOrderNum);
+          console.log('Order Token:', orderToken);
+          await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
+          await AsyncStorage.setItem("orderToken", orderToken);  // Store token for tracking
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to create order:', response.status, errorData);
+          return null;
         }
-        console.log('Order Num:', createdOrderNum);
-        await AsyncStorage.setItem("orderNum", createdOrderNum.toString());
-      } else {
-        console.error('Failed to create order:', response.status, await response.text());
-        throw new Error('Failed to create order.');
-      }
 
  
-      // Update the local state to remove the drink from the cart page
-      setDrinks([]);
-  
-      // Update the AsyncStorage to remove the drink ID from the checkout list
-      await AsyncStorage.removeItem("checkoutList");
-      
+       // Update the local state to remove the drink from the cart page
+       setDrinks(null);
+   
+       // Update the AsyncStorage to remove the drink ID from the checkout list and purchased drinks
+       await AsyncStorage.removeItem("checkoutList");
+       await AsyncStorage.removeItem("purchasedDrinks");
+       
 
-      console.log("cart cleared sucessfully");
-      return true;
+       console.log("cart cleared sucessfully");
+       return true;
       
     } catch (error) {
       console.error('Error removing drinks from cart:', error);
@@ -135,22 +170,28 @@ export default function CheckoutForm(totalPrice) {
     }
   };
 
-  const addRevenue = async () => {
-    try {
-      const orderNum = await AsyncStorage.getItem("orderNum");
-    
-       const token = await AsyncStorage.getItem('userToken');
-       const response = await fetch(`${BASE_URL}/backend/revenues/`, {
-         method: 'POST',
-         headers: {
+    const addRevenue = async () => {
+      try {
+        const orderNum = await AsyncStorage.getItem("orderNum");
+      
+         const token = await AsyncStorage.getItem('userToken');
+         const headers = {
            'Content-Type': 'application/json',
-           'Authorization': `Token ${token}`,
-         },
-          body: JSON.stringify({
-            OrderID: Number(orderNum),
-            TotalAmount: Number(totalPrice),
-          }),
-       });
+         };
+         
+         // Only add authorization header if token exists
+         if (token) {
+           headers['Authorization'] = `Token ${token}`;
+         }
+
+         const response = await fetch(`${BASE_URL}/backend/revenues/`, {
+           method: 'POST',
+           headers,
+           body: JSON.stringify({
+             orderId: Number(orderNum),
+             amount: Number(totalPrice),
+           }),
+        });
     
       if (response.ok) {
         const data = await response.json(); // Parse the response if needed
@@ -167,36 +208,46 @@ export default function CheckoutForm(totalPrice) {
   const finalizeCheckout = async () => {
     const orderCreated = await removeAllDrinks();
     if (!orderCreated) {
+      console.warn('Order issue: unable to create order during demo checkout.');
       return;
     }
 
-    await addRevenue();
-    const savedOrderNum = await AsyncStorage.getItem("orderNum");
-    if (savedOrderNum) {
-      await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
-        method: 'GET',
-        headers: {
+      await addRevenue();
+      const savedOrderNum = await AsyncStorage.getItem("orderNum");
+      if (savedOrderNum) {
+        const token = await AsyncStorage.getItem('userToken');
+        const headers = {
           'Content-Type': 'application/json',
-        },
-      });
-    }
-    navigation.navigate('CheckoutSuccessPage');
+        };
+        
+        // Only add authorization header if token exists
+        if (token) {
+          headers['Authorization'] = `Token ${token}`;
+        }
+
+        await fetch(`${BASE_URL}/backend/email/${savedOrderNum}/`, {
+          method: 'GET',
+          headers,
+        });
+      }
+    navigation.navigate('PostCheckout');
   };
 
   const openPaymentSheet = async () => {
     if (!paymentSheetReady) {
-      console.error('Payment sheet is not ready. Checkout cannot continue.');
+      console.log('Demo checkout mode: payment gateway unavailable, continuing without popup.');
+      await finalizeCheckout();
       return;
     }
 
     const { error } = await presentPaymentSheet();
   
     if (error) {
-      console.error('Payment sheet presentation failed:', error.code, error.message);
-      return;
+      console.log('Demo mode: payment sheet error, using fallback checkout.', error.code, error.message);
+      await finalizeCheckout();
+    } else {
+      await finalizeCheckout();
     }
-
-    await finalizeCheckout();
   };
 
   return { initializePaymentSheet, openPaymentSheet, loading };

@@ -4,8 +4,21 @@ import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session"
 
 type UsersPayload = { data?: unknown[] };
 type InventoryPayload = {
-  data?: Array<{ quantity?: number; thresholdLevel?: number }>;
+  data?: Array<{
+    quantity?: number;
+    thresholdLevel?: number;
+    minThreshold?: number;
+  }>;
 };
+
+function itemThreshold(i: {
+  thresholdLevel?: number;
+  minThreshold?: number;
+}): number {
+  if (typeof i.thresholdLevel === "number") return i.thresholdLevel;
+  if (typeof i.minThreshold === "number") return i.minThreshold;
+  return 0;
+}
 type RevenueReportPayload = { totalRevenue?: number };
 
 function startOfTodayIso(): string {
@@ -55,12 +68,11 @@ export async function GET() {
 
   const userCount = usersR.data.data?.length ?? 0;
   const items = invR.data.data ?? [];
-  const lowCount = items.filter(
-    (i) =>
-      typeof i.quantity === "number" &&
-      typeof i.thresholdLevel === "number" &&
-      i.quantity < i.thresholdLevel
-  ).length;
+  const lowCount = items.filter((i) => {
+    if (typeof i.quantity !== "number") return false;
+    const thr = itemThreshold(i);
+    return thr > 0 && i.quantity < thr;
+  }).length;
 
   return Response.json({
     generatedAt: new Date().toISOString(),

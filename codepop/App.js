@@ -17,8 +17,9 @@ import GeneralHomePage from './src/pages/GeneralHomePage';
 import ManagerDash from './src/pages/ManagerDash';
 import PostCheckout from './src/pages/PostCheckout';
 import PreferencesPage from './src/pages/PreferencesPage';
+import StoreSelectPage from './src/pages/StoreSelectPage';
 import UpdateDrink from './src/pages/UpdateDrink';
-import { BASE_URL } from './ip_address';
+import { BASE_URL, initializeBaseURL, setStoreAndUpdateURL } from './ip_address';
 
 const Stack = createNativeStackNavigator();
 const title = 'CodePop' 
@@ -30,11 +31,13 @@ const App = () => {
   // initialize cart list 
   const initCart = async () => {
     try{
-      const checkoutList = await AsyncStorage.getItem('checkoutList')
-      if (checkoutList === null){
-        const initialList = [];
-        await AsyncStorage.setItem("checkoutList", JSON.stringify(initialList));
-      }
+      // Always start with empty cart on app startup
+      const initialList = [];
+      await AsyncStorage.setItem("checkoutList", JSON.stringify(initialList));
+      // Also clear purchased drinks from previous sessions
+      await AsyncStorage.removeItem("purchasedDrinks");
+      // Note: Store selection (selectedStoreId, selectedStoreName) persists between sessions
+      // User can change it anytime they create/order a drink
     }catch(error){
       console.error("error with initializing cart list", error);
     }
@@ -44,8 +47,19 @@ const App = () => {
   const checkAuthStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
+      const selectedStoreId = await AsyncStorage.getItem('selectedStoreId');
+      
+      // If no store selected, go to store selection first (for everyone)
+      if (!selectedStoreId) {
+        console.log('[AUTH] No store selected, redirecting to StoreSelect');
+        setInitialRoute('StoreSelect');
+        return;
+      }
+
       if (!token) {
-        setInitialRoute('Auth');
+        // No token = guest mode, go to GeneralHome as guest
+        console.log('[AUTH] No token, entering guest mode');
+        setInitialRoute('GeneralHome');
         return;
       }
 
@@ -66,25 +80,25 @@ const App = () => {
         clearTimeout(timeoutId);
 
         if (response.ok) {
-          // Token is valid
+          // Token is valid and store selected
           setInitialRoute('GeneralHome');
         } else {
-          // Token is invalid or expired
-          console.warn('Token validation failed. Clearing and redirecting to login.');
+          // Token is invalid or expired - clear it and enter guest mode
+          console.warn('Token validation failed. Clearing and entering guest mode.');
           await AsyncStorage.removeItem('userToken');
           await AsyncStorage.removeItem('userId');
           await AsyncStorage.removeItem('first_name');
           await AsyncStorage.removeItem('userRole');
-          setInitialRoute('Auth');
+          setInitialRoute('GeneralHome');
         }
       } catch (error) {
         console.error('Error validating token:', error);
-        // Clear invalid token and redirect to login
+        // Clear invalid token and enter guest mode (instead of redirecting to login)
         await AsyncStorage.removeItem('userToken');
         await AsyncStorage.removeItem('userId');
         await AsyncStorage.removeItem('first_name');
         await AsyncStorage.removeItem('userRole');
-        setInitialRoute('Auth');
+        setInitialRoute('GeneralHome');
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -93,7 +107,13 @@ const App = () => {
   };
   
   useEffect(() => {
+    // Initialize BASE_URL for store-aware peer selection
+    initializeBaseURL();
+    
+    // Initialize cart
     initCart();
+    
+    // Check authentication status
     checkAuthStatus();
   }, []);
   useEffect(() => {
@@ -119,7 +139,7 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="GeneralHome"
+        initialRouteName={initialRoute}
         screenOptions={{
           headerStyle: { backgroundColor: '#ffffff' },
           headerTintColor: '#1c334d',
@@ -141,6 +161,7 @@ const App = () => {
         <Stack.Screen name="CreateDrink" component={CreateDrinkPage} />
         <Stack.Screen name="ComplaintsPage" component={ComplaintsPage} />
         <Stack.Screen name="Preferences" component={PreferencesPage} />
+        <Stack.Screen name="StoreSelect" component={StoreSelectPage} />
         <Stack.Screen name="GeneralHome" component={GeneralHomePage} />
         <Stack.Screen name="UpdateDrink" component={UpdateDrink} />
         <Stack.Screen

@@ -65,7 +65,7 @@ router.put(
       throw new ApiError("Invalid user ID", 400)
     }
 
-    const { firstName, lastName, email, role } = req.body
+    const { firstName, lastName, email, role, assignedStores, userRole, enum: enumField } = req.body
     console.log(req.body)
     const updates = {}
 
@@ -73,6 +73,9 @@ router.put(
     if (lastName !== undefined) updates.lastName = lastName
     if (email !== undefined) updates.email = email
     if (role !== undefined) updates.role = role
+    if (assignedStores !== undefined) updates.assignedStores = assignedStores
+    if (userRole !== undefined) updates.userRole = userRole
+    if (enumField !== undefined) updates.enum = enumField
     const user = await updateUser(userId, updates)
 
     res.json({

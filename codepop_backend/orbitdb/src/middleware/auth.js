@@ -3,28 +3,97 @@
 
 import { getTokensDb, getUsersDb } from "../utils/db.js"
 
-function normalizeRole(role) {
-  return String(role ?? "").toLowerCase().replace(/\s+/g, "_")
-}
-
 /** DB / seed may use legacy names; admin routes accept these. */
 function hasAdminPrivileges(role) {
-  const r = normalizeRole(role)
-  return r === "admin" || r === "super_admin" || r === "superadmin"
+  const r = String(role ?? "").toLowerCase()
+  return r === "admin" || r === "superadmin"
 }
 
 /** Staff-tier and above (legacy `manager` = store manager). */
 function hasStaffPrivileges(role) {
-  const r = normalizeRole(role)
-  return [
-    "staff",
-    "manager",
-    "logistics_manager",
-    "repair_staff",
-    "admin",
-    "super_admin",
-    "superadmin",
-  ].includes(r)
+  const r = String(role ?? "").toLowerCase()
+  return ["staff", "manager", "admin", "superadmin", "repair"].includes(r)
+}
+
+/**
+ * Normalize optional `assignedStores` from the user document.
+ * @param {unknown} raw
+ * @returns {number[]}
+ */
+function normalizeAssignedStores(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((id) => parseInt(String(id), 10))
+    .filter((n) => Number.isInteger(n) && n > 0)
+}
+
+/**
+ * When `assignedStores` is empty on the user doc, logistics/manager routes still need store scope.
+ * Broad numeric range matches multi-store seeds; tighten per user via PUT /users/edit when needed.
+ */
+const DEFAULT_COORDINATOR_STORE_IDS = Array.from({ length: 128 }, (_, i) => i + 1)
+
+/**
+ * Default store access when the document has no `assignedStores` (dev / migration).
+ * @param {string} userRole
+ * @returns {number[]}
+ */
+function fallbackAssignedStores(userRole) {
+  if (userRole === "manager" || userRole === "admin" || userRole === "super_admin") {
+    return DEFAULT_COORDINATOR_STORE_IDS
+  }
+  return []
+}
+
+/**
+ * Merge persisted access fields with safe defaults so routes can use `userRole`, `enum`, and `assignedStores`.
+ * @param {Record<string, unknown>} user
+ * @returns {{ userRole: string, enum: string, assignedStores: number[] }}
+ */
+export function mergeAccessFromUserRecord(user) {
+  const rawStores = normalizeAssignedStores(user.assignedStores)
+  const explicitUr =
+    typeof user.userRole === "string" && user.userRole.trim()
+      ? user.userRole.trim().toLowerCase().replace(/\s+/g, "_")
+      : null
+  const explicitEnum =
+    typeof user.enum === "string" && user.enum.trim()
+      ? user.enum.trim().toLowerCase().replace(/\s+/g, "_")
+      : null
+
+  if (explicitUr && explicitEnum) {
+    const assignedStores =
+      rawStores.length > 0 ? rawStores : fallbackAssignedStores(explicitUr)
+    return { userRole: explicitUr, enum: explicitEnum, assignedStores }
+  }
+
+  const r = String(user.role ?? "").toLowerCase()
+  if (r === "admin") {
+    return {
+      userRole: "super_admin",
+      enum: "super_admin",
+      assignedStores: rawStores.length > 0 ? rawStores : DEFAULT_COORDINATOR_STORE_IDS,
+    }
+  }
+  if (r === "staff") {
+    return {
+      userRole: "manager",
+      enum: "manager",
+      assignedStores: rawStores.length > 0 ? rawStores : DEFAULT_COORDINATOR_STORE_IDS,
+    }
+  }
+  if (r === "repair") {
+    return {
+      userRole: "repair",
+      enum: "repair",
+      assignedStores: rawStores.length > 0 ? rawStores : [],
+    }
+  }
+  return {
+    userRole: "customer",
+    enum: "customer",
+    assignedStores: rawStores,
+  }
 }
 
 /**
@@ -86,7 +155,7 @@ export async function authenticate(req, res, next) {
       })
     }
 
-    // Attach user and token to request
+    const access = mergeAccessFromUserRecord(user)
     req.user = {
       userId: user.userId,
       username: user.username,
@@ -94,9 +163,9 @@ export async function authenticate(req, res, next) {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      userRole: user.role,
-      enum: user.role,
-      assignedStores: Array.isArray(user.assignedStores) ? user.assignedStores : []
+      userRole: access.userRole,
+      enum: access.enum,
+      assignedStores: access.assignedStores,
     }
     req.token = tokenKey
 
@@ -122,7 +191,7 @@ export function requireAdmin(req, res, next) {
     })
   }
 
-  if (!hasAdminPrivileges(req.user.userRole || req.user.role || req.user.enum)) {
+  if (!hasAdminPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
@@ -143,8 +212,7 @@ export function requireSuperAdmin(req, res, next) {
     })
   }
 
-  const role = String(req.user.userRole || req.user.role || req.user.enum || "").toLowerCase()
-  if (role !== "super_admin" && role !== "superadmin") {
+  if (req.user.userRole !== "super_admin") {
     return res.status(403).json({
       error: "Super admin privileges required",
       code: "NOT_SUPER_ADMIN"
@@ -165,15 +233,7 @@ export function requireManager(req, res, next) {
     })
   }
 
-  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
-  if (
-    role !== "manager" &&
-    role !== "logistics_manager" &&
-    role !== "staff" &&
-    role !== "admin" &&
-    role !== "super_admin" &&
-    role !== "superadmin"
-  ) {
+  if (req.user.userRole !== "manager" && req.user.userRole !== "admin" && req.user.userRole !== "super_admin") {
     return res.status(403).json({
       error: "Manager privileges required",
       code: "NOT_MANAGER"
@@ -194,8 +254,7 @@ export function requireRepair(req, res, next) {
     })
   }
 
-  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
-  if (role !== "repair" && role !== "repair_staff") {
+  if (req.user.userRole !== "repair") {
     return res.status(403).json({
       error: "Repair user privileges required",
       code: "NOT_REPAIR"
@@ -217,13 +276,12 @@ export function requireStoreAccess(req, res, next) {
   }
 
   // Super admin can access all stores
-  const role = normalizeRole(req.user.userRole || req.user.role || req.user.enum)
-  if (role === "super_admin" || role === "superadmin") {
+  if (req.user.userRole === "super_admin") {
     return next()
   }
 
-  // Manager/admin/logistics roles must have store in assignedStores.
-  if (role === "manager" || role === "staff" || role === "logistics_manager" || role === "admin") {
+  // Manager/admin must have store in assignedStores
+  if (req.user.userRole === "manager" || req.user.userRole === "admin") {
     const storeId = parseInt(req.params.storeId || req.query.storeId)
     if (!storeId) {
       return res.status(400).json({
@@ -254,7 +312,7 @@ export function requireStaff(req, res, next) {
     })
   }
 
-  if (!hasStaffPrivileges(req.user.userRole || req.user.role || req.user.enum)) {
+  if (!hasStaffPrivileges(req.user.role)) {
     return res.status(403).json({
       error: "Staff privileges required",
       code: "NOT_STAFF"
@@ -305,13 +363,17 @@ export async function optionalAuth(req, res, next) {
     const user = await usersDb.get(`user:${tokenEntry.userId}`)
 
     if (user) {
+      const access = mergeAccessFromUserRecord(user)
       req.user = {
         userId: user.userId,
         username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        role: user.role
+        role: user.role,
+        userRole: access.userRole,
+        enum: access.enum,
+        assignedStores: access.assignedStores,
       }
       req.token = tokenKey
     } else {

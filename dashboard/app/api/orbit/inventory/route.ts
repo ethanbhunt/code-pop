@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
 import { getAccessToken } from "@/lib/orbit-session";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   const token = getAccessToken(session);
   if (!token) {
@@ -15,7 +15,10 @@ export async function GET() {
     );
   }
 
-  const result = await orbitJson<unknown>(token, "/inventory", { method: "GET" });
+  const u = new URL(req.url);
+  const qs = u.searchParams.toString();
+  const path = `/inventory${qs ? `?${qs}` : ""}`;
+  const result = await orbitJson<unknown>(token, path, { method: "GET" });
   if (!result.ok) {
     return new Response(result.body, { status: result.status });
   }

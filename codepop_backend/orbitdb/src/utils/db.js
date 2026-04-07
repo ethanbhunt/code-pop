@@ -26,6 +26,14 @@ export async function initializeOrbitDB(orbitdbInstance, dbAddresses) {
     databases.maintenance = await orbitdb.open(dbAddresses.maintenance, { type: "keyvalue" })
     databases.logistics = await orbitdb.open(dbAddresses.logistics, { type: "keyvalue" })
     
+    // Open store-scoped databases
+    console.log("[ ^ ] Initializing store-scoped databases...")
+    for (const [key, address] of Object.entries(dbAddresses)) {
+      if (key.includes('store-')) {
+        databases[key] = await orbitdb.open(address, { type: "keyvalue" })
+      }
+    }
+    
     console.log("[ ^ ]  All databases initialized")
     return true
   } catch (err) {
@@ -103,6 +111,25 @@ export function getMaintenanceDb() {
 export function getLogisticsDb() {
   if (!databases.logistics) throw new Error("Logistics database not initialized")
   return databases.logistics
+}
+
+// Store-scoped database accessors
+export function getStoreOrdersDb(storeId) {
+  const dbKey = `store-${storeId}-orders`
+  if (!databases[dbKey]) throw new Error(`Store ${storeId} orders database not initialized`)
+  return databases[dbKey]
+}
+
+export function getStoreInventoryDb(storeId) {
+  const dbKey = `store-${storeId}-inventory`
+  if (!databases[dbKey]) throw new Error(`Store ${storeId} inventory database not initialized`)
+  return databases[dbKey]
+}
+
+export function getStoreRevenuesDb(storeId) {
+  const dbKey = `store-${storeId}-revenues`
+  if (!databases[dbKey]) throw new Error(`Store ${storeId} revenues database not initialized`)
+  return databases[dbKey]
 }
 
 // Helper: Get all database info (for /info endpoint)

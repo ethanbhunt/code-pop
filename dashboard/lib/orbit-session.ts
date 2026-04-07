@@ -31,3 +31,25 @@ export function hasOrbitStaffDashboardRole(session: Session | null): boolean {
     roles.includes(Role.SuperAdmin)
   );
 }
+
+/** Store managers, logistics, and admins — mirrors Orbit `requireManager` callers. */
+export function hasOrbitManagerDashboardRole(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return (
+    roles.includes(Role.Manager) ||
+    roles.includes(Role.LogisticsManager) ||
+    roles.includes(Role.Admin) ||
+    roles.includes(Role.SuperAdmin)
+  );
+}
+
+/** Logistics transfers / delivery assignments BFF gate. */
+export function hasOrbitLogisticsDashboardRole(session: Session | null): boolean {
+  return hasOrbitManagerDashboardRole(session);
+}
+
+/** Repair assignments/me BFF gate; admins may preview the same proxy. */
+export function hasOrbitRepairDashboardRole(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes(Role.RepairStaff) || hasOrbitAdminDashboardRole(session);
+}

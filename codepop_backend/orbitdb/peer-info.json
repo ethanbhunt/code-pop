@@ -12,12 +12,21 @@
     "qrcodes": "/orbitdb/zdpuAy4xogptVRVNLfSHinzzgSEcgXXUbukDmNyXgXHjRhgnX",
     "stores": "/orbitdb/zdpuAmeRid5xXzFuxKtMR8pwx8uHpD8rVXU4neFhmiS2i1aFE",
     "maintenance": "/orbitdb/zdpuAthTfFMPZGPMryWV6icE6GNteVXxVvidXL8sVghCR6mkk",
-    "logistics": "/orbitdb/zdpuApdjtyqwTVGJxGYLvphH52rZtoJqYHsY7aEPUbpRJA61E"
+    "logistics": "/orbitdb/zdpuApdjtyqwTVGJxGYLvphH52rZtoJqYHsY7aEPUbpRJA61E",
+    "store-1-orders": "/orbitdb/zdpuAsT2FmGbepY4bJr1LtogPRTCWF6peH9cTqLEFR6wmW9uf",
+    "store-1-inventory": "/orbitdb/zdpuAkcYUPKSbqCbutg9rSLL6bscaSkJSmvyRKnAeSP5fqU2S",
+    "store-1-revenues": "/orbitdb/zdpuAxoTxKyHvv2B7jxeRvMq8Ko28o1QBEgpXpPkii3wsMwxa",
+    "store-2-orders": "/orbitdb/zdpuAp2pU4bemrhADax5RSq5WUXBtzY2esTZKkLLFHpQ5HVgp",
+    "store-2-inventory": "/orbitdb/zdpuApVkiBFNuNqjFpi5TnCuBgXUvZywEUFMhuoquggHtJhjH",
+    "store-2-revenues": "/orbitdb/zdpuAuAug7uf78Bw5m7TshkaVNQoPT62uyBt7yT5XLvwiBB3Q",
+    "store-3-orders": "/orbitdb/zdpuB3ZQ2UxjkYfhCqu2GQLwZs75hfi72kRFW9vdpEWhxUugt",
+    "store-3-inventory": "/orbitdb/zdpuAyouvvupcayYc2LJJQfzixDxWvZEbHR329RZkCZ7v1H8E",
+    "store-3-revenues": "/orbitdb/zdpuApYTjAyxmisHn8DBuUpizLSC6dvXKVGNTSt4yWq6V8nHb"
   },
   "multiaddrs": [
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa",
-    "/ip4/100.64.23.230/tcp/4000/p2p/12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa"
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWSdKPodVmx22LwwEL4CPrjcZC64n1VgarwgkxooF8aLct",
+    "/ip4/100.64.23.230/tcp/4000/p2p/12D3KooWSdKPodVmx22LwwEL4CPrjcZC64n1VgarwgkxooF8aLct"
   ],
-  "peerId": "12D3KooWK3Y4t5sLpTWLjMQ2UaPrExodUVavGBLaRTxgJ2xmabaa",
-  "timestamp": "2026-04-02T23:46:16.162Z"
+  "peerId": "12D3KooWSdKPodVmx22LwwEL4CPrjcZC64n1VgarwgkxooF8aLct",
+  "timestamp": "2026-04-06T23:26:10.658Z"
 }

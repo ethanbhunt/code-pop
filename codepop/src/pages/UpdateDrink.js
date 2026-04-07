@@ -37,15 +37,15 @@ const UpdateDrink = ({route, navigation}) => {
     return iceLabels.find(l => l.toLowerCase() === lower) || value;
   };
 
-  useEffect(() => {
-    if (drink) {
-      setSoda(drink.SodaUsed || []);
-      setSyrups(drink.SyrupsUsed || []);
-      setAddIns(drink.AddIns || []);
-      setSize(drink.Size || null);
-      setIce(normalizeIce(drink.Ice));
-    }
-  }, [drink]);
+   useEffect(() => {
+     if (drink) {
+       setSoda(drink.sodaUsed || drink.SodaUsed || drink.sodas || []);
+       setSyrups(drink.syrupsUsed || drink.SyrupsUsed || drink.syrups || []);
+       setAddIns(drink.addIns || drink.AddIns || []);
+       setSize(drink.size || drink.Size || null);
+       setIce(normalizeIce(drink.ice || drink.Ice));
+     }
+   }, [drink]);
 
   const handleSizeSelection = (size) => {
     setSize(size);

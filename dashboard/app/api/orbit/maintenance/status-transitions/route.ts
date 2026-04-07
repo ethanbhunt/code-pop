@@ -12,7 +12,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!getOrbitBaseUrl()) {
-    return Response.json({ error: "ORBITDB_API_URL is not configured" }, { status: 503 });
+    return Response.json(
+      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { status: 503 }
+    );
   }
 
   const body = await req.text();
