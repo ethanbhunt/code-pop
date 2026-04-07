@@ -85,8 +85,9 @@ const ComplaintsPage = () => {
             }
 
             const rawData = await response.json();
-            const data = rawData.data ?? rawData;
-            const botText = data.responses;
+            let data = rawData.response ?? rawData;
+            data = data.replace('"','');
+            const botText = data;
             const botResponse =
                 typeof botText === 'string'
                     ? botText

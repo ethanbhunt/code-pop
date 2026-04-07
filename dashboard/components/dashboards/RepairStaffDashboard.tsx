@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
   Card,
@@ -59,6 +59,27 @@ type HistoricalMaintenanceRecord = {
 
 type MachineFilter = "all" | "warning" | "error" | "normal";
 
+type ApiMaintenanceMachine = {
+  machineId: number;
+  name?: string;
+  model?: string;
+  status: string;
+  lastServiceDate?: string | null;
+  updatedAt?: string;
+  storeId?: number;
+  storeName?: string;
+};
+
+type StatusTransitionRow = {
+  transitionId: number;
+  machineId: number;
+  oldStatus: string;
+  newStatus: string;
+  timestamp: string;
+  reason?: string;
+  notes?: string;
+};
+
 function daysBetween(isoA: string, isoB: string): number {
   const a = new Date(isoA).getTime();
   const b = new Date(isoB).getTime();
@@ -86,6 +107,15 @@ export function RepairStaffDashboard() {
   const [historyMachineId, setHistoryMachineId] = useState<string>("all");
   const [historyPage, setHistoryPage] = useState(0);
   const [statusMachineId, setStatusMachineId] = useState("");
+  const [newStatusPick, setNewStatusPick] = useState("warning");
+  const [statusReason, setStatusReason] = useState("Routine check");
+  const [statusActionError, setStatusActionError] = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [apiMachines, setApiMachines] = useState<RepairWorkflowMachine[]>([]);
+  const [orbitHistoryRows, setOrbitHistoryRows] = useState<HistoricalMaintenanceRecord[] | null>(
+    null
+  );
+  const [historyLoading, setHistoryLoading] = useState(false);
   const pageSize = 5;
 
   useEffect(() => {
@@ -126,27 +156,144 @@ export function RepairStaffDashboard() {
     };
   }, [region, storeId]);
 
+  const loadAssignments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/orbit/maintenance/assignments/me");
+      if (!res.ok) {
+        setApiMachines([]);
+        return;
+      }
+      const json = (await res.json()) as { data?: ApiMaintenanceMachine[] };
+      const mapped: RepairWorkflowMachine[] = (json.data ?? []).map((m) => ({
+        id: String(m.machineId),
+        type: m.model || m.name || "machine",
+        status: m.status,
+        lastServiceDate: m.lastServiceDate || m.updatedAt || "—",
+      }));
+      setApiMachines(mapped);
+    } catch {
+      setApiMachines([]);
+    }
+  }, []);
+
   useEffect(() => {
-    const first = repairWorkflow?.machines[0]?.id;
+    void loadAssignments();
+  }, [loadAssignments]);
+
+  const displayMachines = useMemo(() => {
+    if (apiMachines.length > 0) return apiMachines;
+    return repairWorkflow?.machines ?? [];
+  }, [apiMachines, repairWorkflow?.machines]);
+
+  useEffect(() => {
+    const first = displayMachines[0]?.id;
     if (first && !statusMachineId) {
       setStatusMachineId(first);
     }
-  }, [repairWorkflow, statusMachineId]);
+  }, [displayMachines, statusMachineId]);
 
   const filteredMachines = useMemo(() => {
-    const list = repairWorkflow?.machines ?? [];
+    const list = displayMachines;
     if (machineFilter === "all") return list;
     return list.filter((m) => m.status === machineFilter);
-  }, [repairWorkflow, machineFilter]);
+  }, [displayMachines, machineFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOrbitHistory() {
+      if (historyMachineId === "all") {
+        setOrbitHistoryRows(null);
+        return;
+      }
+      const mid = parseInt(historyMachineId, 10);
+      if (Number.isNaN(mid)) {
+        setOrbitHistoryRows(null);
+        return;
+      }
+      setHistoryLoading(true);
+      try {
+        const res = await fetch(
+          `/api/orbit/maintenance/history?machineId=${mid}&page=${historyPage + 1}&limit=${pageSize}`
+        );
+        if (!res.ok || cancelled) {
+          if (!cancelled) setOrbitHistoryRows([]);
+          return;
+        }
+        const json = (await res.json()) as {
+          data?: StatusTransitionRow[];
+        };
+        const rows = (json.data ?? []).map((t) => ({
+          id: String(t.transitionId),
+          machineId: String(t.machineId),
+          date: t.timestamp,
+          logType: `${t.oldStatus} → ${t.newStatus}`,
+          note: [t.reason, t.notes].filter(Boolean).join(" — "),
+        }));
+        if (!cancelled) setOrbitHistoryRows(rows);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    }
+    void loadOrbitHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyMachineId, historyPage, pageSize]);
 
   const filteredHistory = useMemo(() => {
-    const all = historicalRecords ?? [];
-    const byMachine =
-      historyMachineId === "all"
-        ? all
-        : all.filter((h) => h.machineId === historyMachineId);
-    return byMachine;
-  }, [historicalRecords, historyMachineId]);
+    if (historyMachineId === "all") {
+      return historicalRecords ?? [];
+    }
+    return orbitHistoryRows ?? [];
+  }, [historicalRecords, historyMachineId, orbitHistoryRows]);
+
+  async function submitStatusTransition() {
+    setStatusActionError(null);
+    const machineId = parseInt(statusMachineId, 10);
+    if (Number.isNaN(machineId)) {
+      setStatusActionError("Select a machine.");
+      return;
+    }
+    setStatusSaving(true);
+    try {
+      const res = await fetch("/api/orbit/maintenance/status-transitions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          machineId,
+          newStatus: newStatusPick,
+          reason: statusReason.trim() || "dashboard update",
+          notes: "",
+        }),
+      });
+      if (!res.ok) {
+        setStatusActionError(await res.text().catch(() => res.statusText));
+        return;
+      }
+      await loadAssignments();
+      if (historyMachineId !== "all" && historyMachineId === statusMachineId) {
+        setHistoryLoading(true);
+        const h = await fetch(
+          `/api/orbit/maintenance/history?machineId=${machineId}&page=${historyPage + 1}&limit=${pageSize}`
+        );
+        if (h.ok) {
+          const json = (await h.json()) as { data?: StatusTransitionRow[] };
+          setOrbitHistoryRows(
+            (json.data ?? []).map((t) => ({
+              id: String(t.transitionId),
+              machineId: String(t.machineId),
+              date: t.timestamp,
+              logType: `${t.oldStatus} → ${t.newStatus}`,
+              note: [t.reason, t.notes].filter(Boolean).join(" — "),
+            }))
+          );
+        }
+        setHistoryLoading(false);
+      }
+    } finally {
+      setStatusSaving(false);
+    }
+  }
 
   const historyPageRows = useMemo(() => {
     const start = historyPage * pageSize;
@@ -192,9 +339,8 @@ export function RepairStaffDashboard() {
         <CardHeader>
           <CardTitle>Repair Staff Dashboard</CardTitle>
           <CardDescription>
-            Maintenance UI is scaffold data from{" "}
-            <code className="text-xs">/api/orbit/placeholders/…</code> until OrbitDB exposes
-            machines.{" "}
+            Assigned machines, status transitions, and per-machine history use Orbit maintenance
+            routes when your session is repair-capable; workflow mock still loads as a fallback.{" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -348,10 +494,10 @@ export function RepairStaffDashboard() {
                     <select
                       id="machineId"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      value={statusMachineId || repairWorkflow?.machines[0]?.id || ""}
+                      value={statusMachineId || displayMachines[0]?.id || ""}
                       onChange={(e) => setStatusMachineId(e.target.value)}
                     >
-                      {(repairWorkflow?.machines ?? []).map((m) => (
+                      {displayMachines.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.id}
                         </option>
@@ -365,35 +511,46 @@ export function RepairStaffDashboard() {
                     <select
                       id="machineStatus"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      defaultValue="warning"
+                      value={newStatusPick}
+                      onChange={(e) => setNewStatusPick(e.target.value)}
                     >
+                      <option value="operational">operational</option>
                       <option value="normal">normal</option>
                       <option value="warning">warning</option>
-                      <option value="repair-start">repair-start</option>
-                      <option value="repair-end">repair-end</option>
                       <option value="error">error</option>
                       <option value="out-of-order">out-of-order</option>
-                      <option value="schedule-service">schedule-service</option>
                     </select>
                   </div>
                 </div>
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="statusReason">
+                    Reason
+                  </label>
+                  <input
+                    id="statusReason"
+                    className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                  />
+                </div>
+                {statusActionError ? (
+                  <p className="mt-2 text-xs text-destructive">{statusActionError}</p>
+                ) : null}
                 <div className="mt-3 flex gap-2">
                   <Button
                     type="button"
-                    onClick={() =>
-                      window.alert(
-                        "Status updates are not persisted until Orbit exposes a maintenance write API."
-                      )
-                    }
+                    disabled={statusSaving}
+                    onClick={() => void submitStatusTransition()}
                   >
-                    Update Status
+                    {statusSaving ? "Saving…" : "Update Status"}
                   </Button>
-                  <Button type="button" variant="outline">
-                    Cancel
+                  <Button type="button" variant="outline" onClick={() => setStatusActionError(null)}>
+                    Clear
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Requires Orbit: durable status history with timestamps and responsible personnel.
+                  Persists via <code className="text-xs">POST /maintenance/status-transitions</code>{" "}
+                  (Orbit enforces assignment / store rules).
                 </p>
               </div>
             </div>
@@ -509,12 +666,15 @@ export function RepairStaffDashboard() {
                   }}
                 >
                   <option value="all">All machines</option>
-                  {(repairWorkflow?.machines ?? []).map((m) => (
+                  {displayMachines.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.id}
                     </option>
                   ))}
                 </select>
+                {historyLoading ? (
+                  <span className="text-xs text-muted-foreground">Loading history…</span>
+                ) : null}
               </div>
               <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-sm">

@@ -35,7 +35,7 @@ export async function createDrink(data) {
     throw new Error("Invalid drink size")
   }
 
-  if (!validateDrinkIce(ice || "normal")) {
+  if (!validateDrinkIce(ice || "regular")) {
     throw new Error("Invalid ice level")
   }
 
@@ -65,7 +65,7 @@ export async function createDrink(data) {
     sodaUsed: validateStringArray(finalSodas) ? finalSodas : [],
     price: parseFloat(price),
     size: size || "16oz",
-    ice: ice || "normal",
+    ice: (ice || "regular").toLowerCase(),
     userCreated: Boolean(userCreated),
     isVegan: Boolean(isVegan) || false,
     isGlutenFree: Boolean(isGlutenFree) || false,

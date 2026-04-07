@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
 import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
@@ -49,17 +50,48 @@ type OrbitInventoryItem = {
   itemName: string;
   itemType: string;
   quantity: number;
-  thresholdLevel: number;
+  thresholdLevel?: number;
+  minThreshold?: number;
+};
+
+type OrbitTransfer = {
+  transferId: number;
+  sourceStoreId: number;
+  destStoreId: number;
+  status: string;
+  items?: Array<{ inventoryId?: number; quantity?: number }>;
+};
+
+type DeliveryAssignmentRow = {
+  assignmentId: number;
+  transferId: number;
+  driverId: number;
+  status?: string;
+  vehicle?: string | null;
+};
+
+type ReorderNotificationRow = {
+  notificationId: number;
+  storeId: number;
+  itemName?: string;
+  status?: string;
+  message?: string;
 };
 
 const DELIVERY_STORE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 
+const TRANSFER_STATUSES = ["pending", "approved", "in_transit", "delivered", "cancelled"] as const;
+
 export function LogisticsManagerDashboard() {
+  const { data: session } = useSession();
+  const driverId = session?.user?.id ? parseInt(String(session.user.id), 10) : NaN;
+
   const [ctx, setCtx] = useState<StoreRegionContext | null>(null);
   const [orbitInventory, setOrbitInventory] = useState<OrbitInventoryItem[] | null>(
     null
   );
   const [loadingInv, setLoadingInv] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
 
   const [aiPrediction, setAiPrediction] = useState<AiDemandPrediction | null>(null);
   const [forecastComparison, setForecastComparison] =
@@ -74,16 +106,40 @@ export function LogisticsManagerDashboard() {
   const [shipFrom, setShipFrom] = useState<string>("1");
   const [shipTo, setShipTo] = useState<string>("2");
   const [deliveryDraft, setDeliveryDraft] = useState<string | null>(null);
+  const [transfers, setTransfers] = useState<OrbitTransfer[] | null>(null);
+  const [assignments, setAssignments] = useState<DeliveryAssignmentRow[] | null>(null);
+  const [reorderNotifications, setReorderNotifications] = useState<ReorderNotificationRow[] | null>(
+    null
+  );
+  const [loadingLogisticsApi, setLoadingLogisticsApi] = useState(false);
+  const [logisticsApiError, setLogisticsApiError] = useState<string | null>(null);
+  const [creatingTransfer, setCreatingTransfer] = useState(false);
+  const [deliveryTransferId, setDeliveryTransferId] = useState<string>("");
+  const [patchingTransferId, setPatchingTransferId] = useState<number | null>(null);
 
   const region = ctx?.region ?? "Region C";
   const storeId = ctx?.storeId ?? "1";
 
+  function itemThreshold(row: OrbitInventoryItem): number {
+    if (typeof row.thresholdLevel === "number") return row.thresholdLevel;
+    if (typeof row.minThreshold === "number") return row.minThreshold;
+    return 0;
+  }
+
   const loadInventory = useCallback(async () => {
     setLoadingInv(true);
+    setInventoryError(null);
     try {
-      const res = await fetch("/api/orbit/inventory");
+      const res = await fetch(
+        `/api/orbit/inventory?storeId=${encodeURIComponent(storeId)}&limit=100`
+      );
       if (!res.ok) {
         setOrbitInventory(null);
+        setInventoryError(
+          res.status === 403
+            ? "Inventory forbidden for this session."
+            : (await res.text().catch(() => res.statusText)) || `Error ${res.status}`
+        );
         return;
       }
       const json = (await res.json()) as { data?: OrbitInventoryItem[] };
@@ -91,11 +147,144 @@ export function LogisticsManagerDashboard() {
     } finally {
       setLoadingInv(false);
     }
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
     void loadInventory();
   }, [loadInventory]);
+
+  const loadLogisticsApi = useCallback(async () => {
+    const sid = parseInt(storeId, 10);
+    if (Number.isNaN(sid)) return;
+    setLoadingLogisticsApi(true);
+    setLogisticsApiError(null);
+    try {
+      const [trRes, asgRes, roRes] = await Promise.all([
+        fetch(`/api/orbit/logistics/transfers?storeId=${encodeURIComponent(String(sid))}`),
+        fetch("/api/orbit/logistics/delivery-assignments"),
+        fetch(`/api/orbit/notifications/reorder?storeId=${encodeURIComponent(String(sid))}`),
+      ]);
+      if (trRes.ok) {
+        const j = (await trRes.json()) as { data?: OrbitTransfer[] };
+        setTransfers(j.data ?? []);
+      } else {
+        setTransfers(null);
+        const body = await trRes.text().catch(() => trRes.statusText);
+        if (trRes.status === 403) {
+          setLogisticsApiError(
+            "Transfers blocked (403). Sign in with an Orbit staff/manager user; the dashboard role must include Logistics Manager, Manager, or Admin."
+          );
+        } else if (body) {
+          setLogisticsApiError(body);
+        }
+      }
+      if (asgRes.ok) {
+        const j = (await asgRes.json()) as { data?: DeliveryAssignmentRow[] };
+        setAssignments(j.data ?? []);
+      } else {
+        setAssignments(null);
+        if (asgRes.status === 403 && trRes.ok) {
+          setLogisticsApiError(
+            (p) =>
+              p ??
+              "Delivery assignments blocked (403) while transfers succeeded—check Orbit logistics permissions."
+          );
+        } else if (asgRes.status !== 403) {
+          const msg = await asgRes.text().catch(() => asgRes.statusText);
+          if (msg) setLogisticsApiError((p) => p ?? msg);
+        }
+      }
+      if (roRes.ok) {
+        const j = (await roRes.json()) as { data?: ReorderNotificationRow[] };
+        setReorderNotifications(j.data ?? []);
+      } else {
+        setReorderNotifications(null);
+      }
+    } catch (e) {
+      setLogisticsApiError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setLoadingLogisticsApi(false);
+    }
+  }, [storeId]);
+
+  useEffect(() => {
+    void loadLogisticsApi();
+  }, [loadLogisticsApi]);
+
+  async function createOrbitTransfer() {
+    const inv = orbitInventory?.[0];
+    if (!inv) {
+      setLogisticsApiError("Need at least one inventory row to draft a transfer line.");
+      return;
+    }
+    setCreatingTransfer(true);
+    setLogisticsApiError(null);
+    try {
+      const res = await fetch("/api/orbit/logistics/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceStoreId: parseInt(shipFrom, 10),
+          destStoreId: parseInt(shipTo, 10),
+          items: [{ inventoryId: inv.inventoryId, quantity: 1 }],
+        }),
+      });
+      if (!res.ok) {
+        setLogisticsApiError(await res.text().catch(() => res.statusText));
+        return;
+      }
+      await loadLogisticsApi();
+    } finally {
+      setCreatingTransfer(false);
+    }
+  }
+
+  async function patchTransferStatus(transferId: number, status: string) {
+    setPatchingTransferId(transferId);
+    setLogisticsApiError(null);
+    try {
+      const res = await fetch(`/api/orbit/logistics/transfers/${transferId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        setLogisticsApiError(await res.text().catch(() => res.statusText));
+        return;
+      }
+      await loadLogisticsApi();
+    } finally {
+      setPatchingTransferId(null);
+    }
+  }
+
+  async function submitDeliveryAssignment() {
+    const tid = parseInt(deliveryTransferId, 10);
+    if (Number.isNaN(tid)) {
+      setDeliveryDraft("Select a transfer id.");
+      return;
+    }
+    if (Number.isNaN(driverId)) {
+      setDeliveryDraft("Session user id required as driverId.");
+      return;
+    }
+    setLogisticsApiError(null);
+    const res = await fetch("/api/orbit/logistics/delivery-assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transferId: tid,
+        driverId,
+        vehicle: `Van (${region})`,
+      }),
+    });
+    if (!res.ok) {
+      setDeliveryDraft(await res.text().catch(() => res.statusText));
+      return;
+    }
+    setDeliveryDraft(`Created delivery assignment for transfer ${tid}.`);
+    await loadLogisticsApi();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -221,9 +410,10 @@ export function LogisticsManagerDashboard() {
     downloadTextFile(`demand-summary-${storeId}.csv`, rowsToCsv(rows));
   }
 
-  const lowStockItems = (orbitInventory ?? []).filter(
-    (i) => i.quantity < i.thresholdLevel
-  );
+  const lowStockItems = (orbitInventory ?? []).filter((i) => {
+    const thr = itemThreshold(i);
+    return thr > 0 && i.quantity < thr;
+  });
   const lowStockNames = new Set(lowStockItems.map((i) => i.itemName));
 
   return (
@@ -234,9 +424,9 @@ export function LogisticsManagerDashboard() {
         <CardHeader>
           <CardTitle>Logistics Manager Dashboard</CardTitle>
           <CardDescription>
-            Regional supply coordination (scaffold). OrbitDB inventory is{" "}
-            <span className="font-medium">global</span>—region/store picker is UI-only until
-            the API supports locations.{" "}
+            Inventory is loaded{" "}
+            <span className="font-medium">per selected store</span> (Orbit staff cannot list global
+            inventory). Transfers and assignments require an Orbit staff/manager account.{" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -263,12 +453,15 @@ export function LogisticsManagerDashboard() {
                   ) : !orbitInventory?.length ? (
                     <tr>
                       <td className="p-2 text-muted-foreground" colSpan={4}>
-                        No inventory rows.
+                        {inventoryError
+                          ? inventoryError
+                          : "No inventory rows for this store."}
                       </td>
                     </tr>
                   ) : (
                     orbitInventory.map((inv) => {
-                      const low = inv.quantity < inv.thresholdLevel;
+                      const thr = itemThreshold(inv);
+                      const low = thr > 0 && inv.quantity < thr;
                       return (
                         <tr key={inv.inventoryId} className="border-t">
                           <td className="p-2">{inv.itemName}</td>
@@ -293,7 +486,16 @@ export function LogisticsManagerDashboard() {
                 Refresh inventory
               </Button>
             </div>
+            {inventoryError && orbitInventory && orbitInventory.length > 0 ? (
+              <p className="text-xs text-destructive">{inventoryError}</p>
+            ) : null}
           </div>
+
+          {logisticsApiError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {logisticsApiError}
+            </p>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
@@ -373,8 +575,9 @@ export function LogisticsManagerDashboard() {
               </h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Draft assignment (client only). Persisted routing and distance rules require
-                  Orbit logistics APIs.
+                  Creates a persisted delivery assignment via{" "}
+                  <code className="text-xs">POST /logistics/delivery-assignments</code> using your
+                  session user id as <code className="text-xs">driverId</code>.
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -412,23 +615,67 @@ export function LogisticsManagerDashboard() {
                     </select>
                   </div>
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={() =>
-                      setDeliveryDraft(
-                        `Draft: ship from Store ${shipFrom} → Store ${shipTo} (${region})`
-                      )
-                    }
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="deliveryTransfer">
+                    Transfer
+                  </label>
+                  <select
+                    id="deliveryTransfer"
+                    className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
+                    value={deliveryTransferId}
+                    onChange={(e) => setDeliveryTransferId(e.target.value)}
                   >
-                    Assign Delivery
+                    <option value="">Select transfer…</option>
+                    {(transfers ?? []).map((t) => (
+                      <option key={t.transferId} value={String(t.transferId)}>
+                        #{t.transferId} {t.sourceStoreId}→{t.destStoreId} ({t.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => void submitDeliveryAssignment()}>
+                    Create assignment
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setDeliveryDraft(null)}>
-                    Clear
+                    Clear message
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={creatingTransfer}
+                    onClick={() => void createOrbitTransfer()}
+                  >
+                    {creatingTransfer ? "Creating…" : "Create transfer (1 line)"}
                   </Button>
                 </div>
                 {deliveryDraft ? (
                   <p className="mt-2 text-xs text-muted-foreground">{deliveryDraft}</p>
+                ) : null}
+                {assignments?.length ? (
+                  <div className="mt-4 overflow-x-auto">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">Assignments</p>
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-muted/30">
+                        <tr className="text-left">
+                          <th className="p-2">ID</th>
+                          <th className="p-2">Transfer</th>
+                          <th className="p-2">Driver</th>
+                          <th className="p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignments.map((a) => (
+                          <tr key={a.assignmentId} className="border-t">
+                            <td className="p-2">{a.assignmentId}</td>
+                            <td className="p-2">{a.transferId}</td>
+                            <td className="p-2">{a.driverId}</td>
+                            <td className="p-2 text-muted-foreground">{a.status ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -437,33 +684,73 @@ export function LogisticsManagerDashboard() {
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Coordinate Supply Transfers</h3>
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">
-                Coordinating transfers between stores and regional suppliers requires persisted
-                shipment/transfer APIs in Orbit—the table below is illustrative only.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Scoped to context store <span className="font-medium">{storeId}</span> via{" "}
+                  <code className="text-xs">GET /logistics/transfers?storeId=</code>.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingLogisticsApi}
+                  onClick={() => void loadLogisticsApi()}
+                >
+                  {loadingLogisticsApi ? "Refreshing…" : "Refresh"}
+                </Button>
+              </div>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/30">
                     <tr className="text-left">
                       <th className="p-2">Transfer</th>
-                      <th className="p-2">Item</th>
-                      <th className="p-2">Qty</th>
+                      <th className="p-2">Route</th>
+                      <th className="p-2">Lines</th>
                       <th className="p-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-t">
-                      <td className="p-2">T-102</td>
-                      <td className="p-2">Coconut</td>
-                      <td className="p-2">60</td>
-                      <td className="p-2 text-muted-foreground">Scheduled</td>
-                    </tr>
-                    <tr className="border-t">
-                      <td className="p-2">T-091</td>
-                      <td className="p-2">Dr. Pepper</td>
-                      <td className="p-2">90</td>
-                      <td className="p-2 text-muted-foreground">In Transit</td>
-                    </tr>
+                    {loadingLogisticsApi && !transfers?.length ? (
+                      <tr className="border-t">
+                        <td className="p-2 text-muted-foreground" colSpan={4}>
+                          Loading…
+                        </td>
+                      </tr>
+                    ) : !transfers?.length ? (
+                      <tr className="border-t">
+                        <td className="p-2 text-muted-foreground" colSpan={4}>
+                          No transfers (or forbidden for this session).
+                        </td>
+                      </tr>
+                    ) : (
+                      transfers.map((t) => (
+                        <tr key={t.transferId} className="border-t">
+                          <td className="p-2">#{t.transferId}</td>
+                          <td className="p-2">
+                            {t.sourceStoreId} → {t.destStoreId}
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            {(t.items ?? []).length} line(s)
+                          </td>
+                          <td className="p-2">
+                            <select
+                              className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                              value={t.status}
+                              disabled={patchingTransferId === t.transferId}
+                              onChange={(e) =>
+                                void patchTransferStatus(t.transferId, e.target.value)
+                              }
+                            >
+                              {TRANSFER_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -634,6 +921,25 @@ export function LogisticsManagerDashboard() {
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Low Inventory Notifications</h3>
               <div className="rounded-lg border p-3">
+                {reorderNotifications && reorderNotifications.length > 0 ? (
+                  <div className="mb-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Orbit reorder queue (store {storeId})
+                    </p>
+                    <ul className="mt-2 space-y-2 text-sm">
+                      {reorderNotifications.map((n) => (
+                        <li
+                          key={n.notificationId}
+                          className="flex flex-col gap-1 border-b border-dashed pb-2 last:border-0"
+                        >
+                          <span className="font-medium">{n.itemName ?? `Item ${n.notificationId}`}</span>
+                          <span className="text-xs text-muted-foreground">{n.message}</span>
+                          <span className="text-xs text-muted-foreground">Status: {n.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {lowStockItems.length === 0 && !aiPrediction?.reorderRecommendations?.length ? (
                   <p className="text-sm text-muted-foreground">No low-stock rows from inventory.</p>
                 ) : (
@@ -645,7 +951,7 @@ export function LogisticsManagerDashboard() {
                       >
                         <span className="text-destructive">{i.itemName}</span>
                         <span className="text-muted-foreground">
-                          {i.quantity} / {i.thresholdLevel} (threshold)
+                          {i.quantity} / {itemThreshold(i) || "—"} (threshold)
                         </span>
                       </li>
                     ))}
@@ -665,8 +971,8 @@ export function LogisticsManagerDashboard() {
                   </ul>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Push/email notifications require a notification service; this list is from live
-                  inventory + mock AI suggestions.
+                  Reorder notifications from Orbit when available; remainder from live inventory +
+                  mock AI suggestions.
                 </p>
               </div>
             </div>

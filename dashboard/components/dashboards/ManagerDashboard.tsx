@@ -31,13 +31,20 @@ type OrbitInventoryItem = {
 
 type AiReorderRow = { item: string; suggestedReorderQty: number; reason: string };
 
+type OrbitReorderRow = {
+  notificationId: number;
+  itemName?: string;
+  message?: string;
+  status?: string;
+};
+
 export function ManagerDashboard() {
   const { data: session } = useSession();
   const roles = session?.user?.roles ?? [];
   const canViewRevenue =
     roles.includes(Role.Admin) || roles.includes(Role.SuperAdmin);
 
-  const [storeId] = useState<string>("1");
+  const [storeId, setStoreId] = useState<string>("1");
   const [alerts, setAlerts] = useState<LowStockAlert[] | null>(null);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [inventory, setInventory] = useState<OrbitInventoryItem[] | null>(null);
@@ -50,6 +57,7 @@ export function ManagerDashboard() {
     null
   );
   const [loadingAiRec, setLoadingAiRec] = useState(false);
+  const [orbitReorders, setOrbitReorders] = useState<OrbitReorderRow[] | null>(null);
 
   const primaryAlert = useMemo(() => alerts?.[0] ?? null, [alerts]);
 
@@ -81,7 +89,9 @@ export function ManagerDashboard() {
     async function loadInv() {
       setLoadingInv(true);
       try {
-        const res = await fetch("/api/orbit/inventory");
+        const res = await fetch(
+          `/api/orbit/stores/${encodeURIComponent(storeId)}/inventory`
+        );
         if (!res.ok) {
           if (!cancelled) setInventory(null);
           return;
@@ -96,7 +106,32 @@ export function ManagerDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [storeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadReorder() {
+      const sid = parseInt(storeId, 10);
+      if (Number.isNaN(sid)) {
+        setOrbitReorders(null);
+        return;
+      }
+      const res = await fetch(
+        `/api/orbit/notifications/reorder?storeId=${encodeURIComponent(String(sid))}`
+      );
+      if (cancelled) return;
+      if (!res.ok) {
+        setOrbitReorders(null);
+        return;
+      }
+      const json = (await res.json()) as { data?: OrbitReorderRow[] };
+      setOrbitReorders(json.data ?? []);
+    }
+    void loadReorder();
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   useEffect(() => {
     if (primaryAlert?.item) {
@@ -172,10 +207,35 @@ export function ManagerDashboard() {
         <CardHeader>
           <CardTitle>Manager Dashboard</CardTitle>
           <CardDescription>
-            Store revenue, inventory health, and ordering recommendations (scaffold).
+            Store-scoped inventory and reorder notifications use Orbit; revenue and AI blocks stay
+            as before.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground" htmlFor="mgr-store">
+                Store
+              </label>
+              <select
+                id="mgr-store"
+                className="h-9 rounded-md border bg-transparent px-2 text-sm"
+                value={storeId}
+                onChange={(e) => setStoreId(e.target.value)}
+              >
+                {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((id) => (
+                  <option key={id} value={id}>
+                    Store {id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Inventory:{" "}
+              <code className="text-xs">GET /api/orbit/stores/{"{id}"}/inventory</code>
+            </p>
+          </div>
+
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Store Revenue Reports</h3>
             <div className="rounded-lg border p-3">
@@ -201,6 +261,23 @@ export function ManagerDashboard() {
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Low Inventory Notifications</h3>
               <div className="rounded-lg border p-3">
+                {orbitReorders && orbitReorders.length > 0 ? (
+                  <div className="mb-3 border-b pb-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Orbit reorder notifications
+                    </p>
+                    <ul className="mt-2 space-y-2 text-sm">
+                      {orbitReorders.map((n) => (
+                        <li key={n.notificationId}>
+                          <span className="font-medium">{n.itemName ?? `#${n.notificationId}`}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {n.status} — {n.message}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {loadingAlerts && !alerts ? (
                   <p className="text-sm text-muted-foreground">Loading alerts…</p>
                 ) : alerts ? (
@@ -352,7 +429,7 @@ export function ManagerDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              On-hand from OrbitDB; usage/trend columns need usage telemetry.
+              On-hand from OrbitDB for the selected store; usage/trend columns need usage telemetry.
             </p>
           </div>
 

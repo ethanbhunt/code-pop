@@ -3,14 +3,20 @@
 
 import { getUsersDb, getTokensDb, getNextId, getTimestamp } from "../utils/db.js"
 import { hashPassword, comparePassword, generateToken } from "../utils/crypto.js"
-import { validateEmail, validateUsername, validatePassword } from "../utils/validation.js"
+import {
+  validateEmail,
+  validateUsername,
+  validatePassword,
+  validateUserRole,
+} from "../utils/validation.js"
 
-/** Persist only customer | staff | admin; map seed/legacy names. */
+/** Persist customer | staff | admin | repair; map seed/legacy names. */
 function normalizeOrbitRoleForStorage(role) {
   const r = String(role ?? "customer").trim().toLowerCase()
   if (!r) return "customer"
   if (r === "superadmin" || r === "admin") return "admin"
   if (r === "manager" || r === "staff") return "staff"
+  if (r === "repair" || r === "repair_staff") return "repair"
   if (r === "customer" || r === "user") return "customer"
   return null
 }
@@ -62,7 +68,7 @@ export async function registerUser(username, password, email, role = "customer",
 
   const normalizedRole = normalizeOrbitRoleForStorage(role)
   if (normalizedRole === null) {
-    throw new Error("Invalid role. Use customer, staff, or admin")
+    throw new Error("Invalid role. Use customer, staff, admin, or repair")
   }
 
   // Hash password
@@ -227,7 +233,10 @@ export async function getUserById(userId) {
     lastName: user.lastName,
     role: user.role,
     dateJoined: user.dateJoined,
-    lastLogin: user.lastLogin
+    lastLogin: user.lastLogin,
+    ...(user.assignedStores !== undefined && { assignedStores: user.assignedStores }),
+    ...(user.userRole !== undefined && { userRole: user.userRole }),
+    ...(user.enum !== undefined && { enum: user.enum }),
   }
 }
 
@@ -281,6 +290,31 @@ export async function updateUser(userId, updates) {
     user.email = updates.email
   }
 
+  if (updates.assignedStores !== undefined) {
+    if (!Array.isArray(updates.assignedStores)) {
+      throw new Error("assignedStores must be an array")
+    }
+    user.assignedStores = updates.assignedStores
+      .map((id) => parseInt(String(id), 10))
+      .filter((n) => Number.isInteger(n) && n > 0)
+  }
+
+  if (updates.userRole !== undefined) {
+    const ur = String(updates.userRole).trim().toLowerCase().replace(/\s+/g, "_")
+    if (!validateUserRole(ur)) {
+      throw new Error("Invalid userRole")
+    }
+    user.userRole = ur
+  }
+
+  if (updates.enum !== undefined) {
+    const en = String(updates.enum).trim().toLowerCase().replace(/\s+/g, "_")
+    if (!validateUserRole(en)) {
+      throw new Error("Invalid enum")
+    }
+    user.enum = en
+  }
+
   // Save updated user
   await usersDb.put(`user:${userId}`, user)
 
@@ -290,7 +324,10 @@ export async function updateUser(userId, updates) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
-    role: user.role
+    role: user.role,
+    ...(user.assignedStores !== undefined && { assignedStores: user.assignedStores }),
+    ...(user.userRole !== undefined && { userRole: user.userRole }),
+    ...(user.enum !== undefined && { enum: user.enum }),
   }
 }
 
@@ -344,7 +381,10 @@ export async function listUsers(limit = 100) {
         lastName: user.lastName,
         role: user.role,
         dateJoined: user.dateJoined,
-        lastLogin: user.lastLogin
+        lastLogin: user.lastLogin,
+        ...(user.assignedStores !== undefined && { assignedStores: user.assignedStores }),
+        ...(user.userRole !== undefined && { userRole: user.userRole }),
+        ...(user.enum !== undefined && { enum: user.enum }),
       })
     }
     if (users.length >= limit) break

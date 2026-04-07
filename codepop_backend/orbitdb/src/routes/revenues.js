@@ -11,10 +11,11 @@ router.get("/", authenticate, requireAdmin, asyncHandler(async (req, res) => {
   res.json({ status: "success", count: revenues.length, data: revenues })
 }))
 
-router.post("/", authenticate, requireAdmin, asyncHandler(async (req, res) => {
-  const { orderId, amount, description } = req.body
-  const revenue = await revenueService.createRevenue(orderId, amount, description)
-  res.status(201).json({ status: "created", data: revenue })
+router.post("/", asyncHandler(async (req, res) => {
+   // Allow both authenticated and unauthenticated requests (for demo/guest orders)
+   const { orderId, amount, description } = req.body
+   const revenue = await revenueService.createRevenue(orderId, amount, description)
+   res.status(201).json({ status: "created", data: revenue })
 }))
 
 router.get("/report", authenticate, requireAdmin, asyncHandler(async (req, res) => {
