@@ -10,6 +10,7 @@ const isWin = process.platform === "win32";
 const args = new Set(process.argv.slice(2));
 const detached = !args.has("--foreground");
 const skipBuild = args.has("--skip-build");
+const skipSeed = args.has("--skip-seed");
 
 function log(message) {
   process.stdout.write(`${message}\n`);
@@ -101,6 +102,13 @@ function runCapture(command, commandArgs) {
   return spawnSync(command, commandArgs, { encoding: "utf8" });
 }
 
+function runCompose(compose, composeArgs) {
+  if (compose.kind === "plugin") {
+    return run(compose.command, ["compose", ...composeArgs]);
+  }
+  return run(compose.command, composeArgs);
+}
+
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -147,6 +155,27 @@ function detectComposeMode(dockerPath, dockerComposePath) {
   fail("Neither 'docker compose' plugin nor 'docker-compose' command is available.");
 }
 
+function runComposeCapture(compose, composeArgs) {
+  if (compose.kind === "plugin") {
+    return runCapture(compose.command, ["compose", ...composeArgs]);
+  }
+  return runCapture(compose.command, composeArgs);
+}
+
+function composeServices(compose) {
+  const result = runComposeCapture(compose, ["config", "--services"]);
+  if (result.status !== 0) {
+    return new Set();
+  }
+
+  return new Set(
+    String(result.stdout || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+}
+
 function pingUrl(url) {
   const client = url.startsWith("https") ? https : http;
   return new Promise((resolve) => {
@@ -177,6 +206,21 @@ async function waitHttp(url, timeoutMs) {
   return false;
 }
 
+async function runSeeding(compose, services) {
+  if (skipSeed) {
+    log("Skipping seed step (--skip-seed).");
+    return;
+  }
+
+  if (!services.has("orbitdb-peer")) {
+    log("Skipping seed step (orbitdb-peer service is not present in compose).");
+    return;
+  }
+
+  log("Seeding OrbitDB test data...");
+  await runCompose(compose, ["exec", "-T", "orbitdb-peer", "npm", "run", "seed"]);
+}
+
 async function main() {
   log("Checking required tools...");
   const dockerPath = which("docker");
@@ -201,33 +245,44 @@ async function main() {
   }
 
   const compose = detectComposeMode(dockerPath, dockerComposePath);
+  const services = composeServices(compose);
   const upArgs = ["up"];
   if (detached) upArgs.push("-d");
   if (!skipBuild) upArgs.push("--build");
 
   log("Starting local stack via docker compose...");
-  if (compose.kind === "plugin") {
-    await run(compose.command, ["compose", ...upArgs]);
-  } else {
-    await run(compose.command, upArgs);
-  }
+  await runCompose(compose, upArgs);
 
   log("Waiting for local services to respond...");
-  const [bootstrapReady, peerReady, djangoReady] = await Promise.all([
-    waitHttp("http://localhost:3000/peers/stats", 120_000),
-    waitHttp("http://localhost:3001/peers/stats", 120_000),
-    waitHttp("http://localhost:8000/admin/", 120_000),
-  ]);
+  const healthChecks = [
+    { name: "orbitdb-bootstrap", url: "http://localhost:3000/peers/stats" },
+    { name: "orbitdb-peer", url: "http://localhost:3001/peers/stats" },
+    { name: "orbitdb-api", url: "http://localhost:3001/health" },
+    { name: "dashboard", url: "http://localhost:3002" },
+  ];
 
-  log("Container status:");
-  if (compose.kind === "plugin") {
-    await run(compose.command, ["compose", "ps"]);
-  } else {
-    await run(compose.command, ["ps"]);
+  if (services.has("backend")) {
+    healthChecks.push({ name: "backend", url: "http://localhost:8000/admin/" });
   }
 
-  if (bootstrapReady && peerReady && djangoReady) {
+  const checkResults = await Promise.all(
+    healthChecks.map(async (check) => ({
+      ...check,
+      ready: await waitHttp(check.url, 120_000),
+    })),
+  );
+  const allReady = checkResults.every((result) => result.ready);
+
+  if (allReady) {
+    await runSeeding(compose, services);
+  }
+
+  log("Container status:");
+  await runCompose(compose, ["ps"]);
+
+  if (allReady) {
     log("Local stack is ready for emulator testing.");
+    log("Dashboard URL: http://localhost:3002");
     log("Android emulator backend URL: http://10.0.2.2:3001");
     process.exit(0);
   }

@@ -136,7 +136,7 @@ async function start() {
     console.log("[ ^ ] Helia and OrbitDB initialized\n")
 
     // ── Dial bootstrap node ───────────────────────────────────────────────────
-    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.includes("127.0.0.1"))
+    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => !a.includes("/ip4/127.0.0.1/"))
       ?? bootstrapInfo.multiaddrs[0]
 
     console.log(`[ ^ ] Dialing bootstrap: ${bootstrapAddr}`)

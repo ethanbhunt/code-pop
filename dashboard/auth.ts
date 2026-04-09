@@ -7,7 +7,7 @@ import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
 /**
  * Auth.js config: validates users against codepop_backend/orbitdb REST API.
  *
- * Backend: POST { baseUrl }/auth/login
+ * Backend: POST { baseUrl }/backend/auth/login
  *   Body: JSON { username, password }
  *   Success (200): { status: "authenticated", data: { userId, username, email,
  *     firstName, lastName, role, token } }
@@ -18,7 +18,7 @@ import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
  */
 const orbitDbBaseUrl = process.env.ORBITDB_API_URL?.replace(/\/$/, "");
 
-const orbitDbLoginUrl = orbitDbBaseUrl ? `${orbitDbBaseUrl}/auth/login` : "";
+const orbitDbLoginUrl = orbitDbBaseUrl ? `${orbitDbBaseUrl}/backend/auth/login` : "";
 
 const devBypassEnabled =
   process.env.NODE_ENV !== "production" &&

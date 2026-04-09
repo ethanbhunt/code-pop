@@ -88,13 +88,45 @@ function injectToolBin(toolPath) {
   }
 }
 
+function resolveExecutablePath(tool, toolPath) {
+  if (!toolPath || !isWin) {
+    return toolPath;
+  }
+
+  // On Windows, prefer an executable npm shim. In Git Bash, `where npm`
+  // can resolve to an extensionless path that spawn cannot execute.
+  if (tool === "npm") {
+    const ext = path.extname(toolPath).toLowerCase();
+    if (ext === ".cmd" || ext === ".exe") {
+      return toolPath;
+    }
+
+    const candidates = [`${toolPath}.cmd`, `${toolPath}.exe`, "npm.cmd", "npm.exe"];
+    for (const candidate of candidates) {
+      if (candidate === "npm.cmd" || candidate === "npm.exe" || existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  if (existsSync(toolPath)) {
+    return toolPath;
+  }
+
+  return toolPath;
+}
+
 function run(command, commandArgs, cwd) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, commandArgs, {
+    const opts = {
       cwd,
       stdio: "inherit",
       shell: false,
-    });
+    };
+
+    const child = isWin
+      ? spawn("cmd.exe", ["/d", "/s", "/c", [command, ...commandArgs].join(" ")], opts)
+      : spawn(command, commandArgs, opts);
 
     child.on("error", reject);
     child.on("exit", (code) => {
@@ -134,9 +166,9 @@ function writeEnvFile(envPath, vars) {
 
 async function main() {
   log("Checking required tools...");
-  const nodePath = which("node");
-  const npmPath = which("npm");
-  const adbPath = which("adb");
+  const nodePath = resolveExecutablePath("node", which("node"));
+  const npmPath = resolveExecutablePath("npm", which("npm"));
+  const adbPath = resolveExecutablePath("adb", which("adb"));
 
   if (!nodePath) fail("Required command 'node' was not found in PATH.");
   if (!npmPath) fail("Required command 'npm' was not found in PATH.");
@@ -145,6 +177,8 @@ async function main() {
   injectToolBin(nodePath);
   injectToolBin(npmPath);
   injectToolBin(adbPath);
+
+  const npmCommand = isWin ? "npm" : npmPath;
 
   const repoRoot = path.resolve(__dirname, "..");
   const mobileDir = path.join(repoRoot, "codepop");
@@ -156,10 +190,10 @@ async function main() {
   writeEnvFile(envPath, existingVars);
 
   log("Installing mobile dependencies...");
-  await run(npmPath, ["install"], mobileDir);
+  await run(npmCommand, ["install"], mobileDir);
 
   log("Starting Expo Android app...");
-  await run(npmPath, ["run", "android"], mobileDir);
+  await run(npmCommand, ["run", "android"], mobileDir);
 }
 
 main().catch((error) => fail(String(error.message || error)));

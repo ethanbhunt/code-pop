@@ -10,6 +10,8 @@
 // - Health status
 // - Access control (write permissions)
 
+import fs from "node:fs"
+
 /**
  * In-memory peer registry
  * Key: peerId, Value: { peerId, role, region, apiPort, multiaddrs, lastHeartbeat, status }
@@ -252,8 +254,7 @@ export function getRegistrySnapshot() {
  */
 export function loadAllowlist(filePath) {
   try {
-    const fs = require('fs')
-    const content = fs.readFileSync(filePath, 'utf8')
+    const content = fs.readFileSync(filePath, "utf8")
     allowlist = JSON.parse(content)
     allowlistPath = filePath
     console.log(`[ registry ] Allowlist loaded from ${filePath}`)

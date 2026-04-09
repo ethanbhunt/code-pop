@@ -26,7 +26,7 @@
     "@chainsafe/libp2p-gossipsub": "^13.0.0",
     "@chainsafe/libp2p-noise": "^15.1.0",
     "@chainsafe/libp2p-yamux": "^6.0.2",
-    "@libp2p/identify": "^1.0.0",
+    "@libp2p/identify": "^2.1.5",
     "@libp2p/tcp": "^9.1.0",
     "@multiformats/multiaddr": "^12.3.1",
     "@orbitdb/core": "^2.3.0",

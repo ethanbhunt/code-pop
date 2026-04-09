@@ -10,7 +10,24 @@
  * - Load-balance across healthy bootstrap nodes for peer registration
  */
 
-const axios = require('axios');
+async function requestJson(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    const contentType = response.headers.get("content-type") || ""
+    if (contentType.includes("application/json")) {
+      return await response.json()
+    }
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 
 class BootstrapCoordinator {
   constructor(bootstrapAddresses = []) {
@@ -100,9 +117,11 @@ class BootstrapCoordinator {
    */
   async checkBootstrapHealth(url) {
     try {
-      const response = await axios.get(`${url}/peers/stats`, {
-        timeout: this.healthCheckTimeout,
-      });
+      await requestJson(
+        `${url}/peers/stats`,
+        { method: "GET" },
+        this.healthCheckTimeout
+      )
 
       // Success - update status
       const status = this.bootstrapStatus[url];
@@ -171,13 +190,16 @@ class BootstrapCoordinator {
     for (const url of this.bootstrapAddresses) {
       try {
         console.log(`[BootstrapCoordinator] Attempting peer registration at ${url}`);
-        
-        const response = await axios.post(`${url}/peers/register`, {
-          peerId,
-          ...metadata,
-        }, {
-          timeout: this.healthCheckTimeout,
-        });
+
+        const response = await requestJson(
+          `${url}/peers/register`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ peerId, ...metadata }),
+          },
+          this.healthCheckTimeout
+        )
 
         console.log(`[BootstrapCoordinator] Peer ${peerId} registered successfully at ${url}`);
         return { success: true, bootstrapUrl: url, response: response.data };
@@ -205,11 +227,15 @@ class BootstrapCoordinator {
     // Try each bootstrap node in order until one succeeds
     for (const url of this.bootstrapAddresses) {
       try {
-        const response = await axios.post(
+        const response = await requestJson(
           `${url}/peers/heartbeat/${peerId}`,
-          { timestamp: Date.now() },
-          { timeout: this.healthCheckTimeout }
-        );
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timestamp: Date.now() }),
+          },
+          this.healthCheckTimeout
+        )
 
         return { success: true, bootstrapUrl: url, response: response.data };
       } catch (error) {
@@ -271,4 +297,4 @@ class BootstrapCoordinator {
   }
 }
 
-module.exports = BootstrapCoordinator;
+export default BootstrapCoordinator
