@@ -81,30 +81,35 @@ const ComplaintsPage = () => {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`Chatbot HTTP ${response.status}`);
+                const errorBody = await response.text().catch(() => '');
+                throw new Error(
+                    `Chatbot HTTP ${response.status}${errorBody ? `: ${errorBody}` : ''}`
+                );
             }
 
-            const rawData = await response.json();
-            let data = rawData.response ?? rawData;
-            data = data.replace('"','');
-            const botText = data;
-            const botResponse =
-                typeof botText === 'string'
-                    ? botText
-                    : Array.isArray(botText)
-                      ? botText.join('\n')
-                      : data.message ?? JSON.stringify(data);
+            const payload = await response.json();
+            const botTextRaw =
+                payload?.response ??
+                payload?.message ??
+                (typeof payload === 'string' ? payload : null);
 
-            const responseRefundPhase = data.refund_phase ?? data.refundPhase;
-            const responseWrongDrinkPhase = data.wrong_drink_phase ?? data.wrongDrinkPhase;
+            const botResponse =
+                typeof botTextRaw === 'string'
+                    ? botTextRaw.replace('"', '')
+                    : Array.isArray(botTextRaw)
+                      ? botTextRaw.join('\n')
+                      : JSON.stringify(payload);
+
+            const responseRefundPhase = payload?.refund_phase ?? payload?.refundPhase;
+            const responseWrongDrinkPhase = payload?.wrong_drink_phase ?? payload?.wrongDrinkPhase;
 
             if (responseRefundPhase != null) setRefundPhase(responseRefundPhase);
             if (responseWrongDrinkPhase != null) setWrongDrinkPhase(responseWrongDrinkPhase);
-            if (data.order_num != null || data.orderNum != null) {
-                setOrderNum(data.order_num ?? data.orderNum);
+            if (payload?.order_num != null || payload?.orderNum != null) {
+                setOrderNum(payload.order_num ?? payload.orderNum);
             }
-            if (data.drink_nums != null || data.drinkNums != null) {
-                setDrinkNums(data.drink_nums ?? data.drinkNums);
+            if (payload?.drink_nums != null || payload?.drinkNums != null) {
+                setDrinkNums(payload.drink_nums ?? payload.drinkNums);
             }
 
             setMessages((prev) =>
@@ -113,7 +118,7 @@ const ComplaintsPage = () => {
                 )
             );
 
-            const resolvedOrderNum = data.order_num ?? data.orderNum;
+            const resolvedOrderNum = payload?.order_num ?? payload?.orderNum;
             const shouldLoadOrder =
                 resolvedOrderNum != null &&
                 resolvedOrderNum !== '' &&

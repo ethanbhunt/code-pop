@@ -7,6 +7,7 @@
 //   4. Exposes a full REST API with middleware stack
 
 import express from "express"
+import dotenv from "dotenv"
 import { createHelia } from "helia"
 import { createLibp2p } from "libp2p"
 import { tcp } from "@libp2p/tcp"
@@ -31,11 +32,13 @@ import inventoryRoutes from "./src/routes/inventory.js"
 import notificationRoutes from "./src/routes/notifications.js"
 import revenueRoutes from "./src/routes/revenues.js"
 import paymentRoutes from "./src/routes/payments.js"
+import stripeRoutes from "./src/routes/stripe.js"
 import qrcodeRoutes from "./src/routes/qrcodes.js"
 import storeRoutes from "./src/routes/stores.js"
 import maintenanceRoutes from "./src/routes/maintenance.js"
 import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
+import * as stripeService from "./src/services/stripeService.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -43,6 +46,9 @@ const REPO = `./repo-peer-${HTTP_PORT}`
 const PEER_INFO_FILE = "./peer-info.json"
 
 const app = express()
+
+// Load local env vars (.env) for all peers (3001/3002/3003...).
+dotenv.config()
 
 // ── Middleware Stack ──────────────────────────────────────────────────────────
 
@@ -196,6 +202,7 @@ async function start() {
     app.use("/backend/notifications", notificationRoutes)
     app.use("/backend/revenues", revenueRoutes)
     app.use("/backend/payments", paymentRoutes)
+    app.use("/backend/stripe", stripeRoutes)
     app.use("/backend/qrcodes", qrcodeRoutes)
     app.use("/backend/stores", storeRoutes)
     app.use("/backend/maintenance", maintenanceRoutes)
@@ -204,8 +211,9 @@ async function start() {
 
     // ── Additional standalone endpoints ────────────────────────────────────────
     
-    // POST /backend/create-payment-intent - Create Stripe payment intent (public endpoint, no authentication required)
-    app.post("/backend/create-payment-intent", (req, res) => {
+    // POST /backend/create-payment-intent - Legacy endpoint used by older mobile code
+    // Prefer: POST /backend/stripe/payment-sheet (creates PI tied to an orderId).
+    app.post("/backend/create-payment-intent", optionalAuth, async (req, res) => {
       try {
         const { amount } = req.body
         
@@ -216,12 +224,20 @@ async function start() {
             details: "Amount must be a positive number"
           })
         }
-        
-        // Return mock Stripe payment intent for demo mode
+
+        // Real Stripe TEST-mode intent (no real money).
+        // This legacy endpoint cannot safely attach to an order, so we omit order metadata.
+        const sheet = await stripeService.createPaymentSheetIntent({
+          amountDollars: Number(amount),
+          orderId: `legacy_${Date.now()}`,
+          userId: req.user?.userId ?? null,
+        })
+
         res.json({
-          paymentIntent: `pi_demo_${Date.now()}`,
-          ephemeralKey: `ek_demo_${Date.now()}`,
-          customer: `cus_demo_${req.user?.userId || `guest_${Date.now()}`}`
+          paymentIntent: sheet.paymentIntentClientSecret,
+          paymentIntentId: sheet.paymentIntentId,
+          ephemeralKey: sheet.ephemeralKeySecret,
+          customer: sheet.customerId,
         })
       } catch (error) {
         console.error("Error creating payment intent:", error)
@@ -282,11 +298,11 @@ async function start() {
       }
     })
     
-    // POST /backend/chatbot - Support chatbot endpoint
-    app.post("/backend/chatbot", authenticate, (req, res) => {
+    // POST /backend/chatbot - Support chatbot endpoint (guest-friendly)
+    app.post("/backend/chatbot", optionalAuth, (req, res) => {
       try {
         const { message, refund_phase, wrong_drink_phase, order_num, drink_nums } = req.body
-        const userId = req.user?.userId
+        const userId = req.user?.userId ?? null
         
         if (!message) {
           return res.status(400).json({
@@ -295,21 +311,182 @@ async function start() {
           })
         }
         
-        // Generate a response based on the message and context
-        let response = "Thank you for contacting support. "
-        
-        if (refund_phase) {
-          response += "We'll process your refund request shortly."
-        } else if (wrong_drink_phase) {
-          response += "We apologize for the wrong drink. Please let us know the details."
+        const normalizedMessage = String(message ?? "").trim()
+        const m = normalizedMessage.toLowerCase()
+
+        const asPhase = (v) => {
+          if (v == null) return "none"
+          const s = String(v).trim().toLowerCase()
+          return s === "" ? "none" : s
+        }
+
+        const extractFirstInt = (text) => {
+          const match = String(text ?? "").match(/\b(\d{1,10})\b/)
+          return match ? parseInt(match[1], 10) : null
+        }
+
+        const parseYesNo = (text) => {
+          const t = String(text ?? "").toLowerCase()
+          if (/\b(yes|yep|yeah|y|ok|okay|sure|refund|refunded)\b/.test(t)) return "yes"
+          if (/\b(no|nope|nah|n)\b/.test(t)) return "no"
+          return null
+        }
+
+        const wantsRefund = /\b(refund|money back|return)\b/.test(m)
+        const wantsRemake = /\b(remake|redo|replace|new drink|re-make)\b/.test(m)
+        const saysWrongDrink = /\b(wrong drink|wrong|not mine|not what i ordered|mixed up)\b/.test(m)
+
+        let nextRefundPhase = asPhase(refund_phase)
+        let nextWrongDrinkPhase = asPhase(wrong_drink_phase)
+        let nextOrderNum = order_num ?? "none"
+        let nextDrinkNums = drink_nums ?? "none"
+
+        // If user types a clear intent anytime, route them there.
+        if (wantsRefund && nextRefundPhase === "none" && nextWrongDrinkPhase === "none") {
+          nextRefundPhase = "start"
+        }
+        if ((saysWrongDrink || wantsRemake) && nextRefundPhase === "none" && nextWrongDrinkPhase === "none") {
+          nextWrongDrinkPhase = "start"
+        }
+
+        // Main conversation: refund flow
+        let response = ""
+        if (nextRefundPhase !== "none") {
+          if (nextRefundPhase === "start") {
+            response =
+              "I can help with a refund. What is your order number? (Just type the number.)"
+            nextRefundPhase = "await_order_num"
+          } else if (nextRefundPhase === "await_order_num") {
+            const parsed = extractFirstInt(normalizedMessage)
+            if (!parsed) {
+              response = "Please send just your order number (for example: 12)."
+            } else {
+              nextOrderNum = String(parsed)
+              response =
+                `Got it—order #${parsed}. What went wrong?\n- wrong drink\n- missing item\n- other`
+              nextRefundPhase = "await_reason"
+            }
+          } else if (nextRefundPhase === "await_reason") {
+            if (/\bwrong\b/.test(m)) {
+              response =
+                "Sorry about that. Do you want a remake or a refund? (type: remake or refund)"
+              nextRefundPhase = "await_remake_or_refund"
+            } else {
+              response =
+                "Thanks—do you want a refund for the whole order or just specific drinks? (type: whole or drinks)"
+              nextRefundPhase = "await_scope"
+            }
+          } else if (nextRefundPhase === "await_scope") {
+            if (/\bwhole\b/.test(m)) {
+              response =
+                "Understood. We’ll start processing a full refund. If you have any extra details, type them now."
+              nextRefundPhase = "done"
+            } else if (/\b(drink|drinks|item|items|specific)\b/.test(m)) {
+              response =
+                "Which drink number(s) from the order should we refund? (example: 1 or 1,2)"
+              nextRefundPhase = "await_drink_nums"
+            } else {
+              response = "Please reply with: whole or drinks"
+            }
+          } else if (nextRefundPhase === "await_drink_nums") {
+            const nums = normalizedMessage.replace(/[^\d, ]/g, "").trim()
+            const hasDigit = /\d/.test(nums)
+            if (!hasDigit) {
+              response = "Please provide drink number(s), like: 1 or 1,2"
+            } else {
+              nextDrinkNums = nums
+              response =
+                "Thanks. We’ll process the refund for those drinks soon. Anything else you want to add?"
+              nextRefundPhase = "done"
+            }
+          } else if (nextRefundPhase === "await_remake_or_refund") {
+            if (wantsRemake) {
+              response =
+                "Okay—we can remake it. Please confirm: was the drink name on the order correct? (yes/no)"
+              nextRefundPhase = "await_name_confirm"
+            } else if (wantsRefund) {
+              response =
+                "Understood—we’ll start processing your refund soon. If you have any extra details, type them now."
+              nextRefundPhase = "done"
+            } else {
+              response = "Please type: remake or refund"
+            }
+          } else if (nextRefundPhase === "await_name_confirm") {
+            const yn = parseYesNo(normalizedMessage)
+            if (!yn) {
+              response = "Please reply yes or no."
+            } else if (yn === "yes") {
+              response =
+                "Great. We’ll remake it and prioritize it. You’ll see an update shortly."
+              nextRefundPhase = "done"
+            } else {
+              response =
+                "No problem—what should the correct drink have been? (type the drink name)"
+              nextRefundPhase = "await_correct_name"
+            }
+          } else if (nextRefundPhase === "await_correct_name") {
+            response =
+              "Thanks. We’ll remake the correct drink and prioritize it. You’ll see an update shortly."
+            nextRefundPhase = "done"
+          } else if (nextRefundPhase === "done") {
+            response =
+              "Anything else I can help with? (refund, wrong drink, or general question)"
+          } else {
+            // Unknown phase fallback
+            response =
+              "I can help with refunds or wrong drinks. What do you need today?"
+            nextRefundPhase = "none"
+          }
+        } else if (nextWrongDrinkPhase !== "none") {
+          // Wrong-drink flow (separate from refund flow)
+          if (nextWrongDrinkPhase === "start") {
+            response =
+              "Sorry about the mix-up. What is your order number? (Just type the number.)"
+            nextWrongDrinkPhase = "await_order_num"
+          } else if (nextWrongDrinkPhase === "await_order_num") {
+            const parsed = extractFirstInt(normalizedMessage)
+            if (!parsed) {
+              response = "Please send just your order number (for example: 12)."
+            } else {
+              nextOrderNum = String(parsed)
+              response =
+                `Thanks—order #${parsed}. Do you want us to remake the drink or issue a refund? (remake/refund)`
+              nextWrongDrinkPhase = "await_remake_or_refund"
+            }
+          } else if (nextWrongDrinkPhase === "await_remake_or_refund") {
+            if (wantsRemake) {
+              response =
+                "Got it. We’ll remake your drink. Any details we should know? (ice level, size, etc.)"
+              nextWrongDrinkPhase = "done"
+            } else if (wantsRefund) {
+              response =
+                "Understood. We’ll process your refund soon. Any details you want to add?"
+              nextWrongDrinkPhase = "done"
+            } else {
+              response = "Please type: remake or refund"
+            }
+          } else if (nextWrongDrinkPhase === "done") {
+            response =
+              "Anything else I can help with? (refund, wrong drink, or general question)"
+          } else {
+            response =
+              "I can help with wrong drinks. What is your order number?"
+            nextWrongDrinkPhase = "await_order_num"
+          }
         } else {
-          response += "How can we help you today?"
+          response =
+            "Hi—I’m Bob from support. Are you reaching out about a wrong drink, a remake, or a refund? (type: wrong, remake, or refund)"
         }
         
         res.json({
           status: "success",
           response: response,
           orderId: order_num,
+          userId,
+          refund_phase: nextRefundPhase,
+          wrong_drink_phase: nextWrongDrinkPhase,
+          order_num: nextOrderNum,
+          drink_nums: nextDrinkNums,
           timestamp: new Date().toISOString()
         })
       } catch (error) {

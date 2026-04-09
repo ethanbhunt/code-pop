@@ -153,8 +153,9 @@ const PostCheckout = () => {
            const inventoryItems = inventoryData.data || [];
           
           if (!inventoryItems || inventoryItems.length === 0) {
-            console.warn('No inventory items found in response', inventoryData);
-            return; // Exit early if no inventory to update
+            // Common in dev/demo: store inventory may be unseeded.
+            // Treat as a no-op instead of warning.
+            return;
           }
 
           // Match used items with inventory items (field names: inventoryId, itemName)
@@ -252,10 +253,15 @@ const PostCheckout = () => {
 
     const pollOrder = async () => {
       try {
-        const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/`, {
+        const token = await AsyncStorage.getItem('userToken');
+        const orderToken = await AsyncStorage.getItem('orderToken');
+        const orderTokenQuery = orderToken ? `?orderToken=${encodeURIComponent(orderToken)}` : '';
+
+        const response = await fetch(`${BASE_URL}/backend/orders/${orderNum}/${orderTokenQuery}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Token ${token}` }),
           },
         });
 
@@ -264,8 +270,21 @@ const PostCheckout = () => {
         }
 
         const data = await response.json();
-        setOrderStatus(data.OrderStatus || 'pending');
-        setEstimatedReadyTime(data.PickupTime || null);
+        const order = data.data || data;
+        setOrderStatus(order.orderStatus || order.OrderStatus || 'pending');
+        const resolvedEta =
+          order.estimatedPickupTime ||
+          order.EstimatedPickupTime ||
+          order.pickupTime ||
+          order.PickupTime ||
+          null;
+
+        // Demo/showcase fallback: if backend hasn't set an ETA, default to 10 minutes from now.
+        if (!resolvedEta) {
+          setEstimatedReadyTime(new Date(Date.now() + 10 * 60 * 1000).toISOString());
+        } else {
+          setEstimatedReadyTime(resolvedEta);
+        }
         setLastUpdateText(`Live update: ${new Date().toLocaleTimeString()}`);
         setFailedPollCount(0);
         setIsDemoFallback(false);

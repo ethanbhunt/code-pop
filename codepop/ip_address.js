@@ -17,6 +17,8 @@
  * - machineIP: Your machine's IP (e.g., '192.168.1.100')
  */
 export const BOOTSTRAP_CONFIG = {
+  // On Android emulators, "localhost" points at the emulator itself.
+  // Use the host bridge IP (10.0.2.2) to reach services running on your computer.
   useLocalhost: true,
   machineIP: '10.0.2.2',  // Default: Android emulator bridge
   bootstrapPort: 3000,
