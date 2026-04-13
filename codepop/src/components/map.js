@@ -10,8 +10,7 @@ function buildMarker(color, longitude, latitude) {
     return `pin-s-${color}(${longitude},${latitude})`;
 }
 
-function buildMapboxStaticUrl({ storeLatitude, storeLongitude, userLatitude, userLongitude }) {
-    const token = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN;
+function buildMapboxStaticUrl({ storeLatitude, storeLongitude, userLatitude, userLongitude, token }) {
     if (!token) return null;
 
     const overlays = [];
@@ -40,6 +39,7 @@ const GeoMap = ({
     longitude,
     userLatitude,
     userLongitude,
+    mapboxToken,
     title = 'Code Pop',
     description = 'Store location',
 }) => {
@@ -50,6 +50,7 @@ const GeoMap = ({
         storeLongitude,
         userLatitude,
         userLongitude,
+        token: mapboxToken ?? process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
     });
 
     if (!mapUrl) {

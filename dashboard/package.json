@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
@@ -29,6 +30,7 @@
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
+    "@vitest/coverage-v8": "^4.0.8",
     "@vitejs/plugin-react": "^5.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

@@ -3,18 +3,21 @@ import { render, waitFor } from '@testing-library/react-native';
 
 import App from '../App';
 
-const getItemMock = jest.fn();
-const setItemMock = jest.fn();
-const loadAsyncMock = jest.fn();
+let mockInitialRoute;
+
+const mockGetItem = jest.fn();
+const mockSetItem = jest.fn();
+const mockRemoveItem = jest.fn();
+const mockLoadAsync = jest.fn();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: (...args) => getItemMock(...args),
-  setItem: (...args) => setItemMock(...args),
-  removeItem: jest.fn(),
+  getItem: (...args) => mockGetItem(...args),
+  setItem: (...args) => mockSetItem(...args),
+  removeItem: (...args) => mockRemoveItem(...args),
 }));
 
 jest.mock('expo-font', () => ({
-  loadAsync: (...args) => loadAsyncMock(...args),
+  loadAsync: (...args) => mockLoadAsync(...args),
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -25,7 +28,10 @@ jest.mock('@react-navigation/native', () => ({
 jest.mock('@react-navigation/native-stack', () => ({
   createNativeStackNavigator: () => {
     const Screen = () => null;
-    const Navigator = ({ children }) => children;
+    const Navigator = ({ children, initialRouteName }) => {
+      mockInitialRoute = initialRouteName;
+      return children;
+    };
     return { Navigator, Screen };
   },
 }));
@@ -42,28 +48,80 @@ jest.mock('../src/pages/CreateAccountPage', () => 'CreateAccountPage');
 jest.mock('../src/pages/CreateDrinkPage', () => 'CreateDrinkPage');
 jest.mock('../src/pages/GeneralHomePage', () => 'GeneralHomePage');
 jest.mock('../src/pages/ManagerDash', () => 'ManagerDash');
-jest.mock('../src/pages/PaymentPage', () => 'PaymentPage');
+jest.mock('../src/pages/CheckoutSuccessPage', () => 'CheckoutSuccessPage');
 jest.mock('../src/pages/PostCheckout', () => 'PostCheckout');
 jest.mock('../src/pages/PreferencesPage', () => 'PreferencesPage');
+jest.mock('../src/pages/StoreSelectPage', () => 'StoreSelectPage');
 jest.mock('../src/pages/UpdateDrink', () => 'UpdateDrink');
+
+jest.mock('../ip_address', () => ({
+  BASE_URL: 'http://localhost:3001',
+  initializeBaseURL: jest.fn(),
+  setStoreAndUpdateURL: jest.fn(),
+}));
 
 describe('App bootstrap', () => {
   beforeEach(() => {
-    getItemMock.mockReset();
-    setItemMock.mockReset();
-    loadAsyncMock.mockReset();
+    mockInitialRoute = null;
+    mockGetItem.mockReset();
+    mockSetItem.mockReset();
+    mockRemoveItem.mockReset();
+    mockLoadAsync.mockReset();
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
   });
 
-  it('initializes checkout cart storage when missing', async () => {
-    getItemMock.mockResolvedValueOnce(null);
-    setItemMock.mockResolvedValueOnce();
-    loadAsyncMock.mockResolvedValueOnce();
+  it('initializes checkout cart storage and checks auth defaults', async () => {
+    mockGetItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockSetItem.mockResolvedValueOnce();
+    mockLoadAsync.mockResolvedValueOnce();
 
     render(<App />);
 
     await waitFor(() => {
-      expect(getItemMock).toHaveBeenCalledWith('checkoutList');
-      expect(setItemMock).toHaveBeenCalledWith('checkoutList', JSON.stringify([]));
+      expect(mockGetItem).toHaveBeenCalledWith('userToken');
+      expect(mockGetItem).toHaveBeenCalledWith('selectedStoreId');
+      expect(mockSetItem).toHaveBeenCalledWith('checkoutList', JSON.stringify([]));
+      expect(mockRemoveItem).toHaveBeenCalledWith('purchasedDrinks');
+      expect(mockLoadAsync).toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  it('uses GeneralHome route when token is valid and a store is selected', async () => {
+    mockGetItem
+      .mockResolvedValueOnce('token-1')
+      .mockResolvedValueOnce('store-1');
+    mockLoadAsync.mockResolvedValueOnce();
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/backend/auth/me'),
+        expect.objectContaining({ method: 'GET' }),
+      );
+      expect(mockInitialRoute).toBe('GeneralHome');
+    });
+  });
+
+  it('clears stale auth fields when token validation fails', async () => {
+    mockGetItem
+      .mockResolvedValueOnce('token-1')
+      .mockResolvedValueOnce('store-1');
+    mockLoadAsync.mockResolvedValueOnce();
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockRemoveItem).toHaveBeenCalledWith('userToken');
+      expect(mockRemoveItem).toHaveBeenCalledWith('userId');
+      expect(mockRemoveItem).toHaveBeenCalledWith('first_name');
+      expect(mockRemoveItem).toHaveBeenCalledWith('userRole');
+      expect(mockInitialRoute).toBe('GeneralHome');
     });
   });
 });

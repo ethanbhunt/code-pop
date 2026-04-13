@@ -11,6 +11,7 @@ import CartPage from './src/pages/CartPage';
 import CheckoutForm from './src/pages/CheckoutForm';
 import CheckoutSuccessPage from './src/pages/CheckoutSuccessPage';
 import ComplaintsPage from './src/pages/ComplaintsPage';
+import CompletePage from './src/pages/CompletePage';
 import CreateAccountPage from './src/pages/CreateAccountPage';
 import CreateDrinkPage from './src/pages/CreateDrinkPage';
 import GeneralHomePage from './src/pages/GeneralHomePage';

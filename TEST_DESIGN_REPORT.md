@@ -1,250 +1,117 @@
-# CodePop Test Design Report - Draft 1
+# CodePop Test Design Report (Current)
 
-## 1. Overview and Testing Philosophy
+## 1. Test Strategy Summary
 
-CodePop is a full-stack custom beverage ordering and management application consisting of three main components:
+CodePop testing is organized by product surface:
 
-- **Backend API** (Django + Django REST Framework, PostgreSQL)
-- **Mobile App** (React Native / Expo)
-- **Admin Dashboard** (Next.js / TypeScript)
+- Mobile app unit/integration-style component tests (Jest, React Native Testing Library)
+- Dashboard unit/component tests (Vitest, Testing Library, jsdom)
+- OrbitDB backend/script tests (Python unit tests + Jest tests)
+- Backend deployment/route smoke tests (Django test modules)
 
-Our testing approach centers on **API-level integration tests** for the backend, where the bulk of our business logic resides. The backend handles user authentication, drink management, order processing, inventory control, payment integration, AI-powered recommendations, and a multi-location supply network. Because nearly every user-facing action flows through these API endpoints, thorough backend testing gives us the highest confidence-to-effort ratio.
+The strategy prioritizes validating startup safety, auth correctness, role gating, and script/runtime reliability.
 
-Frontend testing is lighter: the mobile app has a Jest-based smoke test for bootstrap behavior, and the dashboard has Vitest configured but is still in early coverage. We compensate for thinner frontend unit tests with manual end-to-end walkthroughs described in Section 5.
+## 2. Test Inventory by Surface
 
----
+### 2.1 Mobile (`codepop/__tests__`)
 
-## 2. Testing Approach by Component
+Current suites:
 
-### 2.1 Backend (Django) - Primary Test Suite
+- `AIAlert.test.js`
+- `App.test.js`
+- `DropDown.test.js`
+- `Ingredients.test.js`
+- `Map.test.js`
+- `NavBar.test.js`
+- `RatingCarosel.test.js`
+- `SeasonalCarousel.test.js`
+- `StarRating.test.js`
 
-**Framework:** Django `TestCase` and DRF `APITestCase`
-**Location:** `codepop_backend/backend/tests.py` and three supplementary modules
+Recent emphasis:
 
-We organized backend tests around the major domain areas of the application:
+- bootstrap auth/cart initialization in `App.test.js`
+- map token injection behavior in `Map.test.js`
+- carousel/rating/cart flows and navigation side effects
 
-| Test Class | File | Tests | What It Covers |
-|---|---|---|---|
-| `PreferenceTests` | `tests.py` | 6 | CRUD for user flavor preferences, validation of invalid preference values |
-| `DrinkTests` | `tests.py` | 9 | Drink CRUD, user favorites, Ice/Size validation, unauthenticated access |
-| `InventoryTests` | `tests.py` | 7 | Stock deduction, out-of-stock handling, low-stock warnings, non-existent items |
-| `NotificationTests` | `tests.py` | 9 | Notification CRUD, time-range filtering, user isolation, auth enforcement |
-| `OrderTests` | `tests.py` | 8 | Order creation, retrieval by user, deletion, adding/removing drinks from orders |
-| `RevenueTests` | `tests.py` | 5 | Revenue record creation, update after drink deletion, zero-amount edge case |
-| `AITests` | `tests.py` | 3+ | AI drink generation, recommendation accuracy |
-| `InventoryAuditSecurityTests` | `test_inventory_audit.py` | 4 | Role-based access: customers blocked from inventory mutation and audit log access; managers can mutate and read audit trails |
-| `OrderFulfillmentTests` | `test_order_fulfillment.py` | 3 | End-to-end fulfillment flow: inventory deduction on fulfillment, rollback on insufficient stock, auth required |
-| `SupplyHubServiceTests` | `test_supply_network.py` | 2 | Nearest-hub geolocation lookup, supply request creates transfer and deducts hub inventory |
-| `SupplyHubApiTests` | `test_supply_network.py` | 4 | REST API for supply hubs, hub inventory retrieval, stock transfer creation and status updates |
+Coverage command:
 
-**Total: ~60 test methods across 4 files.**
+- `cd codepop && npm run test:coverage`
 
-#### Key patterns in our backend tests
+### 2.2 Dashboard (`dashboard/`)
 
-- **Authentication is tested throughout.** Almost every test class includes a helper `authenticate()` method and tests for both authenticated and unauthenticated access. Notification creation without auth returns 401; drink creation is intentionally open (returns 201).
-- **Role-based access control.** The `InventoryAuditSecurityTests` class specifically validates that customers (non-staff) cannot modify inventory or view audit logs, while managers (staff) can.
-- **Edge cases and error paths.** We test out-of-stock deductions, insufficient stock, non-existent items, invalid preference values (e.g., "Mountain Dew" vs. the canonical "Mtn. Dew"), and invalid Ice/Size enum values.
-- **Transactional integrity.** `OrderFulfillmentTests.test_fulfill_rolls_back_on_insufficient_stock` verifies that when one ingredient is missing, no partial deduction occurs across any inventory items. This was one of the more important tests to get right because a bug here would silently drain inventory.
+Current suites:
 
-### 2.2 Mobile App (React Native)
+- `app/login/page.test.tsx`
+- `lib/orbit-fetch.test.ts`
+- `lib/orbit-role-map.test.ts`
+- `lib/orbit-session.test.ts`
 
-**Framework:** Jest with `jest-expo` preset
-**Location:** `codepop/__tests__/App.test.js`
+Recent emphasis:
 
-The mobile test suite currently has a single test class (`App bootstrap`) that verifies:
+- auth failure/success behavior on login page
+- Orbit fetch header/JSON parsing behavior
+- role conversion and session guard logic
 
-- AsyncStorage is initialized with an empty checkout cart when no prior data exists
+Coverage command:
 
-All page components and navigation dependencies are mocked out, isolating the bootstrap logic. This is a smoke test, not comprehensive coverage of the mobile UI.
+- `cd dashboard && npm run test:coverage`
 
-### 2.3 Admin Dashboard (Next.js)
+### 2.3 OrbitDB Script/Backend Tests (`codepop_backend/orbitdb/tests`)
 
-**Framework:** Vitest with jsdom environment
-**Location:** `dashboard/test/setup.ts`
+Current suites include:
 
-The dashboard test infrastructure is in place (Vitest configured, setup file imports `@testing-library/jest-dom`) but does not yet contain test files. Dashboard functionality is validated through manual end-to-end testing described in Section 5.
+- peer config tests (`test_peer_config_unit.py`, `test_peer_config_backup_unit.py`)
+- seed script unit tests and main-path tests (`test_seed_data_*`, `test_seed_backup_*`)
+- request error-path coverage (`test_seed_request_paths_unit.py`)
+- peer sync behavior (`test_peer_sync.py`)
 
----
+Coverage command:
 
-## 3. Especially Challenging Areas to Test
+- `cd codepop_backend/orbitdb && npm test`
 
-### 3.1 AI Recommendation Engine (`drinkAI.py`, `customerAI.py`)
+### 2.4 Backend Smoke Tests (`codepop_backend/backend`)
 
-The AI module uses scikit-learn cosine similarity and HuggingFace transformers to generate drink recommendations and power a customer service chatbot. Testing AI outputs is inherently non-deterministic. Our approach:
+Current suites:
 
-- Validate that the generation endpoint returns a well-formed drink object
-- Check that recommendations align with user preferences at a basic level
-- We do **not** assert exact drink names or ingredient lists, since the model output varies
+- `test_deployment_smoke.py`
+- `test_route_bindings.py`
 
-**Concern:** The chatbot (`customerAI.py`) is the least-tested AI component. Its responses depend on a language model and are difficult to assert against.
+Focus areas:
 
-### 3.2 Stripe Payment Integration
+- health endpoint reachability
+- authenticated store create/read smoke path
+- `/backend/auth/me/` behavior
+- fulfillment route alias/auth behavior
 
-Payment processing involves the Stripe API (`create-payment-intent` endpoint). We have not written automated tests that hit Stripe's test mode API because:
+## 3. Test Environment and Configuration Notes
 
-- It requires network access and API keys in CI
-- The Stripe SDK is well-tested upstream
+### 3.1 Mobile Jest
 
-Instead, we validate payment flows through manual end-to-end testing with Stripe test cards.
+- `jest-expo` preset
+- coverage enabled via `collectCoverage`
+- component-focused coverage include/exclude patterns
 
-### 3.3 Order Fulfillment with Inventory Rollback
+### 3.2 Dashboard Vitest
 
-The fulfillment flow touches multiple models (Order, Inventory, Notification) in a single transaction. The rollback test (`test_fulfill_rolls_back_on_insufficient_stock`) was challenging because we needed to confirm that no partial inventory deductions occurred when one ingredient was unavailable. Getting the atomic transaction boundaries correct required careful testing.
+- `jsdom` environment
+- single-worker deterministic config
+- V8 coverage provider with include/exclude patterns
 
-### 3.4 Supply Network Geolocation
+### 3.3 Local Stack Validation
 
-The `SupplyHubService.findNearestHub()` uses latitude/longitude calculations to route supply requests. Testing this required setting up hubs at known coordinates and asserting the correct hub was selected. The math is straightforward but the test data setup (multiple hubs at different distances) required care.
+- `scripts/start-local-stack.js` performs runtime health checks and optional seeding.
+- This script acts as a pre-test environment validation mechanism for local integrated runs.
 
-### 3.5 Frontend Component Testing
+## 4. Key Risks and Gaps
 
-React Native components with deep navigation stacks, AsyncStorage, and native modules (maps, payments, location) require extensive mocking. We found that the cost of mocking every native dependency was high relative to the confidence gained, so we opted for manual testing of the mobile UI.
+- End-to-end tests spanning mobile -> dashboard -> orbitdb in one automated pipeline are still limited.
+- Cross-browser dashboard compatibility checks are mostly manual.
+- Compose default uses one peer service while multi-peer behavior is tested mostly at script/unit level.
+- External integration reliability (Stripe, Mapbox, email providers) is validated primarily via targeted/manual testing.
 
----
+## 5. Recommended Next Additions
 
-## 4. Code Coverage Estimate
-
-| Component | Estimated Coverage | Method |
-|---|---|---|
-| Backend API (Django) | ~65-75% | Estimate based on endpoints and models tested vs. total |
-| Mobile App (React Native) | ~5% | Single bootstrap test; most pages untested by automation |
-| Admin Dashboard (Next.js) | ~0% | No automated tests yet; infrastructure only |
-
-**Backend breakdown:**
-
-- **Models with good coverage:** Preference, Drink, Inventory, Notification, Order, Revenue, SupplyHub, Store, StockTransfer, AuditLog
-- **Views with good coverage:** All CRUD endpoints for the above models, fulfillment endpoint, supply hub endpoints
-- **Lower coverage areas:** AI endpoints (partial), Stripe payment intent creation, email notification sending, user management (edit/delete)
-
-We plan to run `coverage.py` with `python manage.py test` to get an exact figure for the final draft.
-
----
-
-## 5. System-Level (End-to-End) Test Plan
-
-These are manual tests that verify the full user journey across frontend and backend. Each test describes steps to reproduce and expected outcomes.
-
-### Test 1: New User Registration and First Order
-
-**Steps:**
-1. Open the CodePop mobile app
-2. Tap "Create Account"
-3. Enter username, email, and password
-4. Confirm account creation succeeds (redirected to home page)
-5. Browse the drink menu on the General Home Page
-6. Select a drink (e.g., "Cola Vanilla")
-7. Customize Ice (Light) and Size (32oz)
-8. Add to cart
-9. Navigate to Cart Page and verify the drink appears with correct details
-10. Proceed to Checkout
-11. Enter Stripe test card number (`4242 4242 4242 4242`)
-12. Complete payment
-13. Verify order confirmation screen appears
-14. Check that the order appears in the user's order history
-
-**Expected outcome:** User can register, browse, customize, order, and pay without errors. Order appears in history with status "processing."
-
-### Test 2: Manager Fulfills an Order
-
-**Steps:**
-1. Log in as a manager (staff) user
-2. Navigate to the Admin Dashboard
-3. View pending orders
-4. Select a pending order and click "Fulfill"
-5. Verify the order status changes to "completed"
-6. Check inventory levels for the drink's ingredients (sodas, syrups, add-ins)
-7. Verify inventory quantities decreased by 1 each
-8. Verify an audit log entry was created for the inventory changes
-
-**Expected outcome:** Order status updates, inventory decrements correctly, and audit trail is recorded.
-
-### Test 3: Inventory Low-Stock Alert
-
-**Steps:**
-1. Log in as a manager
-2. Set an inventory item's quantity to just above its threshold level (e.g., Coke at 3, threshold 2)
-3. Fulfill an order that uses that item
-4. Check for a low-stock warning notification
-
-**Expected outcome:** System generates a warning when stock drops to or below the threshold level.
-
-### Test 4: Supply Network Restocking
-
-**Steps:**
-1. Log in as an authenticated user
-2. View available supply hubs (`/backend/supply-hubs/`)
-3. Create a stock transfer request for a specific item to a store
-4. Verify the transfer is created with "pending" status
-5. Update the transfer status to "approved"
-6. Verify hub inventory was deducted by the requested quantity
-
-**Expected outcome:** Stock transfers flow correctly from hub to store with proper inventory accounting.
-
-### Test 5: AI Drink Recommendation
-
-**Steps:**
-1. Log in as a user with saved flavor preferences (e.g., "mango", "vanilla")
-2. Navigate to the drink generation feature
-3. Request an AI-generated drink recommendation
-4. Verify the returned drink contains ingredients that align with the user's preferences
-5. Verify the drink object has all required fields (Name, SodaUsed, SyrupsUsed, Price, etc.)
-
-**Expected outcome:** AI returns a valid drink object with ingredients relevant to user preferences.
-
-### Test 6: Role-Based Access Control
-
-**Steps:**
-1. Log in as a regular customer
-2. Attempt to access the inventory management endpoint (`PATCH /backend/inventory/{id}/`)
-3. Verify a 403 Forbidden response
-4. Attempt to access audit logs (`GET /backend/audit-logs/`)
-5. Verify a 403 Forbidden response
-6. Log in as a manager (staff) user
-7. Repeat the same requests
-8. Verify 200 OK responses
-
-**Expected outcome:** Customers are blocked from staff-only actions; managers have full access.
-
-### Test 7: Dashboard Analytics View
-
-**Steps:**
-1. Log in to the Next.js admin dashboard
-2. Verify the dashboard loads and displays revenue data
-3. Check that the orders list shows recent orders with correct statuses
-4. Verify inventory overview shows current stock levels
-5. Check notification panel displays relevant alerts
-
-**Expected outcome:** Dashboard renders all analytics components with data from the backend API.
-
----
-
-## 6. What We Are Still Worried About
-
-- **Payment edge cases:** Stripe webhook handling for failed payments, refunds, and network timeouts is not tested automatically. A payment failure mid-checkout could leave an order in an inconsistent state.
-- **AI model reliability:** The recommendation engine's output quality depends on the training data (CSV files of syrups, sodas, add-ins). If the CSV data changes, recommendations could degrade silently.
-- **Concurrent order fulfillment:** We have not tested what happens when two managers attempt to fulfill the same order simultaneously, or when fulfillment and a supply transfer race on the same inventory item.
-- **Mobile app on real devices:** Our React Native testing is minimal. Navigation bugs, platform-specific rendering issues (iOS vs. Android), and native module compatibility could surface in production that we'd miss in Jest.
-- **Dashboard authentication:** The dashboard uses `next-auth` (v5 beta), and we have no automated tests for the auth flow. If the beta introduces breaking changes, we'd only catch it manually.
-
----
-
-## 7. Problems Uncovered by Testing
-
-*(To be completed in the final draft after the testing sprint. This section will document bugs found, fixes applied, and lessons learned.)*
-
----
-
-## 8. Next Steps for Final Draft
-
-- [ ] Run `coverage.py` and report exact backend code coverage percentage
-- [ ] Add screenshots for each end-to-end test
-- [ ] Document bugs found and fixed during the testing sprint
-- [ ] Expand frontend test coverage if time permits
-- [ ] Add dashboard component tests using Vitest
-- [ ] Document any new tests written during the testing sprint
-
-## 9. Deployment and Runtime Validation
-
-- Add smoke tests for the OrbitDB peer endpoint and the Dockerized backend/dashboard startup paths.
-- Validate that the mobile app can point at a non-local backend URL through environment configuration.
-- Add Cloud Run deployment checks to confirm each container starts with the expected env vars and ports.
-- Record any cross-service failures that appear only when the services run together under Docker Compose.
+1. Add dashboard API route tests for critical BFF endpoints under `app/api/orbit/**`.
+2. Add mobile tests for checkout success and error recovery paths.
+3. Add an automated local-stack smoke script that verifies seeded login credentials and one protected endpoint.
+4. Add concurrency-focused backend tests for inventory/order mutation race scenarios.

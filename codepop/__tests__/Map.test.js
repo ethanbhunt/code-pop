@@ -24,11 +24,10 @@ describe('GeoMap', () => {
   });
 
   it('renders a Mapbox image url when configured', () => {
-    process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN = 'test-token';
-
     const { getByLabelText } = render(
       <GeoMap
         title="Code Pop"
+        mapboxToken="test-token"
         latitude={41.7}
         longitude={-111.8}
         userLatitude={41.8}
