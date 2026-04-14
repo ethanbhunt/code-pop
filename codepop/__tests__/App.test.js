@@ -3,18 +3,19 @@ import { render, waitFor } from '@testing-library/react-native';
 
 import App from '../App';
 
-const getItemMock = jest.fn();
-const setItemMock = jest.fn();
-const loadAsyncMock = jest.fn();
+const mockGetItem = jest.fn();
+const mockSetItem = jest.fn();
+const mockRemoveItem = jest.fn();
+const mockLoadAsync = jest.fn();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: (...args) => getItemMock(...args),
-  setItem: (...args) => setItemMock(...args),
-  removeItem: jest.fn(),
+  getItem: (...args) => mockGetItem(...args),
+  setItem: (...args) => mockSetItem(...args),
+  removeItem: (...args) => mockRemoveItem(...args),
 }));
 
 jest.mock('expo-font', () => ({
-  loadAsync: (...args) => loadAsyncMock(...args),
+  loadAsync: (...args) => mockLoadAsync(...args),
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -49,21 +50,25 @@ jest.mock('../src/pages/UpdateDrink', () => 'UpdateDrink');
 
 describe('App bootstrap', () => {
   beforeEach(() => {
-    getItemMock.mockReset();
-    setItemMock.mockReset();
-    loadAsyncMock.mockReset();
+    mockGetItem.mockReset();
+    mockSetItem.mockReset();
+    mockRemoveItem.mockReset();
+    mockLoadAsync.mockReset();
   });
 
-  it('initializes checkout cart storage when missing', async () => {
-    getItemMock.mockResolvedValueOnce(null);
-    setItemMock.mockResolvedValueOnce();
-    loadAsyncMock.mockResolvedValueOnce();
+  it('initializes checkout cart storage on startup (empty cart + clear purchased drinks)', async () => {
+    mockGetItem.mockResolvedValue(null);
+    mockSetItem.mockResolvedValue();
+    mockLoadAsync.mockResolvedValue();
 
     render(<App />);
 
     await waitFor(() => {
-      expect(getItemMock).toHaveBeenCalledWith('checkoutList');
-      expect(setItemMock).toHaveBeenCalledWith('checkoutList', JSON.stringify([]));
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'checkoutList',
+        JSON.stringify([])
+      );
+      expect(mockRemoveItem).toHaveBeenCalledWith('purchasedDrinks');
     });
   });
 });

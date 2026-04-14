@@ -115,7 +115,7 @@ export function validateOrderStatus(status) {
  */
 export function validatePaymentStatus(status) {
   if (!status || typeof status !== "string") return false
-  const allowedStatuses = ["pending", "paid", "failed", "remade"]
+  const allowedStatuses = ["pending", "processing", "paid", "failed", "refunded", "remade"]
   return allowedStatuses.includes(status.toLowerCase())
 }
 
