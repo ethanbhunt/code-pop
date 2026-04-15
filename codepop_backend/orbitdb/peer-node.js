@@ -39,6 +39,7 @@ import maintenanceRoutes from "./src/routes/maintenance.js"
 import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
 import * as stripeService from "./src/services/stripeService.js"
+import { reedPeerInfo } from "./src/utils/gcs.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -98,12 +99,9 @@ async function start() {
 
   try {
     // ── Read bootstrap peer info ──────────────────────────────────────────────
-    if (!fs.existsSync(PEER_INFO_FILE)) {
-      console.error(`[ X ] ${PEER_INFO_FILE} not found — start the bootstrap node first`)
-      process.exit(1)
-    }
     const bootstrapInfo = JSON.parse(fs.readFileSync(PEER_INFO_FILE, "utf8"))
-    console.log(`[ ^ ] Read bootstrap info from ${PEER_INFO_FILE}`)
+    console.log("[ ^ ] Read bootstrap info from GSC")
+
     console.log(`  Bootstrap DB addresses:`)
     Object.entries(bootstrapInfo.dbAddresses).forEach(([key, addr]) => {
       console.log(`    ${key}: ${addr.substring(0, 50)}...`)
@@ -137,8 +135,8 @@ async function start() {
     console.log("[ ^ ] Helia and OrbitDB initialized\n")
 
     // ── Dial bootstrap node ───────────────────────────────────────────────────
-    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.includes("127.0.0.1"))
-      ?? bootstrapInfo.multiaddrs[0]
+    const BOOTSTRAP_IP = process.env.BOOTSTAP_IP
+    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.include(BOOTSTAP_IP)) ?? bootstrapInfo.multiaddrs[0]
 
     console.log(`[ ^ ] Dialing bootstrap: ${bootstrapAddr}`)
     try {

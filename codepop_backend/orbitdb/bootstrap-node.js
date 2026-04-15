@@ -17,7 +17,7 @@ import { identify } from "@libp2p/identify"
 import { LevelBlockstore } from "blockstore-level"
 import { LevelDatastore } from "datastore-level"
 import { createOrbitDB, OrbitDBAccessController } from "@orbitdb/core"
-import fs from "fs"
+import { reedPeerInfo } from "./src/utils/gcs.js"
 
 const HTTP_PORT = 3000
 const LIBP2P_PORT = 4000
@@ -254,8 +254,9 @@ async function start() {
       peerId: libp2p.peerId.toString(),
       timestamp: new Date().toISOString()
     }
-    fs.writeFileSync(PEER_INFO_FILE, JSON.stringify(peerInfo, null, 2))
-    console.log(`[ ^ ] Peer information written to ${PEER_INFO_FILE}`)
+    
+    await writePeerInfo(peerInfo)
+
     console.log(`   Peer ID: ${libp2p.peerId.toString()}\n`)
 
     // Set up event listeners for all databases
