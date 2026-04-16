@@ -39,7 +39,7 @@ import maintenanceRoutes from "./src/routes/maintenance.js"
 import logisticsRoutes from "./src/routes/logistics.js"
 import adminRoutes from "./src/routes/admin.js"
 import * as stripeService from "./src/services/stripeService.js"
-import { reedPeerInfo } from "./src/utils/gcs.js"
+import { readPeerInfo } from "./src/utils/gcs.js"
 
 const HTTP_PORT = parseInt(process.env.PORT || "3001")
 const LIBP2P_PORT = HTTP_PORT + 1000
@@ -99,7 +99,7 @@ async function start() {
 
   try {
     // ── Read bootstrap peer info ──────────────────────────────────────────────
-    const bootstrapInfo = JSON.parse(fs.readFileSync(PEER_INFO_FILE, "utf8"))
+    const bootstrapInfo = await readPeerInfo()
     console.log("[ ^ ] Read bootstrap info from GSC")
 
     console.log(`  Bootstrap DB addresses:`)
@@ -135,8 +135,8 @@ async function start() {
     console.log("[ ^ ] Helia and OrbitDB initialized\n")
 
     // ── Dial bootstrap node ───────────────────────────────────────────────────
-    const BOOTSTRAP_IP = process.env.BOOTSTAP_IP
-    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.include(BOOTSTAP_IP)) ?? bootstrapInfo.multiaddrs[0]
+    const BOOTSTRAP_IP = process.env.BOOTSTRAP_IP
+    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.include(BOOTSTRAP_IP)) ?? bootstrapInfo.multiaddrs[0]
 
     console.log(`[ ^ ] Dialing bootstrap: ${bootstrapAddr}`)
     try {

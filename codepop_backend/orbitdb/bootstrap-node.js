@@ -17,7 +17,7 @@ import { identify } from "@libp2p/identify"
 import { LevelBlockstore } from "blockstore-level"
 import { LevelDatastore } from "datastore-level"
 import { createOrbitDB, OrbitDBAccessController } from "@orbitdb/core"
-import { reedPeerInfo } from "./src/utils/gcs.js"
+import { writePeerInfo } from "./src/utils/gcs.js"
 
 const HTTP_PORT = 3000
 const LIBP2P_PORT = 4000
