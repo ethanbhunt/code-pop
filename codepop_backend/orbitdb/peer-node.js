@@ -136,7 +136,7 @@ async function start() {
 
     // ── Dial bootstrap node ───────────────────────────────────────────────────
     const BOOTSTRAP_IP = process.env.BOOTSTRAP_IP
-    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.include(BOOTSTRAP_IP)) ?? bootstrapInfo.multiaddrs[0]
+    const bootstrapAddr = bootstrapInfo.multiaddrs.find(a => a.includes(BOOTSTRAP_IP)) ?? bootstrapInfo.multiaddrs[0]
 
     console.log(`[ ^ ] Dialing bootstrap: ${bootstrapAddr}`)
     try {
