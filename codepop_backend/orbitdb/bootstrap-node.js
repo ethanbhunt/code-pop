@@ -5,7 +5,8 @@
 //   2. Writes DB addresses + multiaddr to peer-info.json
 //   3. Exposes a simple REST API for node info
 //   4. Stays running so peer nodes can replicate from it
-
+import dotenv from "dotenv"
+dotenv.config()
 import express from "express"
 import { createHelia } from "helia"
 import { createLibp2p } from "libp2p"
