@@ -1,10 +1,12 @@
+import dotenv from "dotenv"
+dotenv.config()
 import { Storage } from "@google-cloud/storage"
-
 const storage = new Storage()
 const BUCKET = process.env.GCS_BUCKET
 const CONFIG_FILE = "peer-info-json"
 
 export async function writePeerInfo(peerInfo) {
+  if (!BUCKET) throw new Error("GCS_BUCKET is not set in .env")
   const file = storage.bucket(BUCKET).file(CONFIG_FILE)
   await file.save(JSON.stringify(peerInfo, null, 2), {
     contentType: "application/json",
