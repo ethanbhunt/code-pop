@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
   Card,
@@ -126,6 +126,25 @@ export function LogisticsManagerDashboard() {
     return 0;
   }
 
+  /**
+   * Same store can contain multiple Orbit rows for one flavor (e.g. repeated seed runs).
+   * Show one row per item+type; keep the row with the largest inventoryId for transfers.
+   */
+  const inventoryRowsForDisplay = useMemo(() => {
+    const rows = orbitInventory ?? [];
+    const byKey = new Map<string, OrbitInventoryItem>();
+    for (const r of rows) {
+      const k = `${(r.itemName ?? "").trim().toLowerCase()}\0${(r.itemType ?? "").trim().toLowerCase()}`;
+      const prev = byKey.get(k);
+      if (!prev || r.inventoryId > prev.inventoryId) {
+        byKey.set(k, r);
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) =>
+      (a.itemName ?? "").localeCompare(b.itemName ?? "", undefined, { sensitivity: "base" })
+    );
+  }, [orbitInventory]);
+
   const loadInventory = useCallback(async () => {
     setLoadingInv(true);
     setInventoryError(null);
@@ -212,7 +231,7 @@ export function LogisticsManagerDashboard() {
   }, [loadLogisticsApi]);
 
   async function createOrbitTransfer() {
-    const inv = orbitInventory?.[0];
+    const inv = inventoryRowsForDisplay[0];
     if (!inv) {
       setLogisticsApiError("Need at least one inventory row to draft a transfer line.");
       return;
@@ -410,7 +429,7 @@ export function LogisticsManagerDashboard() {
     downloadTextFile(`demand-summary-${storeId}.csv`, rowsToCsv(rows));
   }
 
-  const lowStockItems = (orbitInventory ?? []).filter((i) => {
+  const lowStockItems = inventoryRowsForDisplay.filter((i) => {
     const thr = itemThreshold(i);
     return thr > 0 && i.quantity < thr;
   });
@@ -450,7 +469,7 @@ export function LogisticsManagerDashboard() {
                         Loading inventory…
                       </td>
                     </tr>
-                  ) : !orbitInventory?.length ? (
+                  ) : !inventoryRowsForDisplay.length ? (
                     <tr>
                       <td className="p-2 text-muted-foreground" colSpan={4}>
                         {inventoryError
@@ -459,7 +478,7 @@ export function LogisticsManagerDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    orbitInventory.map((inv) => {
+                    inventoryRowsForDisplay.map((inv) => {
                       const thr = itemThreshold(inv);
                       const low = thr > 0 && inv.quantity < thr;
                       return (
@@ -486,6 +505,12 @@ export function LogisticsManagerDashboard() {
                 Refresh inventory
               </Button>
             </div>
+            {orbitInventory && orbitInventory.length > inventoryRowsForDisplay.length ? (
+              <p className="text-xs text-muted-foreground">
+                Multiple Orbit rows matched the same item here (often from re-running the seed).
+                Showing one line per item using the newest record.
+              </p>
+            ) : null}
             {inventoryError && orbitInventory && orbitInventory.length > 0 ? (
               <p className="text-xs text-destructive">{inventoryError}</p>
             ) : null}

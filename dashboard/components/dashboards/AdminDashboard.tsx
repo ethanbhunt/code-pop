@@ -111,6 +111,19 @@ export function AdminDashboard() {
     return 0;
   }
 
+  /** Global inventory lists one row per store; sort so same item name groups are readable. */
+  const sortedInventory = useMemo(() => {
+    const rows = inventory ?? [];
+    return [...rows].sort((a, b) => {
+      const sa = a.storeId ?? 0;
+      const sb = b.storeId ?? 0;
+      if (sa !== sb) return sa - sb;
+      return (a.itemName ?? "").localeCompare(b.itemName ?? "", undefined, {
+        sensitivity: "base",
+      });
+    });
+  }, [inventory]);
+
   const loadMetrics = useCallback(async () => {
     setLoadingMetrics(true);
     try {
@@ -418,6 +431,7 @@ export function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30">
                   <tr className="text-left">
+                    <th className="p-2">Store</th>
                     <th className="p-2">Item</th>
                     <th className="p-2">Type</th>
                     <th className="p-2">Qty</th>
@@ -429,24 +443,27 @@ export function AdminDashboard() {
                 <tbody>
                   {loadingInv && !inventory ? (
                     <tr>
-                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                      <td className="p-2 text-muted-foreground" colSpan={7}>
                         Loading inventory…
                       </td>
                     </tr>
                   ) : !inventory?.length ? (
                     <tr>
-                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                      <td className="p-2 text-muted-foreground" colSpan={7}>
                         No inventory rows (or failed to load).
                       </td>
                     </tr>
                   ) : (
-                    inventory.map((row) => {
+                    sortedInventory.map((row) => {
                       const thr = rowThreshold(row);
                       const low = thr > 0 && row.quantity < thr;
                       const draft =
                         draftQty[row.inventoryId] ?? String(row.quantity);
                       return (
                         <tr key={row.inventoryId} className="border-t">
+                          <td className="p-2 tabular-nums">
+                            {row.storeId != null ? row.storeId : "—"}
+                          </td>
                           <td className="p-2">{row.itemName}</td>
                           <td className="p-2">{row.itemType}</td>
                           <td className="p-2">
@@ -487,6 +504,10 @@ export function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted-foreground">
+              The list is all stores combined: the same item name can appear once per store (not a
+              duplicate row).
+            </p>
           </div>
 
           <div className="space-y-3">

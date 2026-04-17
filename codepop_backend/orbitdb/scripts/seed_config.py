@@ -56,7 +56,44 @@ SEED_USERS = [
         "lastName": "Doe",
         "role": "customer"
     },
+    {
+        "username": "repair",
+        "email": "repair@example.com",
+        "password": "Repair12345",
+        "firstName": "Alex",
+        "lastName": "Technician",
+        "role": "repair",
+    },
+    {
+        "username": "customer2",
+        "email": "jane@example.com",
+        "password": "Customer123",
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "role": "customer",
+    },
 ]
+
+# Maintenance machines (supplies / equipment registry) — per-store
+SEED_MACHINES = [
+    # Store 1
+    {"storeId": 1, "name": "Main soda fountain", "model": "SFC-2000X", "status": "normal", "serviceInterval": 30},
+    {"storeId": 1, "name": "Syrup rack A", "model": "SR-12", "status": "operational", "serviceInterval": 30},
+    {"storeId": 1, "name": "Blend station", "model": "BL-500", "status": "warning", "serviceInterval": 21},
+    {"storeId": 1, "name": "Ice maker", "model": "ICE-Pro4", "status": "normal", "serviceInterval": 60},
+    # Store 2
+    {"storeId": 2, "name": "Compact dispenser", "model": "CDS-Mini", "status": "normal", "serviceInterval": 30},
+    {"storeId": 2, "name": "Mixer unit", "model": "MX-2", "status": "error", "serviceInterval": 14},
+    {"storeId": 2, "name": "Cold well", "model": "CW-88", "status": "operational", "serviceInterval": 45},
+    # Store 3
+    {"storeId": 3, "name": "Premium line", "model": "PL-900", "status": "normal", "serviceInterval": 30},
+    {"storeId": 3, "name": "Carbonator", "model": "CBR-s1", "status": "warning", "serviceInterval": 30},
+    {"storeId": 3, "name": "Nitro tap", "model": "NT-7", "status": "operational", "serviceInterval": 90},
+    {"storeId": 3, "name": "Undercounter fridge", "model": "UCF-200", "status": "normal", "serviceInterval": 120},
+]
+
+# How many synthetic guest orders + revenue rows to create (uses drinkIds 1–N from seeded drinks)
+SEED_ORDER_COUNT = 36
 
 # Drinks Menu - 8 drinks covering major categories
 # Note: API expects name, sodas, price, and optional fields: syrups, addIns, ingredients, description, isVegan, isGlutenFree, calories, rating
@@ -225,12 +262,23 @@ SEED_PREFERENCES = [
         "username": "customer",
         "preference": "pepsi",
         "preferenceType": "dislike"
-    }
+    },
+    {
+        "username": "repair",
+        "preference": "vanilla",
+        "preferenceType": "favorite",
+    },
+    {
+        "username": "customer2",
+        "preference": "caramel",
+        "preferenceType": "favorite",
+    },
 ]
 
 # Inventory Items - Stock levels for admin testing
 # Note: API expects itemName, itemType, quantity, thresholdLevel (not minThreshold), storeId (required), and optional: costPerUnit, supplier
 # itemType values: 'Soda', 'Syrup', 'Add In', 'Physical'
+# Same flavor name is repeated per store (store 1/2/3) — each row is that store's stock, not a duplicate SKU.
 # Created for 3 stores with variety to test store selection
 
 SEED_INVENTORY = [
@@ -712,7 +760,9 @@ SEED_CONFIG = {
     "drinks": len(SEED_DRINKS),
     "preferences": len(SEED_PREFERENCES),
     "inventory": len(SEED_INVENTORY),
-    "description": "CodePop test data with users, drinks, preferences, and inventory"
+    "machines": len(SEED_MACHINES),
+    "orders": SEED_ORDER_COUNT,
+    "description": "CodePop test data: users, drinks, preferences, inventory, machines, orders, revenue, logistics",
 }
 
 # Test Credentials for reference
@@ -740,5 +790,17 @@ TEST_CREDENTIALS = {
         "email": "customer@example.com",
         "password": "Customer123",
         "description": "Regular customer - can browse drinks, place orders, manage preferences"
-    }
+    },
+    "repair": {
+        "username": "repair",
+        "email": "repair@example.com",
+        "password": "Repair12345",
+        "description": "Repair staff - maintenance machines and status in assigned stores",
+    },
+    "customer2": {
+        "username": "customer2",
+        "email": "jane@example.com",
+        "password": "Customer123",
+        "description": "Second test customer account",
+    },
 }
