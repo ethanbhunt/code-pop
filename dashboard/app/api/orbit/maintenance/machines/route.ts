@@ -1,6 +1,10 @@
 import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
-import { getAccessToken, hasOrbitStaffDashboardRole } from "@/lib/orbit-session";
+import {
+  getAccessToken,
+  hasOrbitRepairDashboardRole,
+  hasOrbitStaffDashboardRole,
+} from "@/lib/orbit-session";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -26,4 +30,38 @@ export async function GET(req: Request) {
     return new Response(result.body, { status: result.status });
   }
   return Response.json(result.data);
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  const token = getAccessToken(session);
+  if (!token) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!hasOrbitRepairDashboardRole(session)) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (!getOrbitBaseUrl()) {
+    return Response.json(
+      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { status: 503 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const result = await orbitJson<unknown>(token, "/maintenance/machines", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!result.ok) {
+    return new Response(result.body, { status: result.status });
+  }
+  return Response.json(result.data, { status: 201 });
 }

@@ -5,8 +5,8 @@ import { getTokensDb, getUsersDb } from "../utils/db.js"
 
 /** DB / seed may use legacy names; admin routes accept these. */
 function hasAdminPrivileges(role) {
-  const r = String(role ?? "").toLowerCase()
-  return r === "admin" || r === "superadmin"
+  const r = String(role ?? "").toLowerCase().replace(/\s+/g, "_")
+  return r === "admin" || r === "superadmin" || r === "super_admin"
 }
 
 /** Staff-tier and above (legacy `manager` = store manager). */
@@ -39,7 +39,12 @@ const DEFAULT_COORDINATOR_STORE_IDS = Array.from({ length: 128 }, (_, i) => i + 
  * @returns {number[]}
  */
 function fallbackAssignedStores(userRole) {
-  if (userRole === "manager" || userRole === "admin" || userRole === "super_admin") {
+  if (
+    userRole === "manager" ||
+    userRole === "admin" ||
+    userRole === "super_admin" ||
+    userRole === "repair"
+  ) {
     return DEFAULT_COORDINATOR_STORE_IDS
   }
   return []
@@ -61,10 +66,13 @@ export function mergeAccessFromUserRecord(user) {
       ? user.enum.trim().toLowerCase().replace(/\s+/g, "_")
       : null
 
-  if (explicitUr && explicitEnum) {
+  // Prefer explicit userRole/enum when either is set (avoid requiring both — fixes partial user docs).
+  if (explicitUr || explicitEnum) {
+    const ur = explicitUr ?? explicitEnum
+    const en = explicitEnum ?? explicitUr
     const assignedStores =
-      rawStores.length > 0 ? rawStores : fallbackAssignedStores(explicitUr)
-    return { userRole: explicitUr, enum: explicitEnum, assignedStores }
+      rawStores.length > 0 ? rawStores : fallbackAssignedStores(ur ?? "")
+    return { userRole: ur, enum: en, assignedStores }
   }
 
   const r = String(user.role ?? "").toLowerCase()
@@ -86,7 +94,7 @@ export function mergeAccessFromUserRecord(user) {
     return {
       userRole: "repair",
       enum: "repair",
-      assignedStores: rawStores.length > 0 ? rawStores : [],
+      assignedStores: rawStores.length > 0 ? rawStores : DEFAULT_COORDINATOR_STORE_IDS,
     }
   }
   return {
@@ -181,6 +189,21 @@ export async function authenticate(req, res, next) {
 }
 
 /**
+ * Admin (legacy role) or merged super_admin, or repair — used for machine creation and similar.
+ * @param {Record<string, unknown>} user - req.user after authenticate
+ */
+export function isAdminOrRepairUser(user) {
+  if (!user) return false
+  if (hasAdminPrivileges(user.role)) return true
+  if (user.userRole === "super_admin") return true
+  if (user.userRole === "repair") return true
+  if (user.enum === "repair") return true
+  const rawRole = String(user.role ?? "").toLowerCase().replace(/\s+/g, "_")
+  if (rawRole === "repair" || rawRole === "repair_staff") return true
+  return false
+}
+
+/**
  * Require admin/superuser permission
  */
 export function requireAdmin(req, res, next) {
@@ -195,6 +218,27 @@ export function requireAdmin(req, res, next) {
     return res.status(403).json({
       error: "Admin privileges required",
       code: "NOT_ADMIN"
+    })
+  }
+
+  next()
+}
+
+/**
+ * Create machine: legacy admin role, merged super_admin, or repair (store-scoped in route).
+ */
+export function requireAdminOrRepair(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: "Authentication required",
+      code: "NOT_AUTHENTICATED"
+    })
+  }
+
+  if (!isAdminOrRepairUser(req.user)) {
+    return res.status(403).json({
+      error: "Admin or repair privileges required",
+      code: "NOT_AUTHORIZED"
     })
   }
 

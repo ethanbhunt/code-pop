@@ -48,7 +48,7 @@ export function hasOrbitLogisticsDashboardRole(session: Session | null): boolean
   return hasOrbitManagerDashboardRole(session);
 }
 
-/** Repair assignments/me BFF gate; admins may preview the same proxy. */
+/** Repair store-scoped machines list (`/maintenance/assignments/me`); admins may preview the same proxy. */
 export function hasOrbitRepairDashboardRole(session: Session | null): boolean {
   const roles = session?.user?.roles ?? [];
   return roles.includes(Role.RepairStaff) || hasOrbitAdminDashboardRole(session);

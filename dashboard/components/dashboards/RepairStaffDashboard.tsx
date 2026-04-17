@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StoreRegionPicker } from "@/components/context/StoreRegionPicker";
 import type { StoreRegionContext } from "@/components/context/StoreRegionPicker";
 
@@ -32,6 +33,11 @@ type RepairWorkflowMachine = {
   type: string;
   status: string;
   lastServiceDate: string;
+  /** From Orbit when present */
+  name?: string;
+  model?: string;
+  /** Store ID from Orbit (numeric). Placeholder/workflow rows omit this. */
+  storeId?: number;
 };
 
 type RepairWorkflowStep = { step: string; done: boolean };
@@ -87,6 +93,58 @@ function daysBetween(isoA: string, isoB: string): number {
   return Math.max(0, Math.round((b - a) / (24 * 60 * 60 * 1000)));
 }
 
+/** Label for status dropdown: ID plus name/model when available. */
+function formatMachineOptionLabel(m: RepairWorkflowMachine): string {
+  const name = m.name?.trim();
+  const model = m.model?.trim();
+  const parts: string[] = [];
+  if (name) parts.push(name);
+  if (model) parts.push(model);
+  if (parts.length > 0) {
+    return `${m.id} — ${parts.join(" · ")}`;
+  }
+  if (m.type && m.type !== "machine") {
+    return `${m.id} — ${m.type}`;
+  }
+  return m.id;
+}
+
+const STATUS_FORM_OPTIONS = [
+  "operational",
+  "normal",
+  "warning",
+  "error",
+  "out-of-order",
+] as const;
+
+/** Map Orbit / scaffold status strings onto the update form select values. */
+function mapMachineStatusToFormValue(raw: string | undefined): string {
+  const s = (raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
+  if ((STATUS_FORM_OPTIONS as readonly string[]).includes(s)) {
+    return s;
+  }
+
+  const snake = s.replace(/-/g, "_");
+  const alias: Record<string, (typeof STATUS_FORM_OPTIONS)[number]> = {
+    in_service: "operational",
+    repair_start: "warning",
+    repair_end: "operational",
+    schedule_service: "warning",
+    out_of_order: "out-of-order",
+  };
+  if (alias[snake]) return alias[snake];
+
+  if (s.includes("error")) return "error";
+  if (s.includes("warn")) return "warning";
+  if (s.includes("out") && s.includes("order")) return "out-of-order";
+  if (s.includes("operational") || snake === "in_service") return "operational";
+  return "normal";
+}
+
 export function RepairStaffDashboard() {
   const [ctx, setCtx] = useState<StoreRegionContext | null>(null);
 
@@ -116,7 +174,16 @@ export function RepairStaffDashboard() {
     null
   );
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [createStoreId, setCreateStoreId] = useState("");
+  const [createName, setCreateName] = useState("");
+  const [createModel, setCreateModel] = useState("");
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const pageSize = 5;
+
+  useEffect(() => {
+    setCreateStoreId(storeId);
+  }, [storeId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,6 +233,10 @@ export function RepairStaffDashboard() {
       const json = (await res.json()) as { data?: ApiMaintenanceMachine[] };
       const mapped: RepairWorkflowMachine[] = (json.data ?? []).map((m) => ({
         id: String(m.machineId),
+        storeId:
+          m.storeId != null ? parseInt(String(m.storeId), 10) : undefined,
+        name: m.name,
+        model: m.model,
         type: m.model || m.name || "machine",
         status: m.status,
         lastServiceDate: m.lastServiceDate || m.updatedAt || "—",
@@ -180,17 +251,54 @@ export function RepairStaffDashboard() {
     void loadAssignments();
   }, [loadAssignments]);
 
+  const selectedStoreIdNum = useMemo(() => parseInt(storeId, 10), [storeId]);
+
+  /** Orbit rows narrowed to the store selected in the picker (same scope as repair, filtered by UI store). */
+  const apiMachinesForSelectedStore = useMemo(() => {
+    if (apiMachines.length === 0) return [];
+    if (!Number.isInteger(selectedStoreIdNum) || selectedStoreIdNum < 1) {
+      return apiMachines;
+    }
+    return apiMachines.filter((m) => {
+      if (!Number.isInteger(m.storeId)) return false;
+      return m.storeId === selectedStoreIdNum;
+    });
+  }, [apiMachines, selectedStoreIdNum]);
+
   const displayMachines = useMemo(() => {
-    if (apiMachines.length > 0) return apiMachines;
+    if (apiMachines.length > 0) return apiMachinesForSelectedStore;
     return repairWorkflow?.machines ?? [];
-  }, [apiMachines, repairWorkflow?.machines]);
+  }, [apiMachines, apiMachinesForSelectedStore, repairWorkflow?.machines]);
+
+  const statusMachines = apiMachines.length > 0 ? apiMachinesForSelectedStore : [];
 
   useEffect(() => {
-    const first = displayMachines[0]?.id;
-    if (first && !statusMachineId) {
-      setStatusMachineId(first);
+    if (statusMachines.length === 0) {
+      if (statusMachineId) setStatusMachineId("");
+      return;
     }
-  }, [displayMachines, statusMachineId]);
+    const hasSelected = statusMachines.some((m) => m.id === statusMachineId);
+    if (!hasSelected) {
+      setStatusMachineId(statusMachines[0].id);
+    }
+  }, [statusMachines, statusMachineId]);
+
+  const prevStatusMachineId = useRef<string>("");
+
+  useEffect(() => {
+    if (!statusMachineId || statusMachines.length === 0) return;
+    const sel = statusMachines.find((m) => m.id === statusMachineId);
+    if (!sel) return;
+    setNewStatusPick(mapMachineStatusToFormValue(sel.status));
+    setStatusActionError(null);
+    if (
+      prevStatusMachineId.current !== "" &&
+      prevStatusMachineId.current !== statusMachineId
+    ) {
+      setStatusReason("");
+    }
+    prevStatusMachineId.current = statusMachineId;
+  }, [statusMachineId, statusMachines]);
 
   const filteredMachines = useMemo(() => {
     const list = displayMachines;
@@ -247,11 +355,49 @@ export function RepairStaffDashboard() {
     return orbitHistoryRows ?? [];
   }, [historicalRecords, historyMachineId, orbitHistoryRows]);
 
+  async function submitCreateMachine() {
+    setCreateError(null);
+    const sid = parseInt(createStoreId, 10);
+    const name = createName.trim();
+    const model = createModel.trim();
+    if (!name || !model || Number.isNaN(sid) || sid < 1) {
+      setCreateError("Enter a valid store ID, name, and model.");
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const res = await fetch("/api/orbit/maintenance/machines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: sid,
+          name,
+          model,
+          status: "operational",
+          serviceInterval: 30,
+        }),
+      });
+      if (!res.ok) {
+        setCreateError(await res.text().catch(() => res.statusText));
+        return;
+      }
+      setCreateName("");
+      setCreateModel("");
+      await loadAssignments();
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
   async function submitStatusTransition() {
     setStatusActionError(null);
+    if (!statusMachineId) {
+      setStatusActionError("No Orbit machines in your assigned stores.");
+      return;
+    }
     const machineId = parseInt(statusMachineId, 10);
     if (Number.isNaN(machineId)) {
-      setStatusActionError("Select a machine.");
+      setStatusActionError("Selected machine is invalid for Orbit status updates.");
       return;
     }
     setStatusSaving(true);
@@ -339,9 +485,9 @@ export function RepairStaffDashboard() {
         <CardHeader>
           <CardTitle>Repair Staff Dashboard</CardTitle>
           <CardDescription>
-            Assigned machines, status transitions, and per-machine history use Orbit maintenance
-            routes when your session is repair-capable; workflow mock still loads as a fallback.{" "}
-            {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
+            Machines are scoped to stores; repair staff see machines in stores they cover. Status
+            and history use Orbit maintenance when your session is repair-capable; workflow mock
+            still loads as a fallback. {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -371,7 +517,65 @@ export function RepairStaffDashboard() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Assigned Machines</h3>
+            <h3 className="text-sm font-medium">Machines in your stores</h3>
+            <div className="rounded-lg border p-3">
+              <h4 className="text-xs font-medium text-muted-foreground">Add machine</h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Creates the machine in Orbit for the store below (must be in your repair store
+                scope).
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="createStoreId">
+                    Store ID
+                  </label>
+                  <Input
+                    id="createStoreId"
+                    className="h-8"
+                    value={createStoreId}
+                    onChange={(e) => setCreateStoreId(e.target.value)}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="createName">
+                    Name
+                  </label>
+                  <Input
+                    id="createName"
+                    className="h-8"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="e.g. Front espresso"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor="createModel">
+                    Model
+                  </label>
+                  <Input
+                    id="createModel"
+                    className="h-8"
+                    value={createModel}
+                    onChange={(e) => setCreateModel(e.target.value)}
+                    placeholder="e.g. Rancilio Silvia"
+                  />
+                </div>
+              </div>
+              {createError ? (
+                <p className="mt-2 text-xs text-destructive">{createError}</p>
+              ) : null}
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={createSaving}
+                  onClick={() => void submitCreateMachine()}
+                >
+                  {createSaving ? "Creating…" : "Create machine"}
+                </Button>
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Show:</span>
               <select
@@ -390,7 +594,8 @@ export function RepairStaffDashboard() {
                 <thead className="border-b bg-muted/30">
                   <tr className="text-left">
                     <th className="p-2">Machine ID</th>
-                    <th className="p-2">Type</th>
+                    <th className="p-2">Name</th>
+                    <th className="p-2">Model</th>
                     <th className="p-2">Status</th>
                     <th className="p-2">Last Updated</th>
                   </tr>
@@ -399,7 +604,13 @@ export function RepairStaffDashboard() {
                   {filteredMachines.map((m) => (
                     <tr key={m.id} className="border-t">
                       <td className="p-2">{m.id}</td>
-                      <td className="p-2">{m.type}</td>
+                      <td className="p-2 text-muted-foreground">
+                        {m.name?.trim() ||
+                          (!m.name && !m.model && m.type && m.type !== "machine"
+                            ? m.type
+                            : "—")}
+                      </td>
+                      <td className="p-2 text-muted-foreground">{m.model?.trim() || "—"}</td>
                       <td className="p-2">
                         {m.status === "error" ? (
                           <span className="text-destructive">error</span>
@@ -416,8 +627,9 @@ export function RepairStaffDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Client-side filter on scaffold data. Requires Orbit: assignments keyed to user
-              roles and a machine registry.
+              Status filters below apply to the table. When Orbit data is loaded, the rows shown are
+              machines whose <code className="text-xs">storeId</code> matches the Store number in
+              the region picker (within your account’s store scope).
             </p>
           </div>
 
@@ -494,15 +706,38 @@ export function RepairStaffDashboard() {
                     <select
                       id="machineId"
                       className="h-8 w-full rounded-lg border bg-transparent px-2 text-sm"
-                      value={statusMachineId || displayMachines[0]?.id || ""}
+                      value={statusMachineId}
+                      disabled={statusMachines.length === 0}
                       onChange={(e) => setStatusMachineId(e.target.value)}
                     >
-                      {displayMachines.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.id}
-                        </option>
-                      ))}
+                      {statusMachines.length === 0 ? (
+                        <option value="">No machines in your stores</option>
+                      ) : (
+                        statusMachines.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {formatMachineOptionLabel(m)}
+                          </option>
+                        ))
+                      )}
                     </select>
+                    {statusMachines.length > 0 && statusMachineId
+                      ? (() => {
+                          const sel = statusMachines.find((x) => x.id === statusMachineId);
+                          if (!sel) return null;
+                          const name = sel.name?.trim();
+                          const model = sel.model?.trim();
+                          let line: string | null = null;
+                          if (name || model) {
+                            line = [name, model].filter(Boolean).join(" · ");
+                          } else if (sel.type && sel.type !== "machine") {
+                            line = sel.type;
+                          }
+                          if (!line) return null;
+                          return (
+                            <p className="mt-1 text-xs text-muted-foreground">{line}</p>
+                          );
+                        })()
+                      : null}
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground" htmlFor="machineStatus">
@@ -522,6 +757,19 @@ export function RepairStaffDashboard() {
                     </select>
                   </div>
                 </div>
+                {statusMachineId && statusMachines.length > 0 ? (() => {
+                  const cur = statusMachines.find((x) => x.id === statusMachineId);
+                  if (!cur) return null;
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      Current status:{" "}
+                      <span className="font-medium text-foreground">{cur.status}</span>
+                      {cur.lastServiceDate && cur.lastServiceDate !== "—" ? (
+                        <span> · Last updated {cur.lastServiceDate}</span>
+                      ) : null}
+                    </p>
+                  );
+                })() : null}
                 <div className="mt-3 space-y-1">
                   <label className="text-xs text-muted-foreground" htmlFor="statusReason">
                     Reason
@@ -539,7 +787,7 @@ export function RepairStaffDashboard() {
                 <div className="mt-3 flex gap-2">
                   <Button
                     type="button"
-                    disabled={statusSaving}
+                    disabled={statusSaving || statusMachines.length === 0}
                     onClick={() => void submitStatusTransition()}
                   >
                     {statusSaving ? "Saving…" : "Update Status"}
@@ -550,8 +798,15 @@ export function RepairStaffDashboard() {
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Persists via <code className="text-xs">POST /maintenance/status-transitions</code>{" "}
-                  (Orbit enforces assignment / store rules).
+                  (Orbit allows updates when the machine’s store is in your scope).
                 </p>
+                {statusMachines.length === 0 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    No machines were returned for your store scope. Ensure machines exist for that
+                    store and your account has those stores in{" "}
+                    <code className="text-xs">assignedStores</code>.
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

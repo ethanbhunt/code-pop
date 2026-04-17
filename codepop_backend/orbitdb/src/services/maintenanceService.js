@@ -28,7 +28,6 @@ export async function createMachine(data) {
     name: data.name,
     model: data.model,
     status: data.status || "operational",
-    assignedTo: data.assignedTo || null,
     lastServiceDate: data.lastServiceDate || null,
     serviceInterval: data.serviceInterval || 30,
     createdAt: getTimestamp(),
@@ -94,21 +93,32 @@ export async function listAllMachines(offset = 0, limit = 50) {
 }
 
 /**
- * Get machines assigned to repair user
+ * Machines belong to a store; repair staff see machines whose storeId is in storeIds.
+ * @param {number[]} storeIds
  */
-export async function getMachinesAssignedTo(userId, offset = 0, limit = 50) {
+export async function getMachinesForStores(storeIds, offset = 0, limit = 50) {
   const db = getMaintenanceDb()
+  const idSet = new Set(
+    (storeIds ?? []).map((id) => parseInt(String(id), 10)).filter((n) => Number.isInteger(n) && n > 0)
+  )
+  if (idSet.size === 0) {
+    return { count: 0, data: [] }
+  }
+
   const allEntries = await db.all()
-  
+
   const machines = allEntries
-    .filter(entry => entry.key.startsWith("machine:") && entry.value.assignedTo === userId)
+    .filter(
+      (entry) =>
+        entry.key.startsWith("machine:") && idSet.has(parseInt(String(entry.value.storeId), 10))
+    )
     .sort((a, b) => a.value.machineId - b.value.machineId)
-  
+
   const paginatedMachines = machines.slice(offset, offset + limit)
-  
+
   return {
     count: machines.length,
-    data: paginatedMachines.map(entry => entry.value)
+    data: paginatedMachines.map((entry) => entry.value)
   }
 }
 
@@ -192,30 +202,3 @@ export async function getMachineHistory(machineId, page = 1, limit = 25) {
   }
 }
 
-/**
- * Assign machine to repair user
- */
-export async function assignMachine(machineId, userId) {
-  const db = getMaintenanceDb()
-  const machine = await getMachineById(machineId)
-  
-  machine.assignedTo = userId
-  machine.updatedAt = getTimestamp()
-  
-  await db.put(`machine:${machineId}`, machine)
-  return machine
-}
-
-/**
- * Unassign machine from repair user
- */
-export async function unassignMachine(machineId) {
-  const db = getMaintenanceDb()
-  const machine = await getMachineById(machineId)
-  
-  machine.assignedTo = null
-  machine.updatedAt = getTimestamp()
-  
-  await db.put(`machine:${machineId}`, machine)
-  return machine
-}

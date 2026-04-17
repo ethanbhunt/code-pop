@@ -2,16 +2,25 @@
 // Machine maintenance and repair endpoints
 
 import express from "express"
-import { authenticate, requireRepair, requireManager, requireAdmin } from "../middleware/auth.js"
+import { authenticate, requireRepair, requireAdminOrRepair } from "../middleware/auth.js"
 import * as maintenanceService from "../services/maintenanceService.js"
 import * as storesService from "../services/storesService.js"
 
 const router = express.Router()
 
+/** Repair access is store-scoped: machine.storeId must be in req.user.assignedStores */
+function repairHasStoreAccess(req, machine) {
+  const sid = parseInt(String(machine.storeId), 10)
+  if (!Number.isInteger(sid) || sid < 1) return false
+  return (req.user.assignedStores ?? []).some(
+    (id) => parseInt(String(id), 10) === sid
+  )
+}
+
 /**
  * GET /backend/maintenance/machines
  * List machines for a store
- * Repair users see only machines assigned to them
+ * Repair users see machines in stores they cover (assignedStores)
  * Managers see machines for their stores
  */
 router.get("/machines", authenticate, async (req, res, next) => {
@@ -22,8 +31,7 @@ router.get("/machines", authenticate, async (req, res, next) => {
     let result
     
     if (req.user.userRole === "repair") {
-      // Repair users see only machines assigned to them
-      result = await maintenanceService.getMachinesAssignedTo(req.user.userId, offset, limit)
+      result = await maintenanceService.getMachinesForStores(req.user.assignedStores, offset, limit)
     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
       // Managers see machines for their stores
       const storeId = parseInt(req.query.storeId)
@@ -65,14 +73,14 @@ router.get("/machines", authenticate, async (req, res, next) => {
 
 /**
  * GET /backend/maintenance/assignments/me
- * Get machines assigned to current repair user
+ * Machines in stores the repair user covers (same as GET /machines for repair)
  */
 router.get("/assignments/me", authenticate, requireRepair, async (req, res, next) => {
   try {
     const offset = parseInt(req.query.offset || 0)
     const limit = Math.min(parseInt(req.query.limit || 50), 100)
     
-    const result = await maintenanceService.getMachinesAssignedTo(req.user.userId, offset, limit)
+    const result = await maintenanceService.getMachinesForStores(req.user.assignedStores, offset, limit)
     
     // Enrich with store information
     for (const machine of result.data) {
@@ -111,11 +119,10 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
     const machine = await maintenanceService.getMachineById(machineId)
     
      if (req.user.userRole === "repair") {
-       // Repair users can only update machines assigned to them
-       if (machine.assignedTo !== req.user.userId) {
+       if (!repairHasStoreAccess(req, machine)) {
          return res.status(403).json({
-           error: "Not assigned to this machine",
-           code: "NOT_ASSIGNED"
+           error: "Machine is not in your assigned stores",
+           code: "STORE_ACCESS_DENIED"
          })
        }
      } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
@@ -171,10 +178,10 @@ router.get("/history", authenticate, async (req, res, next) => {
     const machine = await maintenanceService.getMachineById(machineId)
     
      if (req.user.userRole === "repair") {
-       if (machine.assignedTo !== req.user.userId) {
+       if (!repairHasStoreAccess(req, machine)) {
          return res.status(403).json({
-           error: "Not assigned to this machine",
-           code: "NOT_ASSIGNED"
+           error: "Machine is not in your assigned stores",
+           code: "STORE_ACCESS_DENIED"
          })
        }
      } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
@@ -204,11 +211,11 @@ router.get("/history", authenticate, async (req, res, next) => {
 
 /**
  * POST /backend/maintenance/machines
- * Create new machine (admin only)
+ * Create new machine (admin or repair; repair only for stores in assignedStores)
  */
-router.post("/machines", authenticate, requireAdmin, async (req, res, next) => {
+router.post("/machines", authenticate, requireAdminOrRepair, async (req, res, next) => {
   try {
-    const { storeId, name, model, status, assignedTo, serviceInterval } = req.body
+    const { storeId, name, model, status, serviceInterval } = req.body
     
     if (!storeId || !name || !model) {
       return res.status(400).json({
@@ -216,9 +223,20 @@ router.post("/machines", authenticate, requireAdmin, async (req, res, next) => {
         code: "MISSING_FIELDS"
       })
     }
-    
-     // Verify store access
-     if (req.user.userRole !== "super_admin" && !req.user.assignedStores.includes(storeId)) {
+
+    const storeIdNum = parseInt(String(storeId), 10)
+    if (!Number.isInteger(storeIdNum) || storeIdNum < 1) {
+      return res.status(400).json({
+        error: "Invalid storeId",
+        code: "INVALID_STORE_ID"
+      })
+    }
+
+    const hasStoreAccess = (req.user.assignedStores ?? []).some(
+      (id) => parseInt(String(id), 10) === storeIdNum
+    )
+
+    if (req.user.userRole !== "super_admin" && !hasStoreAccess) {
       return res.status(403).json({
         error: "Access denied to this store",
         code: "STORE_ACCESS_DENIED"
@@ -226,11 +244,10 @@ router.post("/machines", authenticate, requireAdmin, async (req, res, next) => {
     }
     
     const machine = await maintenanceService.createMachine({
-      storeId,
+      storeId: storeIdNum,
       name,
       model,
       status,
-      assignedTo,
       serviceInterval
     })
     

@@ -233,19 +233,11 @@ class CodePopTester:
             machine_id = response["data"].get("machineId")
             self.created_ids['machines'].append(machine_id)
             
-            # Assign machine to repair user
-            self.test(
-                "Assign machine to repair user (admin)",
-                "PATCH",
-                f"/maintenance/machines/{machine_id}",
-                data={"assignedTo": 3},  # repair1 user id
-                auth_token=self.tokens.get("admin1"),
-                expected_status=200
-            )
+            # Machines are store-scoped; repair access uses assignedStores (store 1 for dev repair users).
             
-            # Repair user views their assignments
+            # Repair user views machines in their stores
             self.test(
-                "Repair user views assigned machines",
+                "Repair user views machines in assigned stores",
                 "GET",
                 "/maintenance/assignments/me",
                 auth_token=self.tokens.get("repair1"),
