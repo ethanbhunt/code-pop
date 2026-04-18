@@ -33,9 +33,10 @@ function mergeCounts(target, source) {
 }
 
 export async function createOrder(userId, storeId, drinkIds = [], quantities = {}, specialInstructions = "", estimatedPickupTime = null, orderToken = null) {
-  // Use store-specific orders database if storeId is provided
-  const ordersDb = storeId ? getStoreOrdersDb(storeId) : getOrdersDb()
-  const orderId = await getNextId(ordersDb, "order")
+  // Always write to the global orders DB so GET /orders/:id works consistently.
+  // Also write to the store-scoped orders DB (if available) for manager dashboards.
+  const globalOrdersDb = getOrdersDb()
+  const orderId = await getNextId(globalOrdersDb, "order")
 
   // Generate orderToken for guest orders if not provided
   const token = orderToken || randomUUID()
@@ -64,7 +65,17 @@ export async function createOrder(userId, storeId, drinkIds = [], quantities = {
     throw new Error(`Order invariant violation: ${validation.errors.join("; ")}`)
   }
 
-  await ordersDb.put(`order:${orderId}`, order)
+  await globalOrdersDb.put(`order:${orderId}`, order)
+
+  if (storeId) {
+    try {
+      const storeOrdersDb = getStoreOrdersDb(storeId)
+      await storeOrdersDb.put(`order:${orderId}`, order)
+    } catch {
+      // Store-scoped DB may not exist on some peers; global DB is still authoritative.
+    }
+  }
+
   return order
 }
 
@@ -182,6 +193,17 @@ export async function updateOrder(orderId, updates) {
   }
 
   await ordersDb.put(`order:${orderId}`, order)
+
+  // Best-effort keep store-scoped copy in sync for dashboards.
+  if (order.storeId) {
+    try {
+      const storeOrdersDb = getStoreOrdersDb(order.storeId)
+      await storeOrdersDb.put(`order:${orderId}`, order)
+    } catch {
+      // ignore
+    }
+  }
+
   return order
 }
 

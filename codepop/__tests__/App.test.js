@@ -4,7 +4,6 @@ import { render, waitFor } from '@testing-library/react-native';
 import App from '../App';
 
 let mockInitialRoute;
-
 const mockGetItem = jest.fn();
 const mockSetItem = jest.fn();
 const mockRemoveItem = jest.fn();
@@ -70,21 +69,36 @@ describe('App bootstrap', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
   });
 
-  it('initializes checkout cart storage and checks auth defaults', async () => {
-    mockGetItem
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+    mockGetItem.mockResolvedValue(null);
+    mockSetItem.mockResolvedValue();
+    mockLoadAsync.mockResolvedValue();
+  });
+
+  it('initializes checkout cart storage and routes guests without a store to StoreSelect', async () => {
+    mockGetItem.mockResolvedValueOnce(null);
     mockSetItem.mockResolvedValueOnce();
     mockLoadAsync.mockResolvedValueOnce();
 
     render(<App />);
 
     await waitFor(() => {
-      expect(mockGetItem).toHaveBeenCalledWith('userToken');
-      expect(mockGetItem).toHaveBeenCalledWith('selectedStoreId');
       expect(mockSetItem).toHaveBeenCalledWith('checkoutList', JSON.stringify([]));
       expect(mockRemoveItem).toHaveBeenCalledWith('purchasedDrinks');
       expect(mockLoadAsync).toHaveBeenCalled();
+      expect(mockInitialRoute).toBe('StoreSelect');
+    });
+  });
+
+  it('routes guests with a selected store to GeneralHome without validating a token', async () => {
+    mockGetItem
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('store-1');
+    mockLoadAsync.mockResolvedValueOnce();
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockInitialRoute).toBe('GeneralHome');
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });
@@ -94,7 +108,6 @@ describe('App bootstrap', () => {
       .mockResolvedValueOnce('token-1')
       .mockResolvedValueOnce('store-1');
     mockLoadAsync.mockResolvedValueOnce();
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
 
     render(<App />);
 

@@ -1,7 +1,7 @@
 // src/routes/orders.js
 import express from "express"
 import { asyncHandler } from "../middleware/errorHandler.js"
-import { authenticate } from "../middleware/auth.js"
+import { authenticate, optionalAuth } from "../middleware/auth.js"
 import * as orderService from "../services/orderService.js"
 
 const router = express.Router()
@@ -146,8 +146,24 @@ router.post("/:id/fulfill", authenticate, asyncHandler(async (req, res) => {
   res.json({ status: "success", data: fulfilled })
 }))
 
-router.get("/:id", authenticate, asyncHandler(async (req, res) => {
-  const order = await orderService.getOrderById(parseInt(req.params.id, 10))
+router.get("/:id", optionalAuth, asyncHandler(async (req, res) => {
+  const orderId = parseInt(req.params.id, 10)
+  const order = await orderService.getOrderById(orderId)
+
+  // Authenticated users can view as before.
+  if (req.user) {
+    return res.json({ status: "success", data: order })
+  }
+
+  // Guest tracking requires matching orderToken.
+  const providedToken = String(req.query.orderToken || "").trim()
+  if (!providedToken || providedToken !== String(order.orderToken || "")) {
+    return res.status(401).json({
+      error: "Authentication required (provide a valid orderToken for guest tracking)",
+      code: "NOT_AUTHENTICATED",
+    })
+  }
+
   res.json({ status: "success", data: order })
 }))
 

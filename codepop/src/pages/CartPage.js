@@ -13,6 +13,7 @@ const CartPage = () => {
    const [drinks, setDrinks] = useState([]);
    const [totalPrice, setTotalPrice] = useState(0);
    const [storeName, setStoreName] = useState('Select Store');
+   const [stripePublishableKey, setStripePublishableKey] = useState("pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz");
    const [storeModalVisible, setStoreModalVisible] = useState(false);
    const [stores, setStores] = useState([]);
    const [storesLoading, setStoresLoading] = useState(false);
@@ -27,6 +28,24 @@ const CartPage = () => {
   useEffect(() => {
     initializePaymentSheet(); // Initialize payment sheet on page load
   }, [totalPrice]);
+
+  useEffect(() => {
+    // Keep Stripe publishable key in sync with whatever backend peer is active.
+    // If it doesn't exist (or can't be fetched), fall back to the existing hardcoded test key.
+    const fetchStripeKey = async () => {
+      try {
+        const resp = await fetch(`${BASE_URL}/backend/stripe/config`, { method: 'GET' });
+        const payload = await resp.json().catch(() => ({}));
+        const pk = payload?.publishableKey;
+        if (resp.ok && typeof pk === 'string' && pk.startsWith('pk_test_')) {
+          setStripePublishableKey(pk);
+        }
+      } catch (e) {
+        // ignore; fallback key remains
+      }
+    };
+    fetchStripeKey();
+  }, [BASE_URL]);
 
    const loadStoreName = async () => {
      try {
@@ -277,7 +296,7 @@ const CartPage = () => {
   
 
     return (
-      <StripeProvider publishableKey="pk_test_51QEDP7HwEWxwIyaLoeRGprLwnn6Fj7jZljzxglWudPSTSe6sMyFPAjHZsnMOy1HuwZhUYT9JGZbOsxhXxkFTJp9700JSZTZKIz">
+      <StripeProvider publishableKey={stripePublishableKey}>
           <View style={styles.container}>
          <View style={styles.headerContainer}>
              <Text style={styles.headerText}>Your Drinks</Text>
