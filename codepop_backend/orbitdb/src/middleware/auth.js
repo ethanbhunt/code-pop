@@ -4,7 +4,7 @@
 import { getTokensDb, getUsersDb } from "../utils/db.js"
 
 /** DB / seed may use legacy names; admin routes accept these. */
-function hasAdminPrivileges(role) {
+export function hasAdminPrivileges(role) {
   const r = String(role ?? "").toLowerCase().replace(/\s+/g, "_")
   return r === "admin" || r === "superadmin" || r === "super_admin"
 }

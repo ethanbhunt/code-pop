@@ -1,12 +1,12 @@
 // src/routes/inventory.js
 import express from "express"
 import { asyncHandler } from "../middleware/errorHandler.js"
-import { authenticate, requireAdmin } from "../middleware/auth.js"
+import { authenticate, requireAdmin, optionalAuth, hasAdminPrivileges } from "../middleware/auth.js"
 import * as inventoryService from "../services/inventoryService.js"
 
 const router = express.Router()
 
-router.get("/", asyncHandler(async (req, res) => {
+router.get("/", optionalAuth, asyncHandler(async (req, res) => {
   const offset = parseInt(req.query.offset || 0)
   const limit = Math.min(parseInt(req.query.limit || 50), 100)
   
@@ -20,8 +20,7 @@ router.get("/", asyncHandler(async (req, res) => {
     return res.json({ status: "success", storeId, count: result.count, data: result.data })
   }
   
-  // Otherwise return all inventory (admin only)
-  // Unauthenticated users cannot access all inventory
+  // Otherwise return all inventory (admin tier only)
   if (!req.user) {
     return res.status(403).json({
       error: "Not authorized to view all inventory",
@@ -29,8 +28,9 @@ router.get("/", asyncHandler(async (req, res) => {
     })
   }
   
-  const userRole = String(req.user.role || "").toLowerCase()
-  if (userRole !== "admin") {
+  const rawRole = req.user.role
+  const mergedRole = req.user.userRole
+  if (!hasAdminPrivileges(rawRole) && !hasAdminPrivileges(mergedRole)) {
     return res.status(403).json({
       error: "Not authorized to view all inventory",
       code: "NOT_AUTHORIZED"

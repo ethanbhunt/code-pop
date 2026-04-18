@@ -2,7 +2,12 @@
 // Machine maintenance and repair endpoints
 
 import express from "express"
-import { authenticate, requireRepair, requireAdminOrRepair } from "../middleware/auth.js"
+import {
+  authenticate,
+  requireRepair,
+  requireAdminOrRepair,
+  hasAdminPrivileges,
+} from "../middleware/auth.js"
 import * as maintenanceService from "../services/maintenanceService.js"
 import * as storesService from "../services/storesService.js"
 
@@ -32,8 +37,12 @@ router.get("/machines", authenticate, async (req, res, next) => {
     
     if (req.user.userRole === "repair") {
       result = await maintenanceService.getMachinesForStores(req.user.assignedStores, offset, limit)
+    } else if (req.user.userRole === "super_admin") {
+      result = await maintenanceService.listAllMachines(offset, limit)
+    } else if (hasAdminPrivileges(req.user.role) && !req.query.storeId) {
+      // Orbit `admin` / `superadmin` role: list all machines when no storeId (dashboard BFF).
+      result = await maintenanceService.listAllMachines(offset, limit)
     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
-      // Managers see machines for their stores
       const storeId = parseInt(req.query.storeId)
       if (!storeId) {
         return res.status(400).json({
@@ -41,19 +50,15 @@ router.get("/machines", authenticate, async (req, res, next) => {
           code: "MISSING_STORE_ID"
         })
       }
-      
-      // Verify access to store
+
       if (!req.user.assignedStores.includes(storeId)) {
         return res.status(403).json({
           error: "Access denied to this store",
           code: "STORE_ACCESS_DENIED"
         })
       }
-      
-       result = await maintenanceService.listMachinesByStore(storeId, offset, limit)
-     } else if (req.user.userRole === "super_admin") {
-      // Super admin sees all machines
-      result = await maintenanceService.listAllMachines(offset, limit)
+
+      result = await maintenanceService.listMachinesByStore(storeId, offset, limit)
     } else {
       return res.status(403).json({
         error: "Not authorized to view machines",

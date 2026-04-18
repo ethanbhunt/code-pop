@@ -32,6 +32,8 @@ type SystemReports = {
     inventoryLowCount: number;
     totalStores: number;
     totalRevenueToday: number;
+    /** Same window as default Orbit multi-store report (last 30 days). */
+    totalRevenueLast30Days?: number;
   };
   revenue: { today: number; week: number; month: number };
   maintenance: {
@@ -88,6 +90,7 @@ export function SuperAdminDashboard() {
 
   const [reports, setReports] = useState<SystemReports | null>(null);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [systemReportError, setSystemReportError] = useState<string | null>(null);
   const [users, setUsers] = useState<OrbitUser[] | null>(null);
   const [roleDraft, setRoleDraft] = useState<Record<number, Role>>({});
   const [initialRolePick, setInitialRolePick] = useState<Record<number, Role>>({});
@@ -114,10 +117,17 @@ export function SuperAdminDashboard() {
 
   const loadReports = useCallback(async () => {
     setLoadingReports(true);
+    setSystemReportError(null);
     try {
       const res = await fetch("/api/orbit/admin/system-reports");
       if (!res.ok) {
         setReports(null);
+        const body = (await res.text().catch(() => res.statusText)).trim();
+        setSystemReportError(
+          body
+            ? `HTTP ${res.status}: ${body.slice(0, 280)}${body.length > 280 ? "…" : ""}`
+            : `HTTP ${res.status}`
+        );
         return;
       }
       const data = (await res.json()) as SystemReports;
@@ -204,6 +214,10 @@ export function SuperAdminDashboard() {
       ["inventoryLowCount", String(reports.metrics.inventoryLowCount)],
       ["totalStores_reported", String(reports.metrics.totalStores)],
       ["totalRevenueToday", String(reports.metrics.totalRevenueToday)],
+      [
+        "totalRevenueLast30Days",
+        String(reports.metrics.totalRevenueLast30Days ?? ""),
+      ],
       ["revenue_today", String(reports.revenue.today)],
       ["revenue_week", String(reports.revenue.week)],
       ["revenue_month", String(reports.revenue.month)],
@@ -370,13 +384,29 @@ export function SuperAdminDashboard() {
               <p className="text-xs text-muted-foreground">From OrbitDB inventory</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">System Revenue (Today)</p>
+              <p className="text-sm text-muted-foreground">System revenue</p>
               <p className="text-2xl font-semibold">
-                {loadingReports ? "…" : `$${(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()}`}
+                {loadingReports
+                  ? "…"
+                  : `$${(
+                      reports?.metrics.totalRevenueLast30Days ??
+                      reports?.metrics.totalRevenueToday ??
+                      0
+                    ).toLocaleString()}`}
               </p>
-              <p className="text-xs text-muted-foreground">From OrbitDB revenues</p>
+              <p className="text-xs text-muted-foreground">
+                Primary figure: last 30 days (multi-store aggregate). Today (UTC): $
+                {(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()} · Week: $
+                {(reports?.revenue.week ?? 0).toLocaleString()}
+              </p>
             </div>
           </div>
+          {systemReportError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              System report failed — machines, low-stock, and revenue cards above may be empty or
+              zero: {systemReportError}
+            </p>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
@@ -523,11 +553,19 @@ export function SuperAdminDashboard() {
                     <table className="w-full text-sm">
                       <tbody>
                         <tr className="border-b">
-                          <td className="p-2 text-muted-foreground">Revenue (today)</td>
+                          <td className="p-2 text-muted-foreground">Revenue (today, UTC)</td>
                           <td className="p-2 font-medium">
                             {loadingReports
                               ? "…"
                               : `$${(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()}`}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2 text-muted-foreground">Revenue (30d, multi-store)</td>
+                          <td className="p-2">
+                            {loadingReports
+                              ? "…"
+                              : `$${(reports?.metrics.totalRevenueLast30Days ?? 0).toLocaleString()}`}
                           </td>
                         </tr>
                         <tr className="border-b">
@@ -741,8 +779,8 @@ export function SuperAdminDashboard() {
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
                   Summaries from{" "}
-                  <code className="text-xs">/api/orbit/admin/system-reports</code>. Maintenance
-                  figures stay placeholder until Orbit exposes machines.
+                  <code className="text-xs">/api/orbit/admin/system-reports</code> (inventory,
+                  revenue reports, maintenance machines when Orbit returns them).
                 </p>
                 {reports?.note ? (
                   <p className="mt-2 text-xs text-muted-foreground">{reports.note}</p>
@@ -755,11 +793,19 @@ export function SuperAdminDashboard() {
                     </span>
                   </li>
                   <li>
-                    Revenue today:{" "}
+                    Revenue today (UTC):{" "}
                     <span className="font-medium">
                       {loadingReports
                         ? "…"
                         : `$${(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()}`}
+                    </span>
+                  </li>
+                  <li>
+                    Revenue last 30 days:{" "}
+                    <span className="font-medium">
+                      {loadingReports
+                        ? "…"
+                        : `$${(reports?.metrics.totalRevenueLast30Days ?? 0).toLocaleString()}`}
                     </span>
                   </li>
                 </ul>

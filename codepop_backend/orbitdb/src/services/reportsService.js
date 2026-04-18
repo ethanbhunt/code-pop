@@ -3,6 +3,38 @@
 
 import { getOrdersDb, getRevenuesDb, getInventoryDb, getStoresDb } from "../utils/db.js"
 
+/** Orders use `creationTime`; legacy rows may use `createdAt`. */
+function orderCreatedMs(order) {
+  const raw = order?.creationTime || order?.createdAt
+  if (!raw) return NaN
+  const t = new Date(raw).getTime()
+  return Number.isNaN(t) ? NaN : t
+}
+
+/** Revenues use `timestamp`; legacy rows may use `createdAt`. */
+function revenueRecordedMs(revenue) {
+  const raw = revenue?.timestamp || revenue?.createdAt
+  if (!raw) return NaN
+  const t = new Date(raw).getTime()
+  return Number.isNaN(t) ? NaN : t
+}
+
+/** Revenue rows from the API often omit `storeId`; resolve via linked order. */
+function buildOrderIdToStoreId(allOrderEntries) {
+  const map = new Map()
+  for (const entry of allOrderEntries) {
+    const o = entry.value
+    if (o?.orderId != null && o.storeId != null) map.set(o.orderId, o.storeId)
+  }
+  return map
+}
+
+function revenueStoreId(revenue, orderIdToStoreId) {
+  if (revenue?.storeId != null) return revenue.storeId
+  if (revenue?.orderId != null) return orderIdToStoreId.get(revenue.orderId)
+  return undefined
+}
+
 /**
  * Get multi-store system report
  */
@@ -34,6 +66,9 @@ export async function getMultiStoreReport(storeIds = null, startDate = null, end
   const allOrders = await ordersDb.all()
   const allRevenues = await revenuesDb.all()
   const allInventory = await inventoryDb.all()
+  const orderIdToStoreId = buildOrderIdToStoreId(allOrders)
+  const fromMs = fromDate.getTime()
+  const toMs = toDate.getTime()
   
   const storeReports = []
   let totalRevenue = 0
@@ -41,15 +76,23 @@ export async function getMultiStoreReport(storeIds = null, startDate = null, end
   
   for (const store of stores) {
     const storeOrders = allOrders
-      .filter(entry => entry.value.storeId === store.storeId && 
-              new Date(entry.value.createdAt) >= fromDate &&
-              new Date(entry.value.createdAt) <= toDate)
+      .filter((entry) => {
+        const o = entry.value
+        if (!o || o.storeId !== store.storeId) return false
+        const t = orderCreatedMs(o)
+        return !Number.isNaN(t) && t >= fromMs && t <= toMs
+      })
       .map(entry => entry.value)
     
     const storeRevenues = allRevenues
-      .filter(entry => entry.value.storeId === store.storeId &&
-              new Date(entry.value.createdAt) >= fromDate &&
-              new Date(entry.value.createdAt) <= toDate)
+      .filter((entry) => {
+        const rev = entry.value
+        if (!rev) return false
+        const sid = revenueStoreId(rev, orderIdToStoreId)
+        if (sid !== store.storeId) return false
+        const t = revenueRecordedMs(rev)
+        return !Number.isNaN(t) && t >= fromMs && t <= toMs
+      })
       .map(entry => entry.value)
     
     const storeInventory = allInventory
@@ -125,14 +168,25 @@ export async function getStoreRevenueReport(storeId, startDate = null, endDate =
   const fromDate = startDate ? new Date(startDate) : new Date(new Date().setMonth(new Date().getMonth() - 1))
   const toDate = endDate ? new Date(endDate) : new Date()
   
-  // Get all revenues for store
+  const ordersDb = getOrdersDb()
+  const allOrders = await ordersDb.all()
+  const orderIdToStoreId = buildOrderIdToStoreId(allOrders)
+  const fromMs = fromDate.getTime()
+  const toMs = toDate.getTime()
+
+  // Get all revenues for store (match by storeId or linked order's store)
   const allEntries = await revenuesDb.all()
   const revenues = allEntries
-    .filter(entry => entry.value.storeId === storeId &&
-            new Date(entry.value.createdAt) >= fromDate &&
-            new Date(entry.value.createdAt) <= toDate)
+    .filter((entry) => {
+      const rev = entry.value
+      if (!rev) return false
+      const sid = revenueStoreId(rev, orderIdToStoreId)
+      if (sid !== storeId) return false
+      const t = revenueRecordedMs(rev)
+      return !Number.isNaN(t) && t >= fromMs && t <= toMs
+    })
     .map(entry => entry.value)
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .sort((a, b) => revenueRecordedMs(a) - revenueRecordedMs(b))
   
   // Calculate totals
   const totalRevenue = revenues.reduce((acc, rev) => acc + (rev.amount || 0), 0)
@@ -154,7 +208,7 @@ export async function getStoreRevenueReport(storeId, startDate = null, endDate =
   // Daily breakdown
   const dailyBreakdown = {}
   revenues.forEach(rev => {
-    const date = new Date(rev.createdAt).toISOString().split('T')[0]
+    const date = new Date(revenueRecordedMs(rev)).toISOString().split('T')[0]
     if (!dailyBreakdown[date]) {
       dailyBreakdown[date] = { revenue: 0, transactions: 0 }
     }

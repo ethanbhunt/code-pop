@@ -4,6 +4,13 @@ import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
 import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
 
+function unwrapOrbitRevenueReportBody(root: unknown): unknown {
+  if (!root || typeof root !== "object") return root;
+  const o = root as { data?: unknown };
+  if (o.data != null && typeof o.data === "object") return o.data;
+  return root;
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   const token = getAccessToken(session);
@@ -32,5 +39,5 @@ export async function GET(req: NextRequest) {
   if (!result.ok) {
     return new Response(result.body, { status: result.status });
   }
-  return Response.json(result.data);
+  return Response.json(unwrapOrbitRevenueReportBody(result.data));
 }

@@ -1,22 +1,18 @@
 import type { NextRequest } from "next/server";
 
 import { auth } from "@/auth";
+import {
+  fetchInventoryMergedAcrossStores,
+  storeIdsFromOrbitStoresPayload,
+  type OrbitInventoryRow,
+} from "@/lib/orbit-inventory-by-store";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
 import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
 
-type InventoryPayload = {
-  data?: Array<{
-    inventoryId?: number;
-    itemName?: string;
-    itemType?: string;
-    quantity?: number;
-    thresholdLevel?: number;
-    lastUpdated?: string;
-  }>;
-};
+type InventoryPayload = { data?: OrbitInventoryRow[] };
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("storeId") ?? "global";
+  const storeIdParam = req.nextUrl.searchParams.get("storeId") ?? "global";
   const limitParam = req.nextUrl.searchParams.get("limit") ?? "25";
   const limit = Math.min(Math.max(Number(limitParam) || 25, 1), 100);
 
@@ -35,18 +31,40 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const result = await orbitJson<InventoryPayload>(token, "/inventory", { method: "GET" });
-  if (!result.ok) {
-    return new Response(result.body, { status: result.status });
+  let items: OrbitInventoryRow[] = [];
+  let storeIdLabel = storeIdParam;
+
+  if (storeIdParam === "global") {
+    const storesR = await orbitJson<unknown>(token, "/stores?limit=200", { method: "GET" });
+    const storeIds = storeIdsFromOrbitStoresPayload(storesR.ok ? storesR.data : null);
+    items = await fetchInventoryMergedAcrossStores(
+      token,
+      storeIds.length ? storeIds : [1, 2, 3]
+    );
+  } else {
+    const sid = parseInt(storeIdParam, 10);
+    if (!Number.isInteger(sid) || sid < 1) {
+      return Response.json({ error: "Invalid storeId" }, { status: 400 });
+    }
+    storeIdLabel = String(sid);
+    const result = await orbitJson<InventoryPayload>(
+      token,
+      `/inventory?storeId=${sid}&limit=500`,
+      { method: "GET" }
+    );
+    if (!result.ok) {
+      return new Response(result.body, { status: result.status });
+    }
+    items = [...(result.data.data ?? [])];
   }
 
-  const items = [...(result.data.data ?? [])].sort((a, b) => {
+  const itemsSorted = [...items].sort((a, b) => {
     const ta = new Date(a.lastUpdated ?? 0).getTime();
     const tb = new Date(b.lastUpdated ?? 0).getTime();
     return tb - ta;
   });
 
-  const logs = items.slice(0, limit).map((item) => ({
+  const logs = itemsSorted.slice(0, limit).map((item) => ({
     id: `inv-${item.inventoryId ?? "?"}`,
     timestamp: item.lastUpdated ?? new Date().toISOString(),
     actor: { id: "system", name: "Inventory", role: "system" },
@@ -54,13 +72,13 @@ export async function GET(req: NextRequest) {
     target: {
       item: item.itemName ?? "Unknown",
       type: item.itemType ?? "—",
-      storeId,
+      storeId: item.storeId != null ? String(item.storeId) : storeIdLabel,
     },
     changes: { toQty: item.quantity, toThreshold: item.thresholdLevel },
   }));
 
   return Response.json({
-    storeId,
+    storeId: storeIdLabel,
     note: "Derived from inventory lastUpdated; no dedicated audit log in OrbitDB.",
     generatedAt: new Date().toISOString(),
     logs,
