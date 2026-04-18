@@ -2,11 +2,13 @@
 
 ## Document Overview & Introduction
 
-This document is the **Low-Level Design (LLD)** which outlines user accounts, orders, payments, inventory, AI recommendations, and manager/admin tooling. It translates the High-Level Design into concrete technical specifications for our team to implement.
+This document is the **Low-Level Design (LLD)** which outlines the current mobile app, dashboard, decentralized backend, and the remaining Django/Python support workflows. It translates the High-Level Design into concrete technical specifications for the stack that exists now, while keeping not-yet-implemented modules clearly labeled as partial or future work.
+
+This revision intentionally emphasizes workflow diagrams, pseudocode, data structures, and algorithms rather than long implementation samples, so the document stays at the design level.
 
 The LLD covers:
 
-- **System architecture** — Client-server, three-tier layout (Frontend, Backend, Database), and how components interact.
+- **System architecture** — Multi-app layout with a mobile client, a Next.js dashboard, an OrbitDB/libp2p backend, and Python/Django support workflows.
 - **Subsystem designs** — User management, orders, payments, catalog, inventory, and AI recommendations, with class-level responsibilities and interfaces.
 - **Data and persistence** — Database schema (PostgreSQL), tables, normalization, indexes, and data access patterns.
 - **Cross-cutting concerns** — Security, performance, monitoring, deployment, and consistency (naming, docs, testing).
@@ -23,29 +25,32 @@ Each major area is specified with classes, methods, relationships, design choice
 
 **Architecture style and tiers**
 
-CodePop follows a **client–server**, **three-tier** architecture:
+CodePop is best described as a distributed multi-app architecture rather than a single client-server product:
 
-- **Presentation tier (frontend)** — React-based single-page application(s) serving the customer ordering experience, manager dashboard, and admin interface. The frontend communicates with the backend exclusively over HTTPS via REST APIs; no direct database access.
-- **Application tier (backend)** — Django-based REST API that implements business logic, authentication, authorization, and integrations with external services (Stripe, AI provider, email, maps). All user-facing and internal operations flow through this tier.
-- **Data tier** — PostgreSQL database storing users, orders, payments, catalog, inventory, preferences, and related data. Access is only through the backend (Django ORM); see Section 4 for schema and data access.
+- **Mobile presentation tier** — Expo React Native app serving the customer ordering experience, including cart, checkout, complaints, and maps.
+- **Dashboard presentation tier** — Next.js app serving managers, logistics staff, repair staff, and administrators with role-based views.
+- **Backend tier** — OrbitDB/libp2p/Express peer services for authentication, orders, inventory, logistics, maintenance, stripe, and revenue routes.
+- **Support tier** — Django and Python tooling remain in the workspace for smoke tests, seeding, and backend-related workflows.
 
 **Core runtime components**
 
 | Component                      | Responsibility                                                    | Technology / Interaction                                           |
 | ----------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Web client(s)                 | Customer UI, manager UI, admin UI                                 | React; HTTP/JSON to backend                                       |
-| Django API server             | Request routing, auth middleware, business logic                  | Gunicorn/uWSGI + Django; HTTP to DB and external APIs              |
-| User Management module        | Registration, login, profiles, preferences, guests                | Part of Django backend; uses `users`, `preferences` tables (Section 4) |
-| Order Management module       | Order lifecycle, status, QR codes                                 | Part of Django backend; depends on User Management, Catalog, Payment |
-| Payment module                | Payment processing, refunds                                       | Part of Django backend; integrates with Stripe                     |
-| Catalog module                | Products, drinks, customization                                   | Part of Django backend; uses catalog and inventory data           |
-| Inventory module              | Stock levels, alerts, restock                                     | Part of Django backend                                             |
-| AI Recommendation module      | Personalized recommendations, chatbot                             | Part of Django backend; uses preferences; calls external AI API    |
-| PostgreSQL                    | Persistent storage                                                | Accessed via Django ORM / repositories                             |
-| Stripe                        | Payment processing                                                | HTTPS API; webhooks for async events                               |
-| Email / notification service  | Verification, password reset, order/alert notifications           | HTTPS or SMTP from backend                                         |
-| AI provider (e.g., Claude API)| Recommendation and complaint chatbot                             | HTTPS API from backend                                             |
-| Maps / geolocation provider   | Store locator, delivery/pickup                                    | HTTPS API from frontend or backend                                 |
+| Mobile app                    | Customer UI, cart, checkout, complaints, map flow                | Expo React Native; HTTP/JSON to backend                            |
+| Dashboard                     | Manager/admin UI, role-based dashboards                          | Next.js 16 + React 19 + next-auth; HTTP/JSON to backend            |
+| OrbitDB peer API              | Request routing, auth, business logic, peer coordination         | Express + OrbitDB + libp2p + Helia                                 |
+| Support workflows             | Seeding, data tooling                                | Django 5.1 + Python scripts                                         |
+| User Management module        | Registration, login, profiles, preferences, guests                | Backend service layer; uses `users`, `preferences` tables (Section 4) |
+| Order Management module       | Order lifecycle, status, QR codes                                 | Backend service layer; depends on User Management, Catalog, Payment |
+| Payment module                | Payment processing, refunds                                       | Backend service layer; integrates with Stripe                      |
+| Catalog module                | Products, drinks, customization                                   | Backend service layer; uses catalog and inventory data             |
+| Inventory module              | Stock levels, alerts, restock                                     | Backend service layer                                                |
+| AI Recommendation module      | Personalized recommendations, chatbot                             | Backend service layer; uses preferences; calls external AI API     |
+| PostgreSQL                    | Persistent storage                                                | Accessed where the current deployment stack requires it             |
+| Stripe                        | Payment processing                                                | HTTPS API; webhooks for async events                                |
+| Email / notification service  | Verification, password reset, order/alert notifications           | HTTPS or SMTP from backend                                          |
+| AI provider (e.g., Claude API)| Recommendation and complaint chatbot                             | HTTPS API from backend                                              |
+| Maps / geolocation provider   | Store locator, delivery/pickup                                    | HTTPS API from frontend or backend                                  |
 
 ![1.1 Component Diagram](misc/1.1_Component_Diagram.png)
 
@@ -220,31 +225,18 @@ The Order Management Subsystem is responsible for the full order lifecycle from 
   - **Notifications**: Send status updates (e.g., order confirmed, ready for pickup).
 - **Key interfaces**: Order creation (cart + user + pickup preference), status updates (internal and from external triggers), and QR code generation/validation for pickup.
 
-### Detailed Class Breakdown
-
-#### `OrderService` class
 
 - **Fields**
   - `orderRepository`: OrderRepository — persistence of orders and order items.
-  - `paymentService`: PaymentService — process payment and refunds.
-  - `notificationService`: NotificationService — send order status notifications.
-  - `inventoryService`: InventoryService — reserve/release or check inventory for items.
 - **Methods**
   - `createOrder(userId, cartItems, pickupPreference)`: Validates cart, checks inventory, creates order in PENDING state, triggers payment flow; on payment success finalizes order and triggers notification and QR generation.
   - `updateOrderStatus(orderId, newStatus)`: Delegates to OrderStatusManager for validity, then persists and sends notifications.
-  - `cancelOrder(orderId)`: Validates cancellability, initiates refund if paid, updates status to CANCELLED, releases inventory, notifies user.
-  - `getOrderHistory(userId, filters)`: Returns paginated list of orders for the user (via OrderRepository).
-- **Responsibilities**: Order business logic and orchestration; single entry point for order operations used by API layer.
 
 #### `OrderRepository` class
 
-- **Fields**
-  - `dbConnection`: Database connection/ORM session (e.g., Django ORM).
 - **Methods**
   - `save(order)`: Persists order and its OrderItems; used for create and update.
   - `findById(orderId)`: Returns order with items by primary key.
-  - `findByUserId(userId, limit, offset)`: Returns orders for a user (e.g., for history).
-  - `findByStatus(status)`: Returns orders in a given status (e.g., for fulfillment queue).
 - **Responsibilities**: Order and order-item data persistence; no business rules.
 
 #### `OrderItem` class
@@ -262,16 +254,9 @@ The Order Management Subsystem is responsible for the full order lifecycle from 
 
 - **Fields**
   - `statusTransitionRules`: Map or table of allowed (currentStatus → newStatus) transitions.
-- **Methods**
-  - `canTransition(orderId, newStatus)`: Returns whether the order’s current status may transition to `newStatus`.
-  - `updateStatus(orderId, newStatus, reason?)`: Performs transition (via OrderRepository), records in status history.
   - `getStatusHistory(orderId)`: Returns chronological list of status changes for the order.
 - **Responsibilities**: Enforce order status state machine; prevent invalid transitions (e.g., CANCELLED → IN_PROGRESS).
 
-#### `QRCodeService` class
-
-- **Fields**
-  - `codeGenerator`: Generates unique QR payload (e.g., UUID or signed token).
   - `expirationManager`: Tracks and enforces QR expiration (e.g., time-to-live after “ready for pickup”).
 - **Methods**
   - `generateQRCode(orderId)`: Creates unique code, stores mapping orderId ↔ code and expiration, returns code/payload for display.
@@ -333,156 +318,14 @@ classDiagram
 
 - **Relationships**: OrderService orchestrates repositories and external services. OrderRepository persists aggregates that include OrderItems. OrderStatusManager and QRCodeService are used by OrderService and may interact with the same persistence (orders table) for status and QR metadata.
 
-### Code samples — Order Management
+### Workflow pseudocode — Order Management
 
 Plain Python samples; can be adapted to Django ORM. Persistence is in-memory for illustration.
 
-```python
-from dataclasses import dataclass
-from decimal import Decimal
-from typing import Any, Optional
-from enum import Enum
-
-class OrderStatus(str, Enum):
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    IN_PROGRESS = "in_progress"
-    READY_FOR_PICKUP = "ready_for_pickup"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-@dataclass
-class OrderItem:
-    drink_id: int
-    quantity: int
-    customization: dict[str, Any]
-    price: Decimal
-
-    def calculate_subtotal(self) -> Decimal:
-        return self.price * self.quantity
-
-@dataclass
-class Order:
-    order_id: Optional[int]
-    user_id: int
-    items: list[OrderItem]
-    status: OrderStatus
-    total_amount: Decimal = Decimal("0")
-
-    def __post_init__(self):
-        if self.total_amount == 0 and self.items:
-            self.total_amount = sum(i.calculate_subtotal() for i in self.items)
-
-class OrderRepository:
-    def __init__(self, db_connection: Any = None):
-        self._db = db_connection or {}
-        self._next_id = 1
-
-    def save(self, order: Order) -> Order:
-        if order.order_id is None:
-            order.order_id = self._next_id
-            self._next_id += 1
-        self._db[order.order_id] = order
-        return order
-
-    def find_by_id(self, order_id: int) -> Optional[Order]:
-        return self._db.get(order_id)
-
-    def find_by_user_id(self, user_id: int, limit: int = 20, offset: int = 0) -> list[Order]:
-        orders = [o for o in self._db.values() if o.user_id == user_id]
-        orders.sort(key=lambda o: o.order_id or 0, reverse=True)
-        return orders[offset : offset + limit]
-
-    def find_by_status(self, status: OrderStatus) -> list[Order]:
-        return [o for o in self._db.values() if o.status == status]
-
-class OrderStatusManager:
-    STATUS_TRANSITION_RULES: dict[OrderStatus, list[OrderStatus]] = {
-        OrderStatus.PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-        OrderStatus.CONFIRMED: [OrderStatus.IN_PROGRESS, OrderStatus.CANCELLED],
-        OrderStatus.IN_PROGRESS: [OrderStatus.READY_FOR_PICKUP],
-        OrderStatus.READY_FOR_PICKUP: [OrderStatus.COMPLETED],
-        OrderStatus.COMPLETED: [],
-        OrderStatus.CANCELLED: [],
-    }
-
-    def __init__(self, order_repository: OrderRepository):
-        self._order_repository = order_repository
-        self._status_history: dict[int, list[tuple[OrderStatus, str | None]]] = {}
-
-    def can_transition(self, order_id: int, new_status: OrderStatus) -> bool:
-        order = self._order_repository.find_by_id(order_id)
-        if not order:
-            return False
-        allowed = self.STATUS_TRANSITION_RULES.get(order.status, [])
-        return new_status in allowed
-
-    def update_status(self, order_id: int, new_status: OrderStatus, reason: Optional[str] = None) -> bool:
-        if not self.can_transition(order_id, new_status):
-            return False
-        order = self._order_repository.find_by_id(order_id)
-        if not order:
-            return False
-        order.status = new_status
-        self._order_repository.save(order)
-        self._status_history.setdefault(order_id, []).append((new_status, reason))
-        return True
-
-    def get_status_history(self, order_id: int) -> list[tuple[OrderStatus, str | None]]:
-        return self._status_history.get(order_id, [])
-
-class QRCodeService:
-    def __init__(self, code_generator=None, expiration_manager=None):
-        self._code_generator = code_generator or (lambda: f"QR-{id(object())}")
-        self._codes: dict[str, tuple[int, bool]] = {}
-
-    def generate_qr_code(self, order_id: int) -> str:
-        code = self._code_generator()
-        self._codes[code] = (order_id, False)
-        return code
-
-    def validate_qr_code(self, code: str) -> tuple[Optional[int], bool]:
-        if code not in self._codes:
-            return None, False
-        order_id, used = self._codes[code]
-        return order_id, not used
-
-    def expire_qr_code(self, order_id: int) -> None:
-        for code, (oid, _) in list(self._codes.items()):
-            if oid == order_id:
-                self._codes[code] = (oid, True)
-                break
-
-class OrderService:
-    def __init__(self, order_repository: OrderRepository, payment_service: Any,
-                 notification_service: Any, inventory_service: Any,
-                 order_status_manager: OrderStatusManager, qr_code_service: QRCodeService):
-        self.order_repository = order_repository
-        self.payment_service = payment_service
-        self.notification_service = notification_service
-        self.inventory_service = inventory_service
-        self.order_status_manager = order_status_manager
-        self.qr_code_service = qr_code_service
-
-    def create_order(self, user_id: int, cart_items: list[dict], pickup_preference: str) -> tuple[Optional[Order], Optional[str]]:
-        items = [OrderItem(drink_id=c["drink_id"], quantity=c["quantity"],
-                          customization=c.get("customization", {}), price=Decimal(str(c["price"])))
-                 for c in cart_items]
-        order = Order(order_id=None, user_id=user_id, items=items, status=OrderStatus.PENDING)
-        order = self.order_repository.save(order)
-        return order, None
-
-    def update_order_status(self, order_id: int, new_status: OrderStatus) -> bool:
-        return self.order_status_manager.update_status(order_id, new_status)
-
-    def cancel_order(self, order_id: int) -> bool:
-        if not self.order_status_manager.can_transition(order_id, OrderStatus.CANCELLED):
-            return False
-        self.order_status_manager.update_status(order_id, OrderStatus.CANCELLED)
-        return True
-
-    def get_order_history(self, user_id: int, limit: int = 20, offset: int = 0) -> list[Order]:
-        return self.order_repository.find_by_user_id(user_id, limit=limit, offset=offset)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -566,104 +409,14 @@ classDiagram
 - **Integration with Order Management**: PaymentService calls OrderService to confirm order on payment success or to support cancellation/refund flows. Order Management triggers PaymentService.processPayment when the user completes checkout.
 - **External dependency**: StripeIntegration is the only class that talks to Stripe; all secrets and API details are encapsulated there.
 
-### Code samples — Payment Integration
+### Workflow pseudocode — Payment Integration
 
 Stripe calls are stubbed; replace with real Stripe SDK in production.
 
-```python
-from dataclasses import dataclass
-from decimal import Decimal
-from enum import Enum
-from typing import Any, Optional
-
-class PaymentStatus(str, Enum):
-    PENDING = "pending"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    REFUNDED = "refunded"
-
-@dataclass
-class Payment:
-    payment_id: Optional[int]
-    order_id: int
-    user_id: int
-    amount: Decimal
-    payment_method_id: str
-    stripe_payment_intent_id: Optional[str]
-    status: PaymentStatus
-
-class PaymentRepository:
-    def __init__(self, db_connection: Any = None):
-        self._db: dict[int, Payment] = {}
-        self._by_order: dict[int, int] = {}
-        self._next_id = 1
-
-    def save(self, payment: Payment) -> Payment:
-        if payment.payment_id is None:
-            payment.payment_id = self._next_id
-            self._next_id += 1
-        self._db[payment.payment_id] = payment
-        self._by_order[payment.order_id] = payment.payment_id
-        return payment
-
-    def find_by_order_id(self, order_id: int) -> Optional[Payment]:
-        pid = self._by_order.get(order_id)
-        return self._db.get(pid) if pid else None
-
-    def find_by_user_id(self, user_id: int, limit: int = 50, offset: int = 0) -> list[Payment]:
-        list_ = [p for p in self._db.values() if p.user_id == user_id]
-        list_.sort(key=lambda p: p.payment_id or 0, reverse=True)
-        return list_[offset : offset + limit]
-
-class StripeIntegration:
-    def __init__(self, api_key: str = "", webhook_secret: str = ""):
-        self.api_key = api_key
-        self.webhook_secret = webhook_secret
-
-    def create_payment_intent(self, amount_cents: int, currency: str = "usd", metadata: Optional[dict] = None) -> dict:
-        metadata = metadata or {}
-        return {"id": f"pi_{id(self)}", "client_secret": "pi_xxx_secret_xxx",
-                "amount": amount_cents, "currency": currency, "metadata": metadata}
-
-    def confirm_payment(self, payment_intent_id: str) -> dict:
-        return {"id": payment_intent_id, "status": "succeeded"}
-
-    def handle_webhook(self, payload: bytes, signature: str) -> Optional[dict]:
-        return {"type": "payment_intent.succeeded", "data": {}}
-
-class PaymentService:
-    def __init__(self, stripe_client: StripeIntegration, payment_repository: PaymentRepository, order_service: Any):
-        self.stripe_client = stripe_client
-        self.payment_repository = payment_repository
-        self.order_service = order_service
-
-    def process_payment(self, order_id: int, payment_method_id: str, amount: Decimal, user_id: int) -> tuple[bool, Optional[str]]:
-        amount_cents = int(amount * 100)
-        intent = self.stripe_client.create_payment_intent(amount_cents=amount_cents, currency="usd", metadata={"order_id": str(order_id)})
-        result = self.stripe_client.confirm_payment(intent["id"])
-        status = PaymentStatus.SUCCEEDED if result.get("status") == "succeeded" else PaymentStatus.FAILED
-        payment = Payment(payment_id=None, order_id=order_id, user_id=user_id, amount=amount,
-                          payment_method_id=payment_method_id, stripe_payment_intent_id=intent["id"], status=status)
-        self.payment_repository.save(payment)
-        if status == PaymentStatus.SUCCEEDED:
-            if self.order_service and hasattr(self.order_service, "confirm_order"):
-                self.order_service.confirm_order(order_id)
-            return True, None
-        return False, "Payment failed"
-
-    def refund_payment(self, payment_id_or_order_id: int, amount: Optional[Decimal] = None, reason: Optional[str] = None) -> tuple[bool, Optional[str]]:
-        payment = self.payment_repository.find_by_order_id(payment_id_or_order_id)
-        if not payment:
-            payment = self.payment_repository._db.get(payment_id_or_order_id)
-        if not payment:
-            return False, "Payment not found"
-        payment.status = PaymentStatus.REFUNDED
-        self.payment_repository.save(payment)
-        return True, None
-
-    def get_payment_status(self, order_id: int) -> Optional[PaymentStatus]:
-        payment = self.payment_repository.find_by_order_id(order_id)
-        return payment.status if payment else None
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -731,43 +484,24 @@ The Catalog subsystem is responsible for product and drink management, pricing, 
 **Responsibilities:** Orchestrate inventory operations, coordinate stock updates, and manage alerts.
 
 **Fields:**
-```python
-- inventoryRepository: InventoryRepository
-- stockAlertService: StockAlertService
-- supplyHubService: SupplyHubService
-- orderService: OrderService
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ updateInventory(itemId: int, quantity: int) -> Inventory
-+ deductInventory(itemName: str, quantity: int, storeId: int) -> bool
-+ resetInventory(itemId: int) -> Inventory  # Restock to threshold
-+ checkStockLevel(itemName: str, storeId: int) -> int
-+ getLowStockItems(storeId: int) -> List[Inventory]
-+ requestRestock(itemName: str, quantity: int, storeId: int) -> StockTransfer
-+ getInventoryReport(storeId: int) -> InventoryReport
-+ bulkDeduct(items: List[tuple], storeId: int) -> bool  # For order fulfillment
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Transaction Handling:**
-```python
-@transaction.atomic
-def bulkDeduct(self, items: List[tuple], storeId: int) -> bool:
-    """
-    Atomically deduct multiple items with rollback on insufficient stock.
-    items: [(itemName, quantity), ...]
-    """
-    for item_name, qty in items:
-        inventory = self.inventoryRepository.findByName(item_name, storeId)
-        if inventory.Quantity < qty:
-            raise InsufficientStockError(f"{item_name} out of stock")
-        inventory.Quantity -= qty
-        inventory.save()
-        
-        if inventory.Quantity <= inventory.ThresholdLevel:
-            self.stockAlertService.sendAlert(inventory)
-    return True
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 #### 3.3.2.2 InventoryRepository
@@ -775,19 +509,17 @@ def bulkDeduct(self, items: List[tuple], storeId: int) -> bool:
 **Responsibilities:** Data access for inventory entities.
 
 **Fields:**
-```python
-- dbConnection: DatabaseConnection
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ findByItemName(name: str, storeId: int) -> Inventory
-+ findAllByStore(storeId: int) -> QuerySet[Inventory]
-+ findBelowThreshold(storeId: int) -> QuerySet[Inventory]
-+ updateQuantity(itemId: int, newQuantity: int) -> Inventory
-+ bulkUpdate(updates: List[dict]) -> bool
-+ save(inventory: Inventory) -> Inventory
-+ delete(itemId: int) -> bool
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 #### 3.3.2.3 StockAlertService
@@ -795,44 +527,24 @@ def bulkDeduct(self, items: List[tuple], storeId: int) -> bool:
 **Responsibilities:** Monitor thresholds and trigger notifications for low stock.
 
 **Fields:**
-```python
-- notificationService: NotificationService
-- thresholdRules: dict
-- alertChannels: List[str]  # ['email', 'push', 'dashboard']
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ checkThresholds(storeId: int) -> List[Alert]
-+ sendAlert(inventory: Inventory) -> bool
-+ updateThreshold(itemId: int, newThreshold: int) -> bool
-+ getAlertHistory(storeId: int, days: int) -> List[Alert]
-+ suppressAlert(itemId: int, duration: timedelta) -> bool  # Snooze alerts
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Alert Trigger Logic:**
-```python
-def checkThresholds(self, storeId: int):
-    low_stock = self.inventoryRepository.findBelowThreshold(storeId)
-    alerts = []
-    
-    for item in low_stock:
-        alert_level = 'CRITICAL' if item.Quantity == 0 else 'WARNING'
-        alerts.append({
-            'item': item.ItemName,
-            'current': item.Quantity,
-            'threshold': item.ThresholdLevel,
-            'level': alert_level,
-            'recommended_order': item.ThresholdLevel * 2  # 2x safety stock
-        })
-        
-        self.notificationService.notify(
-            recipients=['store_manager', 'logistics_manager'],
-            message=f"Low stock: {item.ItemName}",
-            urgency=alert_level
-        )
-    
-    return alerts
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 #### 3.3.2.4 SupplyHubService
@@ -840,43 +552,24 @@ def checkThresholds(self, storeId: int):
 **Responsibilities:** Coordinate supply distribution from regional hubs to stores.
 
 **Fields:**
-```python
-- hubRepository: SupplyHubRepository
-- transferRepository: StockTransferRepository
-- routingAlgorithm: RoutingAlgorithm
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ requestSupply(itemName: str, quantity: int, storeId: int) -> StockTransfer
-+ findNearestHub(storeId: int) -> SupplyHub
-+ calculateDeliveryTime(fromHubId: int, toStoreId: int) -> timedelta
-+ getHubInventory(hubId: int) -> List[HubInventory]
-+ scheduleDelivery(transferId: int, deliveryTime: datetime) -> bool
-+ trackShipment(transferId: int) -> ShipmentStatus
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Hub Selection Algorithm:**
-```python
-def findNearestHub(self, storeId: int) -> SupplyHub:
-    """
-    1. Get store region (A-G based on location)
-    2. Check regional hub capacity
-    3. If unavailable, search hubs within 1000 miles
-    4. Sort by distance and availability
-    """
-    store = Store.objects.get(id=storeId)
-    regional_hub = SupplyHub.objects.get(region=store.region)
-    
-    if regional_hub.has_capacity():
-        return regional_hub
-    
-    # Cross-region fulfillment (up to 1000 miles)
-    nearby_hubs = SupplyHub.objects.filter(
-        location__distance_lt=(store.location, 1000)  # Miles
-    ).order_by('location__distance')
-    
-    return nearby_hubs.first()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 #### 3.3.2.5 SupplyCoordinator
@@ -884,42 +577,24 @@ def findNearestHub(self, storeId: int) -> SupplyHub:
 **Responsibilities:** Automate supply requests based on inventory levels and demand predictions.
 
 **Fields:**
-```python
-- inventoryService: InventoryService
-- supplyHubService: SupplyHubService
-- demandPredictor: DemandPredictionService
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ autoReorder(storeId: int) -> List[StockTransfer]
-+ calculateReorderQuantity(itemName: str, storeId: int) -> int
-+ optimizeBatchOrders(storeId: int) -> BatchOrder
-+ getPredictedDemand(itemName: str, days: int) -> float
-+ scheduleAutomatedRestocking(storeId: int, frequency: str) -> bool
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Auto-Reorder Logic:**
-```python
-def autoReorder(self, storeId: int):
-    low_stock_items = self.inventoryService.getLowStockItems(storeId)
-    transfers = []
-    
-    for item in low_stock_items:
-        # Get AI demand prediction for next 7 days
-        predicted_demand = self.demandPredictor.predict(item.ItemName, days=7)
-        safety_stock = item.ThresholdLevel
-        reorder_qty = predicted_demand + safety_stock - item.Quantity
-        
-        if reorder_qty > 0:
-            transfer = self.supplyHubService.requestSupply(
-                itemName=item.ItemName,
-                quantity=reorder_qty,
-                storeId=storeId
-            )
-            transfers.append(transfer)
-    
-    return transfers
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### 3.3.3 Database Schema - Inventory Tables
@@ -1122,47 +797,24 @@ CREATE INDEX idx_transfers_requested ON stock_transfers(RequestedAt DESC);
 **Responsibilities:** Orchestrate recommendation generation and coordinate AI models.
 
 **Fields:**
-```python
-- contentBasedModel: ContentBasedFilter
-- userPreferenceService: PreferenceService
-- catalogService: CatalogService
-- cacheManager: CacheManager
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ getPersonalizedRecommendations(userId: int, count: int) -> List[Drink]
-+ getRandomRecommendation() -> Drink
-+ generateFromPreferences(preferences: List[str]) -> dict
-+ refreshRecommendations(userId: int) -> bool
-+ trainModel(updatedData: DataFrame) -> bool
-+ getCachedRecommendation(userId: int) -> Drink | None
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Algorithm Flow:**
-```python
-def getPersonalizedRecommendations(self, userId: int, count: int = 3):
-    # 1. Check cache first
-    cached = self.cacheManager.get(f"rec_{userId}")
-    if cached:
-        return cached
-    
-    # 2. Fetch user preferences
-    preferences = self.userPreferenceService.getPreferences(userId)
-    if not preferences:
-        # Fallback for no preferences
-        preferences = ["mango", "peach", "vanilla", "salted caramel"]
-    
-    # 3. Generate recommendations using content-based filtering
-    drink_ingredients = self.contentBasedModel.generateDrink(preferences)
-    
-    # 4. Create drink object
-    drink = self.catalogService.createCustomDrink(drink_ingredients, userId)
-    
-    # 5. Cache for 1 hour
-    self.cacheManager.set(f"rec_{userId}", drink, ttl=3600)
-    
-    return drink
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 #### 3.4.2.2 ContentBasedFilter
@@ -1170,129 +822,25 @@ def getPersonalizedRecommendations(self, userId: int, count: int = 3):
 **Responsibilities:** Implement Scikit-Learn content-based recommendation algorithm.
 
 **Fields:**
-```python
-- cvVectorizer: CountVectorizer
-- similarityMatrix: np.ndarray
-- syrupData: DataFrame
-- sodaData: DataFrame
-- addinData: DataFrame
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ generateDrink(preferences: List[str]) -> dict
-+ findSimilarSyrups(syrupName: str, topN: int) -> List[str]
-+ findBestSoda(syrupTypes: List[str], sodaPrefs: List[str]) -> str
-+ findBestAddins(syrupTypes: str, sodaType: str, addinPrefs: List[str]) -> List[str]
-+ loadCSVData(filePath: str) -> DataFrame
-+ computeSimilarity(data: DataFrame, column: str) -> np.ndarray
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Scikit-Learn Implementation:**
 
-```python
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import pandas as pd
-
-class ContentBasedFilter:
-    def __init__(self):
-        self.cvVectorizer = CountVectorizer()
-        self.syrupData = pd.read_csv('backend/Syrups.csv')
-        self.sodaData = pd.read_csv('backend/Sodas.csv')
-        self.addinData = pd.read_csv('backend/AddIns.csv')
-    
-    def findSimilarSyrups(self, syrupName: str, topN: int = 5) -> List[str]:
-        """
-        Use cosine similarity on syrup 'type' field to find similar flavors.
-        Example: "strawberry" (type: "fruit berry cool") 
-                 → similar: raspberry, blackberry, pomegranate
-        """
-        # Extract type field as text corpus
-        count_matrix = self.cvVectorizer.fit_transform(self.syrupData['type'])
-        
-        # Compute cosine similarity matrix (n x n)
-        similarity_matrix = cosine_similarity(count_matrix)
-        
-        # Get index of target syrup
-        idx = self.syrupData[self.syrupData['name'] == syrupName].index[0]
-        
-        # Get similarity scores for this syrup
-        similarity_scores = list(enumerate(similarity_matrix[idx]))
-        
-        # Sort by similarity (descending)
-        sorted_syrups = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
-        
-        # Return top N (excluding self at index 0)
-        top_indices = [i[0] for i in sorted_syrups[1:topN+1]]
-        return self.syrupData.iloc[top_indices]['name'].tolist()
-    
-    def findBestSoda(self, syrupTypes: List[str], sodaPrefs: List[str]) -> str:
-        """
-        Find soda that best matches syrup flavor profiles.
-        Uses best-match-flavors column in Sodas.csv.
-        """
-        # Combine syrup types into single string
-        combined_types = " ".join(set(syrupTypes))
-        
-        # Temporarily append to soda dataframe for comparison
-        temp_df = self.sodaData.copy()
-        temp_row = {'name': 'user_syrups', 'best-match-flavors': combined_types}
-        temp_df = temp_df.append(temp_row, ignore_index=True)
-        
-        # Compute similarity
-        count_matrix = self.cvVectorizer.fit_transform(temp_df['best-match-flavors'])
-        similarity_matrix = cosine_similarity(count_matrix)
-        
-        # Get similarity to user's syrup combination (last row)
-        user_idx = len(temp_df) - 1
-        scores = list(enumerate(similarity_matrix[user_idx][:-1]))
-        sorted_sodas = sorted(scores, key=lambda x: x[1], reverse=True)
-        
-        # If user has soda preferences, pick best match from those
-        if sodaPrefs:
-            for idx, score in sorted_sodas:
-                if temp_df.iloc[idx]['name'] in sodaPrefs:
-                    return temp_df.iloc[idx]['name']
-        
-        # Otherwise return top match
-        return temp_df.iloc[sorted_sodas[0][0]]['name']
-    
-    def generateDrink(self, preferences: List[str]) -> dict:
-        """
-        Main algorithm: preferences → complete drink recommendation.
-        """
-        # 1. Separate preferences by type
-        syrup_prefs = [p for p in preferences if p in self.syrupData['name'].values]
-        soda_prefs = [p for p in preferences if p in self.sodaData['name'].values]
-        addin_prefs = [p for p in preferences if p in self.addinData['name'].values]
-        
-        # 2. Select 1-2 random syrup preferences
-        selected_syrups = random.sample(syrup_prefs, min(2, len(syrup_prefs)))
-        
-        # 3. Find similar syrups using content-based filtering
-        all_syrups = []
-        for syrup in selected_syrups:
-            similar = self.findSimilarSyrups(syrup, topN=3)
-            all_syrups.extend(similar)
-        
-        # Pick 2 syrups from combined pool
-        final_syrups = random.sample(all_syrups, min(2, len(all_syrups)))
-        
-        # 4. Find best matching soda
-        syrup_types = [self._getType(s, 'syrup') for s in final_syrups]
-        best_soda = self.findBestSoda(syrup_types, soda_prefs)
-        
-        # 5. Find matching add-ins (0-2)
-        addins = self.findBestAddins(syrup_types, best_soda, addin_prefs)
-        
-        return {
-            'SyrupsUsed': final_syrups,
-            'SodaUsed': [best_soda],
-            'AddIns': addins,
-            'Size': '24oz',
-            'Ice': 'regular'
-        }
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Design Rationale:**
@@ -1309,132 +857,33 @@ class ContentBasedFilter:
 **Responsibilities:** Handle customer service conversations, complaint routing, refunds, and remakes.
 
 **Fields:**
-```python
-- model: AutoModelForCausalLM
-- tokenizer: AutoTokenizer
-- orderService: OrderService
-- paymentService: PaymentService
-- conversationHistory: dict
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ processMessage(userId: int, message: str, context: dict) -> ChatResponse
-+ detectIntent(message: str) -> Intent
-+ handleComplaint(orderId: int, issueType: str) -> Resolution
-+ processRefund(orderId: int) -> bool
-+ processDrinkRemake(orderId: int, drinkIds: List[int]) -> Order
-+ generateResponse(input: str, grounding: str) -> str
-+ validateResponse(response: str) -> bool
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **State Machine for Complaint Handling:**
 
-```python
-class ComplaintStateMachine:
-    STATES = {
-        'INIT': 'Determine if refund or remake',
-        'GET_ORDER': 'Request order number',
-        'CONFIRM_DRINKS': 'Select which drinks to remake',
-        'ACCEPT_TERMS': 'User must confirm action',
-        'COMPLETE': 'Navigate to completion page'
-    }
-    
-    KEYWORDS = {
-        'WRONG_DRINK': ['wrong drink', 'incorrect', 'bad drink', 'mistake', 
-                        'too sweet', 'wrong flavor', 'flat', 'warm'],
-        'REFUND': ['refund', 'money back', 'compensation', 'not satisfied']
-    }
-    
-    def processMessage(self, userInput: str, currentPhase: str, context: dict):
-        if 'cancel' in userInput.lower():
-            return {'phase': 'INIT', 'message': 'Process cancelled'}
-        
-        if currentPhase == 'INIT':
-            if self._matchKeywords(userInput, 'REFUND'):
-                return {'phase': 'GET_ORDER', 'flow': 'REFUND', 
-                        'message': 'Provide order number for refund'}
-            elif self._matchKeywords(userInput, 'WRONG_DRINK'):
-                return {'phase': 'GET_ORDER', 'flow': 'REMAKE',
-                        'message': 'Provide order number to remake drink'}
-        
-        elif currentPhase == 'GET_ORDER':
-            order_num = self._extractOrderNumber(userInput)
-            if not order_num:
-                return {'phase': 'GET_ORDER', 
-                        'message': 'Please provide valid order number'}
-            
-            # Fetch order details
-            order = Order.objects.filter(order_id=order_num).first()
-            if not order:
-                return {'phase': 'GET_ORDER',
-                        'message': 'Order not found. Try again.'}
-            
-            # Show order details
-            drink_list = self._formatDrinkList(order.Drinks.all())
-            return {'phase': 'CONFIRM_DRINKS', 'order_num': order_num,
-                    'message': f'Found your order:\n{drink_list}\n' 
-                              'Which drinks to remake? (or say "all")'}
-        
-        elif currentPhase == 'CONFIRM_DRINKS':
-            drink_nums = self._extractDrinkNumbers(userInput)
-            # Create new order with remade drinks
-            new_order = self._createRemakeOrder(context['order_num'], drink_nums)
-            return {'phase': 'ACCEPT_TERMS', 'new_order_id': new_order.order_id,
-                    'message': 'Say "I accept" to confirm remake'}
-        
-        elif currentPhase == 'ACCEPT_TERMS':
-            if 'i accept' in userInput.lower():
-                return {'phase': 'COMPLETE', 'order_id': context['new_order_id'],
-                        'message': 'Drinks being remade! Check order status.'}
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **DialoGPT Implementation:**
 
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-
-class AIChatbotService:
-    def __init__(self):
-        self.tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-        self.model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
-    
-    def generateResponse(self, userInput: str, grounding: str = "") -> str:
-        """
-        Generate conversational response using DialoGPT.
-        Grounding provides context: "you are a customer service agent, answer: "
-        """
-        full_input = grounding + userInput if grounding else userInput
-        
-        # Tokenize input
-        input_ids = self.tokenizer.encode(
-            full_input + self.tokenizer.eos_token, 
-            return_tensors='pt'
-        )
-        
-        # Create attention mask
-        attention_mask = torch.ones_like(input_ids)
-        
-        # Generate response
-        chat_history = self.model.generate(
-            input_ids,
-            max_length=1000,
-            pad_token_id=self.tokenizer.eos_token_id,
-            temperature=1.0,      # Moderate randomness
-            top_k=50,             # Consider top 50 tokens
-            top_p=0.9,            # Nucleus sampling
-            do_sample=True,
-            attention_mask=attention_mask
-        )
-        
-        # Decode response (excluding input)
-        response = self.tokenizer.decode(
-            chat_history[:, input_ids.shape[-1]:][0],
-            skip_special_tokens=True
-        )
-        
-        return response
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Design Decision: DialoGPT vs Claude API**
@@ -1466,114 +915,25 @@ class AIChatbotService:
 **Responsibilities:** Forecast demand for inventory items using historical sales data.
 
 **Fields:**
-```python
-- model: RandomForestRegressor  # Scikit-Learn
-- historicalData: DataFrame
-- featureExtractor: FeatureExtractor
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Methods:**
-```python
-+ predictDemand(itemName: str, storeId: int, days: int) -> float
-+ trainModel(historicalCSV: str) -> bool
-+ importHistoricalData(csvPath: str) -> DataFrame
-+ extractFeatures(data: DataFrame) -> np.ndarray
-+ evaluateModel() -> dict  # Returns MAE, RMSE metrics
-+ generateReorderRecommendations(storeId: int) -> List[ReorderRec]
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Algorithm (Scikit-Learn Random Forest):**
 
-```python
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-import pandas as pd
-
-class DemandPredictionService:
-    def __init__(self):
-        self.model = RandomForestRegressor(n_estimators=100, random_state=42)
-        self.historicalData = None
-    
-    def trainModel(self, csvPath: str):
-        """
-        Train on historical sales data CSV.
-        Expected columns: date, item_name, store_id, quantity_sold, 
-                          day_of_week, is_weekend, temperature, promotions
-        """
-        df = pd.read_csv(csvPath)
-        
-        # Feature engineering
-        df['date'] = pd.to_datetime(df['date'])
-        df['month'] = df['date'].dt.month
-        df['day_of_week'] = df['date'].dt.dayofweek
-        df['is_weekend'] = df['day_of_week'].isin([5, 6]).astype(int)
-        
-        # Encode categorical variables
-        df = pd.get_dummies(df, columns=['item_name', 'store_id'])
-        
-        # Split features and target
-        X = df.drop(['quantity_sold', 'date'], axis=1)
-        y = df['quantity_sold']
-        
-        # Train-test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-        
-        # Train model
-        self.model.fit(X_train, y_train)
-        
-        # Evaluate
-        train_score = self.model.score(X_train, y_train)
-        test_score = self.model.score(X_test, y_test)
-        
-        return {'train_r2': train_score, 'test_r2': test_score}
-    
-    def predictDemand(self, itemName: str, storeId: int, days: int = 7):
-        """
-        Predict total demand for item over next N days.
-        """
-        # Generate feature vectors for next N days
-        today = pd.Timestamp.now()
-        future_dates = pd.date_range(today, periods=days)
-        
-        predictions = []
-        for date in future_dates:
-            features = self._extractFeatures(itemName, storeId, date)
-            daily_pred = self.model.predict([features])[0]
-            predictions.append(daily_pred)
-        
-        # Return total predicted demand
-        return sum(predictions)
-    
-    def generateReorderRecommendations(self, storeId: int):
-        """
-        For each item below threshold, recommend reorder quantity based on 
-        7-day demand forecast + safety stock.
-        """
-        low_stock = Inventory.objects.filter(
-            StoreID=storeId,
-            Quantity__lte=F('ThresholdLevel')
-        )
-        
-        recommendations = []
-        for item in low_stock:
-            predicted_demand = self.predictDemand(item.ItemName, storeId, days=7)
-            safety_stock = item.ThresholdLevel
-            current_stock = item.Quantity
-            
-            reorder_qty = predicted_demand + safety_stock - current_stock
-            
-            if reorder_qty > 0:
-                recommendations.append({
-                    'item': item.ItemName,
-                    'current_stock': current_stock,
-                    'predicted_demand': round(predicted_demand, 0),
-                    'recommended_order': round(reorder_qty, 0),
-                    'urgency': 'HIGH' if current_stock == 0 else 'MEDIUM'
-                })
-        
-        return recommendations
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **CSV Import Format:**
@@ -1750,17 +1110,10 @@ date,item_name,store_id,quantity_sold,temperature,promotions,day_of_week,is_week
 **Use Case:** Validate ingredient availability during drink creation
 
 **Implementation:**
-```python
-class CustomizationService:
-    def validateIngredients(self, ingredients: dict, storeId: int):
-        for ingredient_type, items in ingredients.items():
-            for item_name in items:
-                inventory = InventoryRepository.findByName(item_name, storeId)
-                if not inventory or inventory.Quantity == 0:
-                    raise IngredientUnavailableError(
-                        f"{item_name} is out of stock at this location"
-                    )
-        return True
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **API Endpoint:**
@@ -1774,36 +1127,10 @@ GET /backend/inventory/?store_id=1&available_only=true
 
 **Required Implementation:**
 
-```python
-class OrderCompletionService:
-    @transaction.atomic
-    def fulfillOrder(self, orderId: int):
-        order = Order.objects.select_for_update().get(id=orderId)
-        
-        # Extract ingredients from all drinks in order
-        ingredients = self._extractIngredients(order.Drinks.all())
-        
-        # Prepare deduction list
-        deductions = []
-        for ingredient, quantity in ingredients.items():
-            deductions.append((ingredient, quantity))
-        
-        # Bulk deduct with rollback on failure
-        try:
-            InventoryService.bulkDeduct(deductions, order.StoreID)
-        except InsufficientStockError as e:
-            # Rollback order, notify customer
-            order.OrderStatus = 'failed'
-            order.save()
-            NotificationService.notifyCustomer(
-                order.user_id, 
-                f"Order failed: {e.message}"
-            )
-            raise
-        
-        # Mark order as fulfilled
-        order.OrderStatus = 'completed'
-        order.save()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Current Status:** ❌ Not implemented (manual PATCH endpoint only)
@@ -1815,13 +1142,10 @@ class OrderCompletionService:
 **Use Case:** Fetch user preferences for personalized recommendations
 
 **Implementation:**
-```python
-# In RecommendationService
-preferences = Preference.objects.filter(user_id=userId).values_list('Preference', flat=True)
-preferences_list = list(preferences)
-
-# Pass to AI model
-drink = ContentBasedFilter.generateDrink(preferences_list)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **API Flow:**
@@ -1838,43 +1162,10 @@ drink = ContentBasedFilter.generateDrink(preferences_list)
 **Use Case:** Automate restock requests from stores to regional hubs
 
 **Implementation:**
-```python
-class AutoRestockJob:
-    """
-    Cron job running daily at 2 AM to check inventory and request supplies.
-    """
-    def run(self):
-        all_stores = Store.objects.filter(OperatingStatus='operational')
-        
-        for store in all_stores:
-            # Get low stock items
-            low_stock = InventoryService.getLowStockItems(store.StoreID)
-            
-            if not low_stock:
-                continue
-            
-            # Find nearest hub
-            hub = SupplyHubService.findNearestHub(store.StoreID)
-            
-            # Create transfer requests
-            for item in low_stock:
-                # Get AI demand prediction
-                predicted_demand = DemandPredictionService.predictDemand(
-                    item.ItemName, store.StoreID, days=7
-                )
-                
-                # Calculate order quantity
-                reorder_qty = predicted_demand + item.ThresholdLevel - item.Quantity
-                
-                if reorder_qty > 0:
-                    StockTransfer.objects.create(
-                        FromHubID=hub.HubID,
-                        ToStoreID=store.StoreID,
-                        ItemName=item.ItemName,
-                        Quantity=reorder_qty,
-                        Priority='HIGH' if item.Quantity == 0 else 'NORMAL',
-                        EstimatedDelivery=timezone.now() + timedelta(days=2)
-                    )
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -1894,33 +1185,10 @@ class AutoRestockJob:
 - Expected: 10-50 recommendations/second during peak
 
 **Solution:**
-```python
-import redis
-import pickle
-
-class CSVCacheManager:
-    def __init__(self):
-        self.redis_client = redis.Redis(host='localhost', port=6379)
-        self.ttl = 3600  # 1 hour
-    
-    def getCachedCSV(self, filename: str) -> DataFrame:
-        cache_key = f"csv_{filename}"
-        cached = self.redis_client.get(cache_key)
-        
-        if cached:
-            return pickle.loads(cached)
-        
-        # Load from file
-        df = pd.read_csv(filename)
-        
-        # Cache serialized dataframe
-        self.redis_client.setex(
-            cache_key, 
-            self.ttl, 
-            pickle.dumps(df)
-        )
-        
-        return df
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Impact:**
@@ -1936,29 +1204,17 @@ class CSVCacheManager:
 - 5 drinks = 5 separate API calls
 
 **Current Code:**
-```javascript
-// CartPage.js
-for (let drinkId of checkoutList) {
-    const response = await fetch(`${BASE_URL}/backend/drinks/${drinkId}/`);
-    const drink = await response.json();
-    drinks.push(drink);
-}
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Solution:**
-```python
-# Backend: Add bulk fetch endpoint
-class DrinkBulkView(APIView):
-    def get(self, request):
-        ids = request.GET.get('ids', '').split(',')
-        drinks = Drink.objects.filter(drink_id__in=ids)
-        serializer = DrinkSerializer(drinks, many=True)
-        return Response(serializer.data)
-
-# Frontend: Single request
-const ids = checkoutList.join(',');
-const response = await fetch(`${BASE_URL}/backend/drinks/bulk/?ids=${ids}`);
-const drinks = await response.json();
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Impact:**
@@ -1975,42 +1231,17 @@ const drinks = await response.json();
 - Potential data corruption
 
 **Current Code:**
-```python
-# Temporarily append row to CSV
-rows.append(new_row)
-with open(csv_path, 'w') as file:
-    writer.writerows(rows)
-
-# ... compute similarity ...
-
-# Remove row
-rows.pop(-1)
-with open(csv_path, 'w') as file:
-    writer.writerows(rows)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Solution:**
-```python
-def findBestSoda(self, syrupTypes: List[str], sodaPrefs: List[str]):
-    """
-    Use in-memory DataFrame only, avoid file writes.
-    """
-    # Create temporary DataFrame (copy)
-    temp_df = self.sodaData.copy()
-    
-    # Append row in memory
-    temp_df = temp_df.append({
-        'name': 'user_syrups',
-        'best-match-flavors': ' '.join(syrupTypes)
-    }, ignore_index=True)
-    
-    # Compute on in-memory data (no file I/O)
-    count_matrix = self.cvVectorizer.fit_transform(temp_df['best-match-flavors'])
-    similarity = cosine_similarity(count_matrix)
-    
-    # ... rest of logic ...
-    
-    # temp_df discarded after function (no file modification)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Impact:**
@@ -2027,9 +1258,10 @@ def findBestSoda(self, syrupTypes: List[str], sodaPrefs: List[str]):
 - 100 stores × 80 items = 8,000 rows to aggregate
 
 **Query:**
-```python
-# Slow: Full table scan
-inventory = Inventory.objects.all()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Solution:**
@@ -2052,13 +1284,10 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY inventory_summary;
 ```
 
 **Django ORM:**
-```python
-from django.db import connection
-
-def getInventorySummary():
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM inventory_summary")
-        return cursor.fetchall()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Impact:**
@@ -2075,30 +1304,10 @@ def getInventorySummary():
 - When exported to CSV, executes code on admin's machine
 
 **Mitigation:**
-```python
-# In PreferenceSerializer
-class PreferenceSerializer(serializers.ModelSerializer):
-    ALLOWED_INGREDIENTS = [
-        'coconut', 'pineapple', 'strawberry', ... # 80+ items
-    ]
-    
-    def validate_Preference(self, value):
-        normalized = value.lower().strip()
-        
-        # Whitelist validation
-        if normalized not in self.ALLOWED_INGREDIENTS:
-            raise serializers.ValidationError(
-                f"Invalid ingredient: {value}"
-            )
-        
-        # Additional CSV injection check
-        dangerous_chars = ['=', '+', '-', '@', '|', '\t']
-        if any(char in value for char in dangerous_chars):
-            raise serializers.ValidationError(
-                "Invalid characters in preference"
-            )
-        
-        return normalized
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Status:** ✅ Already implemented in serializers.py
@@ -2110,46 +1319,17 @@ class PreferenceSerializer(serializers.ModelSerializer):
 - Attacker increases stock to hide theft or manipulate reports
 
 **Current Issue:**
-```python
-# No authentication check
-class InventoryUpdate(RetrieveUpdateAPIView):
-    queryset = Inventory.objects.all()
-    serializer_class = InventorySerializer
-    # MISSING: permission_classes
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Mitigation:**
-```python
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import permission_classes
-
-class IsStoreManager(BasePermission):
-    def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.is_staff
-
-class InventoryUpdate(RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated, IsStoreManager]
-    
-    def update(self, request, *args, **kwargs):
-        # Audit logging
-        AuditLog.objects.create(
-            user=request.user,
-            action='INVENTORY_UPDATE',
-            item_id=kwargs['pk'],
-            old_quantity=self.get_object().Quantity,
-            new_quantity=request.data.get('Quantity'),
-            timestamp=timezone.now()
-        )
-        
-        # Add reasonable limits
-        new_qty = int(request.data.get('Quantity', 0))
-        if new_qty > 10000:  # Max reasonable stock
-            return Response(
-                {'error': 'Quantity exceeds maximum allowed'},
-                status=400
-            )
-        
-        return super().update(request, *args, **kwargs)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Priority:** ⚠️ CRITICAL - Implement immediately
@@ -2161,25 +1341,10 @@ class InventoryUpdate(RetrieveUpdateAPIView):
 - Biases recommendations toward unavailable items
 
 **Mitigation:**
-```python
-class PreferenceRateLimiter:
-    MAX_PREFS_PER_USER = 50
-    MAX_PREFS_PER_HOUR = 10
-    
-    def checkLimit(self, userId: int):
-        # Total limit
-        count = Preference.objects.filter(user_id=userId).count()
-        if count >= self.MAX_PREFS_PER_USER:
-            raise PermissionDenied("Maximum preferences reached")
-        
-        # Rate limit (last hour)
-        recent = Preference.objects.filter(
-            user_id=userId,
-            created_at__gte=timezone.now() - timedelta(hours=1)
-        ).count()
-        
-        if recent >= self.MAX_PREFS_PER_HOUR:
-            raise ThrottledException("Too many preferences created")
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Priority:** MEDIUM
@@ -2191,39 +1356,17 @@ class PreferenceRateLimiter:
 - DialoGPT generates inappropriate business responses
 
 **Mitigation:**
-```python
-class ResponseFilter:
-    BANNED_WORDS = ['profanity1', 'profanity2', ...]  # Load from config
-    FALLBACK_RESPONSES = [
-        "I'm sorry, I didn't understand that. Can you rephrase?",
-        "Let me connect you with a manager for assistance.",
-        "Please use the contact form for this type of request."
-    ]
-    
-    def validateResponse(self, response: str) -> str:
-        # Check for banned words
-        for word in self.BANNED_WORDS:
-            if word in response.lower():
-                return random.choice(self.FALLBACK_RESPONSES)
-        
-        # Check response length (too short = likely error)
-        if len(response) < 10:
-            return self.FALLBACK_RESPONSES[0]
-        
-        # Check for code/script injection attempts
-        dangerous_patterns = ['<script>', 'javascript:', 'eval(']
-        if any(pattern in response.lower() for pattern in dangerous_patterns):
-            return self.FALLBACK_RESPONSES[0]
-        
-        return response
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Implementation:**
-```python
-def generateResponse(self, userInput: str):
-    raw_response = self.model.generate(...)
-    filtered_response = self.responseFilter.validateResponse(raw_response)
-    return filtered_response
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Priority:** HIGH - Implement before chatbot launch
@@ -3765,58 +2908,10 @@ Rather than directly accessing Django models from views, CodePop implements a **
 
 **Example Service Class** (`OrderService`):
 
-```python
-from django.db import transaction
-from .repositories import OrderRepository, InventoryRepository, PaymentRepository
-from .models import Order, OrderItem
-
-class OrderService:
-    def __init__(self):
-        self.order_repo = OrderRepository()
-        self.inventory_repo = InventoryRepository()
-        self.payment_repo = PaymentRepository()
-    
-    @transaction.atomic
-    def create_order(self, user, store, items, payment_method):
-        """
-        Create order with payment and inventory deduction.
-        Uses database transaction for atomicity.
-        """
-        # 1. Validate inventory availability
-        for item in items:
-            ingredients = self.inventory_repo.get_drink_ingredients(item['drink_id'])
-            if not self.inventory_repo.check_availability(store.id, ingredients, item['quantity']):
-                raise InsufficientInventoryError(f"Not enough stock for {item['drink_id']}")
-        
-        # 2. Create order record
-        order = self.order_repo.create(
-            user=user,
-            store=store,
-            items=items,
-            status='pending'
-        )
-        
-        # 3. Process payment via Stripe
-        payment_result = self.payment_repo.charge(
-            amount=order.total_amount,
-            payment_method=payment_method,
-            order_id=order.id
-        )
-        
-        if not payment_result.success:
-            raise PaymentFailedError(payment_result.error)
-        
-        # 4. Deduct inventory
-        for item in items:
-            ingredients = self.inventory_repo.get_drink_ingredients(item['drink_id'])
-            self.inventory_repo.deduct_ingredients(store.id, ingredients, item['quantity'])
-        
-        # 5. Update order status
-        order.payment_status = 'paid'
-        order.status = 'preparing'
-        self.order_repo.save(order)
-        
-        return order
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Benefits**:
@@ -3833,52 +2928,30 @@ class OrderService:
 
 **1. Eager Loading with `select_related()` (1:1 and N:1 relationships)**
 
-```python
-# BAD: Triggers separate query for each order's user
-orders = Order.objects.all()
-for order in orders:
-    print(order.user.email)  # Query executed here for each iteration
-
-# GOOD: Single JOIN query
-orders = Order.objects.select_related('user', 'store').all()
-for order in orders:
-    print(order.user.email)  # No additional query
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **When to Use**: Fetching foreign key relationships (user, store, payment)
 
 **2. Eager Loading with `prefetch_related()` (1:N and N:M relationships)**
 
-```python
-# BAD: N+1 queries (1 for orders + N for order_items)
-orders = Order.objects.all()
-for order in orders:
-    for item in order.order_items.all():  # Separate query per order
-        print(item.drink.name)
-
-# GOOD: 3 queries total (orders, order_items, drinks)
-orders = Order.objects.prefetch_related('order_items__drink').all()
-for order in orders:
-    for item in order.order_items.all():  # Uses cached results
-        print(item.drink.name)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **When to Use**: Fetching reverse foreign keys (order → order_items) and many-to-many (drinks → ingredients)
 
 **3. Query Result Caching**
 
-```python
-from django.core.cache import cache
-
-def get_popular_drinks():
-    cache_key = 'popular_drinks_top_10'
-    drinks = cache.get(cache_key)
-    
-    if drinks is None:
-        drinks = Drink.objects.filter(is_active=True).order_by('-rating_avg')[:10]
-        cache.set(cache_key, drinks, timeout=3600)  # Cache for 1 hour
-    
-    return drinks
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **When to Use**: Data that changes infrequently (menu items, top-rated drinks, store locations)
@@ -3887,47 +2960,20 @@ def get_popular_drinks():
 
 **4. Database Query Annotations (Aggregation)**
 
-```python
-from django.db.models import Count, Avg, Sum
-
-# Calculate total revenue per store
-store_revenue = Store.objects.annotate(
-    total_orders=Count('orders'),
-    avg_order_value=Avg('orders__total_amount'),
-    total_revenue=Sum('orders__total_amount')
-).filter(is_active=True)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **When to Use**: Dashboard analytics, reporting queries
 
 **5. Raw SQL for Complex Queries**
 
-```python
-from django.db import connection
-
-def get_low_stock_items_with_demand_forecast(store_id):
-    """
-    Complex query combining inventory, order history, and ML predictions.
-    Too complex for ORM; use raw SQL.
-    """
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT 
-                inv.item_name,
-                inv.quantity,
-                inv.threshold_level,
-                COALESCE(SUM(oi.quantity), 0) as last_30_days_usage
-            FROM inventory inv
-            LEFT JOIN drink_ingredients di ON inv.id = di.inventory_id
-            LEFT JOIN order_items oi ON di.drink_id = oi.drink_id
-            LEFT JOIN orders o ON oi.order_id = o.id
-            WHERE inv.store_id = %s
-              AND o.created_at >= NOW() - INTERVAL '30 days'
-              AND inv.quantity <= inv.threshold_level
-            GROUP BY inv.id, inv.item_name, inv.quantity, inv.threshold_level
-            ORDER BY (inv.threshold_level - inv.quantity) DESC
-        """, [store_id])
-        return cursor.fetchall()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **When to Use**: Multi-table aggregations, window functions, or PostgreSQL-specific features not exposed by ORM
@@ -3938,41 +2984,10 @@ def get_low_stock_items_with_demand_forecast(store_id):
 
 **Django's `transaction.atomic` Decorator**:
 
-```python
-from django.db import transaction
-
-@transaction.atomic
-def process_refund(order_id, refund_amount):
-    """
-    Refund payment and restore inventory.
-    If any step fails, entire operation rolls back.
-    """
-    order = Order.objects.select_for_update().get(id=order_id)
-    payment = Payment.objects.get(order=order)
-    
-    # 1. Process Stripe refund
-    stripe.Refund.create(
-        payment_intent=payment.stripe_payment_intent_id,
-        amount=int(refund_amount * 100)  # Stripe uses cents
-    )
-    
-    # 2. Update payment record
-    payment.refund_status = 'full' if refund_amount == payment.amount else 'partial'
-    payment.refund_amount = refund_amount
-    payment.save()
-    
-    # 3. Restore inventory
-    for item in order.order_items.all():
-        ingredients = DrinkIngredient.objects.filter(drink=item.drink)
-        for ing in ingredients:
-            inv = Inventory.objects.get(store=order.store, item_name=ing.inventory.item_name)
-            inv.quantity += ing.quantity_ml * item.quantity
-            inv.save()
-    
-    # 4. Update order status
-    order.status = 'cancelled'
-    order.payment_status = 'refunded'
-    order.save()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Key Points**:
@@ -3993,10 +3008,10 @@ def process_refund(order_id, refund_amount):
 **Workflow**:
 
 1. **Modify Django Model**:
-```python
-class Drink(models.Model):
-    # Add new field
-    allergen_info = models.JSONField(null=True, blank=True)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 2. **Generate Migration**:
@@ -4018,27 +3033,10 @@ python manage.py migrate
 
 **Data Migrations** (for transforming existing data):
 
-```python
-from django.db import migrations
-
-def populate_allergen_info(apps, schema_editor):
-    """
-    Populate allergen_info for existing drinks based on ingredients.
-    """
-    Drink = apps.get_model('backend', 'Drink')
-    for drink in Drink.objects.all():
-        if 'milk' in drink.add_ins_json:
-            drink.allergen_info = {'contains': ['dairy']}
-            drink.save()
-
-class Migration(migrations.Migration):
-    dependencies = [
-        ('backend', '0015_drink_allergen_info'),
-    ]
-    
-    operations = [
-        migrations.RunPython(populate_allergen_info),
-    ]
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Best Practices**:
@@ -4154,12 +3152,10 @@ LIMIT 50;
 - Pagination (LIMIT 50 prevents unbounded result sets)
 
 **Django ORM Equivalent**:
-```python
-orders = Order.objects.filter(
-    store_id=5,
-    status__in=['pending', 'preparing'],
-    created_at__gte=timezone.now() - timedelta(hours=24)
-).values('id', 'user_id', 'status', 'total_amount', 'created_at').order_by('-created_at')[:50]
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### 4.5.3 Connection Pooling
@@ -4204,21 +3200,10 @@ query_timeout = 60               # Cancel queries taking >60 seconds
 
 **Django Settings** (`settings.py`):
 
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'codepop_db',
-        'USER': 'codepop_user',
-        'PASSWORD': 'secure_password',
-        'HOST': '127.0.0.1',
-        'PORT': '6432',  # PgBouncer port, not PostgreSQL direct
-        'CONN_MAX_AGE': 600,  # Persist connections for 10 minutes
-        'OPTIONS': {
-            'connect_timeout': 10,
-        }
-    }
-}
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Benefits**:
@@ -4256,28 +3241,10 @@ psql -h 127.0.0.1 -p 6432 -U codepop_user -d pgbouncer -c "SHOW POOLS;"
 - **Replicas (3x)**: Handle read-only queries (menu browsing, order history, analytics)
 - **Routing**: Django database router directs reads to replicas
 
-```python
-# settings.py
-DATABASES = {
-    'default': {  # Primary (read-write)
-        'ENGINE': 'django.db.backends.postgresql',
-        'HOST': 'primary.codepop.rds.amazonaws.com',
-        # ... other settings
-    },
-    'replica1': {  # Read-only
-        'ENGINE': 'django.db.backends.postgresql',
-        'HOST': 'replica1.codepop.rds.amazonaws.com',
-        # ... other settings
-    }
-}
-
-# Database router
-class PrimaryReplicaRouter:
-    def db_for_read(self, model, **hints):
-        return random.choice(['default', 'replica1'])  # Load balance reads
-    
-    def db_for_write(self, model, **hints):
-        return 'default'  # All writes to primary
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **3. Sharding** (Future Consideration for >500 stores):
@@ -4496,82 +3463,24 @@ RefreshToken (opaque)
 ```
 
 **Implementation Pattern**
-```python
-# Authentication flow
-class LoginView(APIView):
-    def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        
-        # Validate input (rate limit, check if user exists)
-        if not validate_input(username, password):
-            log_failed_attempt(request.ip, username)
-            return Response({'error': 'Invalid input'}, status=401)
-        
-        # Authenticate user
-        user = User.objects.filter(username=username).first()
-        if not user or not check_password(password, user.password_hash):
-            log_failed_attempt(request.ip, username)
-            return Response({'error': 'Invalid credentials'}, status=401)
-        
-        # Generate tokens (JWT for mobile, session for web)
-        if request.headers.get('X-Client') == 'mobile':
-            access_token = generate_jwt_token(user, expires_in=900)  # 15 min
-            refresh_token = generate_jwt_token(user, expires_in=604800)  # 7 days
-            return Response({
-                'access_token': access_token,
-                'refresh_token': refresh_token
-            })
-        else:
-            create_session(request, user)
-            return Response({'status': 'authenticated'})
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **RBAC Authorization Decorator**
-```python
-def require_role(*allowed_roles):
-    def decorator(view_func):
-        def wrapper(request, *args, **kwargs):
-            if not request.user.is_authenticated:
-                log_unauthorized_access(request.path, 'not_authenticated')
-                return Response({'error': 'Unauthorized'}, status=401)
-            
-            if request.user.role not in allowed_roles:
-                log_unauthorized_access(request.user.id, request.path)
-                return Response({'error': 'Forbidden'}, status=403)
-            
-            return view_func(request, *args, **kwargs)
-        return wrapper
-    return decorator
-
-# Usage
-@require_role('super', 'manager')
-def delete_user(request, user_id):
-    # Only super & manager can delete users
-    user = User.objects.get(id=user_id)
-    user.delete()
-    return Response(status=204)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Verification**
-```python
-# Test: Unauthorized user cannot access restricted endpoint
-def test_rbac_unauthorized_access():
-    user = create_test_user(role='user')
-    response = client.delete(
-        '/api/users/123',
-        HTTP_AUTHORIZATION=f'Bearer {get_token(user)}'
-    )
-    assert response.status_code == 403
-
-# Test: Correct role can access endpoint
-def test_rbac_authorized_access():
-    user = create_test_user(role='manager')
-    response = client.delete(
-        '/api/users/123',
-        HTTP_AUTHORIZATION=f'Bearer {get_token(user)}'
-    )
-    assert response.status_code in [200, 204]
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -4598,77 +3507,24 @@ def test_rbac_authorized_access():
 ###### Implementation Patterns
 
 **Input Validation**
-```python
-# Use DRF serializers for validation
-class UserSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(
-        min_length=12,
-        validators=[
-            validators.validate_password
-        ]
-    )
-    
-    class Meta:
-        model = User
-        fields = ['username', 'email', 'password', 'role']
-    
-    def validate_username(self, value):
-        # Reject special characters, SQL keywords
-        if not value.replace('_', '').isalnum():
-            raise serializers.ValidationError(
-                "Username must be alphanumeric"
-            )
-        return value
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Authorization Check Pattern**
-```python
-# Check user owns resource before accessing
-class OrderDetailView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request, order_id):
-        order = Order.objects.get(id=order_id)
-        
-        # CRITICAL: Verify user owns order or is admin
-        if order.user_id != request.user.id and \
-           request.user.role not in ['super', 'manager']:
-            log_unauthorized_access(
-                request.user.id,
-                'order_access',
-                order_id
-            )
-            raise PermissionDenied()
-        
-        return Response(OrderSerializer(order).data)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Structured Logging**
-```python
-import json
-import logging
-
-logger = logging.getLogger(__name__)
-
-def log_failed_attempt(user_id, ip_address, reason):
-    logger.warning(json.dumps({
-        'event': 'authentication_failed',
-        'user_id': user_id,
-        'ip': ip_address,
-        'reason': reason,
-        'timestamp': utcnow().isoformat(),
-        'request_id': get_request_id()
-    }))
-
-def log_unauthorized_access(user_id, resource, action):
-    logger.warning(json.dumps({
-        'event': 'unauthorized_access',
-        'user_id': user_id,
-        'resource': resource,
-        'action': action,
-        'timestamp': utcnow().isoformat()
-    }))
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -4678,70 +3534,26 @@ def log_unauthorized_access(user_id, resource, action):
 ###### Encryption at Rest
 
 **Field-Level Encryption** (use `django-cryptography`)
-```python
-from django_cryptography.fields import EncryptedCharField
-from django_cryptography.fields import EncryptedDecimalField
-
-class User(models.Model):
-    email = EncryptedCharField(max_length=255)
-    phone = EncryptedCharField(max_length=20, null=True)
-    geolocation_lat = EncryptedDecimalField(null=True)
-    geolocation_lng = EncryptedDecimalField(null=True)
-    password_hash = models.CharField(max_length=255)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Key Rotation Strategy**
-```python
-# Quarterly key rotation with versioning
-from django.core.management.base import BaseCommand
-
-class Command(BaseCommand):
-    def handle(self, *args, **options):
-        """
-        1. Generate new master key (new version)
-        2. Store old key as inactive
-        3. Re-encrypt all fields with new key (background job)
-        4. Archive old key with audit timestamp
-        5. Destroy old key after 90 days
-        """
-        old_version = get_current_key_version()
-        new_version = old_version + 1
-        new_key = generate_key(version=new_version)
-        
-        store_key(new_key, version=new_version, status='active')
-        
-        # Async task: re-encrypt all EncryptedFields
-        reencrypt_all_fields.delay(
-            old_version=old_version,
-            new_version=new_version
-        )
-        
-        logger.info(json.dumps({
-            'event': 'key_rotation_initiated',
-            'old_version': old_version,
-            'new_version': new_version,
-            'timestamp': utcnow().isoformat()
-        }))
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ###### Encryption in Transit
 
 **Django Settings**
-```python
-# settings.py
-SECURE_SSL_REDIRECT = True  # Force HTTPS
-SESSION_COOKIE_SECURE = True  # Only send over HTTPS
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-
-# CSP Headers
-SECURE_CONTENT_SECURITY_POLICY = {
-    'default-src': ("'self'",),
-    'script-src': ("'self'", "'unsafe-inline'"),
-    'style-src': ("'self'", "'unsafe-inline'"),
-}
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ###### Sensitive Data Lifecycle (Updated for New Features)
@@ -4767,356 +3579,69 @@ SECURE_CONTENT_SECURITY_POLICY = {
 ###### Geolocation Compliance (NEW)
 
 **GDPR Requirements**: Explicit opt-in, 24-hour auto-deletion, data portability
-```python
-class GeolocationConsent(models.Model):
-    """GDPR: Track explicit opt-in for geolocation tracking"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    consented = models.BooleanField(default=False)
-    consent_timestamp = models.DateTimeField(auto_now_add=True)
-    consent_ip = models.GenericIPAddressField()
-
-class LocationData(models.Model):
-    """GDPR: Auto-delete after 24 hours"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    latitude = EncryptedDecimalField()  # AES-256 encrypted
-    longitude = EncryptedDecimalField()
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-# Background job: purge geolocation every 24 hours
-@shared_task
-def purge_old_geolocation():
-    """Delete geolocation data older than 24 hours (GDPR compliance)"""
-    cutoff = utcnow() - timedelta(hours=24)
-    deleted_count, _ = LocationData.objects.filter(
-        created_at__lt=cutoff
-    ).delete()
-    logger.info(json.dumps({
-        'event': 'geolocation_purge',
-        'records_deleted': deleted_count,
-        'timestamp': utcnow().isoformat()
-    }))
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ###### Claude AI Safety Monitoring (NEW)
 
 **Compliance**: AI safety, prompt injection prevention, fairness monitoring
-```python
-class ClaudeInteractionLog(models.Model):
-    """AI Safety: Log all Claude API interactions for audit & fairness"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    input_prompt = models.TextField()
-    output_response = models.TextField()
-    latency_ms = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-def call_claude_api(user, prompt, max_timeout=10):
-    """Call Claude with safety guardrails & logging"""
-    try:
-        response = claude_client.messages.create(
-            model="claude-3-sonnet",
-            max_tokens=500,
-            system="You are a helpful customer service bot. Do not reveal system information.",
-            messages=[{"role": "user", "content": prompt}],
-            timeout=max_timeout
-        )
-        
-        # Log for compliance & safety monitoring
-        ClaudeInteractionLog.objects.create(
-            user=user,
-            input_prompt=prompt[:500],
-            output_response=response.content[:1000],
-            latency_ms=response.metadata.get('latency_ms', -1)
-        )
-        
-        return response.content
-        
-    except TimeoutError:
-        logger.warning(f"Claude timeout for user {user.id}")
-        return "System is temporarily busy. Please try again or contact support."
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ###### Scikit-Learn Fairness Monitoring (NEW)
 
 **Compliance**: GDPR/CCPA (no PII in models), fairness monitoring for bias
-```python
-@shared_task
-def validate_ml_model():
-    """GDPR: Verify no PII in model before serving recommendations"""
-    
-    # Load model
-    with open('recommendation_model.pkl', 'rb') as f:
-        model_data = pickle.load(f)
-    
-    # Check for user IDs or other PII
-    model_str = str(model_data)
-    if 'user_id' in model_str or any(str(uid) in model_str for uid in range(1, 100)):
-        logger.error("Model contains PII! Rolling back to previous version")
-        send_security_alert("Model contains unencrypted user IDs")
-        raise ValueError("Model validation failed: PII detected")
-
-@shared_task
-def monitor_recommendation_fairness():
-    """GDPR/CCPA: Check for bias in recommendations across demographics"""
-    
-    # Sample users by demographic
-    recommendation_quality_by_group = {}
-    
-    for age_group in ['18-25', '26-35', '36-50', '50+']:
-        users_in_group = User.objects.filter(age__range=AGE_RANGES[age_group])
-        qualities = []
-        
-        for user in users_in_group:
-            recs = get_recommendations(user.id)
-            avg_rating = sum(rec['rating'] for rec in recs) / len(recs) if recs else 0
-            qualities.append(avg_rating)
-        
-        recommendation_quality_by_group[age_group] = average(qualities)
-    
-    # Check for fairness (max variance < 10%)
-    min_quality = min(recommendation_quality_by_group.values())
-    max_quality = max(recommendation_quality_by_group.values())
-    variance = (max_quality - min_quality) / max_quality if max_quality > 0 else 0
-    
-    if variance > 0.1:
-        logger.warning(f"Fairness variance detected: {variance:.2%}")
-        send_alert_to_ml_team("Fairness check failed; review training data for bias")
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ###### Firebase Cloud Messaging (FCM) Compliance (NEW)
 
 **Compliance**: CAN-SPAM (opt-out for marketing), consent logging
-```python
-class PushNotificationPreference(models.Model):
-    """Track FCM opt-in/opt-out per notification type"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    order_updates = models.BooleanField(default=True)  # Critical: always on
-    marketing = models.BooleanField(default=False)  # CAN-SPAM: requires opt-in
-    
-    class Meta:
-        indexes = [
-            models.Index(fields=['user']),
-        ]
-
-def send_push_notification(user_id, message_type, **kwargs):
-    """Send FCM notification respecting user preferences"""
-    user = User.objects.get(id=user_id)
-    prefs = user.pushnotificationpreference
-    
-    # Check consent
-    if message_type == 'marketing' and not prefs.marketing:
-        logger.info(f"Skipping marketing notification for user {user_id} (not opted in)")
-        return
-    
-    # Get device token
-    device = UserDevice.objects.filter(user=user).first()
-    if not device:
-        logger.warning(f"No device token for user {user_id}")
-        return
-    
-    try:
-        # Send via FCM
-        response = firebase_messaging.send(
-            messaging.Message(
-                token=device.fcm_token,
-                data={'type': message_type, **kwargs}
-            )
-        )
-        logger.info(f"FCM sent to user {user_id}: {response}")
-        
-    except firebase_admin.exceptions.InvalidArgumentError as e:
-        # Invalid token: remove it
-        logger.warning(f"Invalid FCM token for user {user_id}: {str(e)}")
-        device.delete()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Decentralized System Compliance (NEW)
 
 **Inter-Store Message Signing** (prevent spoofing, ensure authenticity)
-```python
-import hashlib
-import hmac
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes, serialization
-
-class InterStoreMessage(models.Model):
-    """Signed messages between stores for inventory/order sync"""
-    sender_store_id = models.CharField(max_length=50)
-    recipient_store_id = models.CharField(max_length=50)
-    message_type = models.CharField(max_length=50)  # 'inventory_sync', 'order_update', etc.
-    payload = models.JSONField()  # Encrypted data
-    signature = models.BinaryField()  # HMAC-SHA256 signature
-    nonce = models.CharField(max_length=64)  # Prevent replay attacks
-    created_at = models.DateTimeField(auto_now_add=True)
-    processed = models.BooleanField(default=False)
-
-def sign_inter_store_message(sender_store_id, payload, private_key):
-    """Sign message with store's private key"""
-    # Create JSON payload
-    message_json = json.dumps(payload, sort_keys=True)
-    
-    # Sign with HMAC-SHA256
-    signature = hmac.new(
-        private_key.encode(),
-        message_json.encode(),
-        hashlib.sha256
-    ).digest()
-    
-    # Generate nonce to prevent replay attacks
-    nonce = secrets.token_hex(32)
-    
-    return {
-        'payload': payload,
-        'signature': signature.hex(),
-        'nonce': nonce,
-        'timestamp': utcnow().isoformat()
-    }
-
-def verify_inter_store_message(message, sender_store_id, public_key):
-    """Verify message signature & nonce"""
-    
-    # Verify signature
-    expected_signature = hmac.new(
-        public_key.encode(),
-        json.dumps(message['payload'], sort_keys=True).encode(),
-        hashlib.sha256
-    ).digest()
-    
-    if not hmac.compare_digest(expected_signature.hex(), message['signature']):
-        logger.error(f"Signature verification failed from store {sender_store_id}")
-        return False
-    
-    # Check nonce (prevent replay)
-    if InterStoreMessage.objects.filter(nonce=message['nonce']).exists():
-        logger.error(f"Duplicate nonce from store {sender_store_id}")
-        return False
-    
-    # Check timestamp (message not older than 5 minutes)
-    msg_time = datetime.fromisoformat(message['timestamp'])
-    if (utcnow() - msg_time).total_seconds() > 300:
-        logger.error(f"Stale message from store {sender_store_id}")
-        return False
-    
-    return True
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### GDPR Compliance
 
 **Data Subject Access Request (DSAR) Endpoint**
-```python
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-
-class GDPRDataExportView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request):
-        """
-        Export user's personal data as JSON (right to access)
-        """
-        user = request.user
-        data = {
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'created_at': user.created_at.isoformat()
-            },
-            'orders': [
-                {
-                    'id': o.id,
-                    'total': float(o.total),
-                    'created_at': o.created_at.isoformat()
-                }
-                for o in user.orders.all()
-            ],
-            'preferences': list(
-                user.preferences.values('drink_id', 'rating')
-            ),
-            'audit_log': list(
-                AuditLog.objects.filter(user=user).values(
-                    'event', 'timestamp'
-                )
-            )
-        }
-        return Response(data)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Right to Erasure (Deletion) Flow**
-```python
-class GDPRDeleteUserView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def delete(self, request):
-        """
-        Delete user and all associated data (right to erasure)
-        """
-        user = request.user
-        user_id = user.id
-        
-        # 1. Log deletion request
-        AuditLog.objects.create(
-            user_id=user_id,
-            event='user_deletion_requested',
-            timestamp=utcnow()
-        )
-        
-        # 2. Async task: cascade delete
-        async_delete_user.delay(user_id=user_id)
-        
-        return Response({'status': 'deletion_in_progress'})
-
-@shared_task
-def async_delete_user(user_id):
-    """Delete all user data"""
-    user = User.objects.get(id=user_id)
-    
-    # Cascade delete with audit trail
-    orders = Order.objects.filter(user=user)
-    for order in orders:
-        AuditLog.objects.create(
-            event='order_deleted',
-            user_id=user_id,
-            timestamp=utcnow()
-        )
-        order.delete()
-    
-    preferences = Preference.objects.filter(user=user)
-    preferences.delete()
-    
-    user.delete()
-    AuditLog.objects.create(
-        event='user_deleted',
-        user_id=user_id,
-        timestamp=utcnow()
-    )
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Consent Management**
-```python
-class ConsentLog(models.Model):
-    CONSENT_TYPES = [
-        ('marketing', 'Marketing'),
-        ('analytics', 'Analytics'),
-        ('third_party', 'Third Party'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    consent_type = models.CharField(max_length=20, choices=CONSENT_TYPES)
-    given = models.BooleanField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-    ip_address = models.GenericIPAddressField()
-    user_agent = models.TextField()
-
-# Every opt-in/opt-out is audited
-def update_marketing_consent(user, consent):
-    ConsentLog.objects.create(
-        user=user,
-        consent_type='marketing',
-        given=consent,
-        ip_address=get_client_ip(request),
-        user_agent=request.META.get('HTTP_USER_AGENT')
-    )
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### CCPA Compliance
@@ -5141,61 +3666,17 @@ Similar to GDPR with CA-specific language:
 ### Database Query Optimization
 
 **Indexing Strategy**
-```python
-class User(models.Model):
-    username = models.CharField(
-        max_length=150,
-        db_index=True
-    )
-    email = EncryptedCharField(db_index=True)
-    role = models.CharField(
-        max_length=20,
-        choices=[...],
-        db_index=True
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        db_index=True
-    )
-    
-    class Meta:
-        indexes = [
-            models.Index(fields=['email', 'is_active']),
-            models.Index(fields=['-created_at']),
-        ]
-
-class Order(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        db_index=True
-    )
-    status = models.CharField(max_length=20, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Query Optimization Patterns**
-```python
-# BAD: N+1 queries
-orders = Order.objects.all()
-for order in orders:
-    print(order.user.email)  # One query per order!
-
-# GOOD: Select related (foreign key)
-orders = Order.objects.select_related('user')
-
-# GOOD: Prefetch related (reverse FK)
-users = User.objects.prefetch_related('orders')
-
-# GOOD: Annotate for counts
-users = User.objects.annotate(
-    order_count=Count('orders')
-)
-
-# GOOD: Filter in database, not Python
-recent_orders = Order.objects.filter(
-    created_at__gte=utcnow() - timedelta(days=7)
-)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Connection Pooling** (pgbouncer)
@@ -5219,310 +3700,58 @@ server_idle_timeout = 600
 ### Async Task Processing
 
 **Payment Processing with Retries**
-```python
-from celery import shared_task
-from celery.utils.log import get_task_logger
-import stripe
-
-logger = get_task_logger(__name__)
-
-@shared_task(
-    autoretry_for=(stripe.error.StripeError,),
-    retry_kwargs={'max_retries': 3},
-    bind=True
-)
-def process_payment(self, order_id):
-    """
-    Retry logic: exponential backoff (5s → 10s → 20s)
-    """
-    order = Order.objects.get(id=order_id)
-    
-    try:
-        charge = stripe.Charge.create(
-            amount=int(order.total * 100),
-            currency='usd',
-            source=order.stripe_token,
-            idempotency_key=f"order_{order_id}"
-        )
-        
-        order.status = 'paid'
-        order.stripe_charge_id = charge.id
-        order.save()
-        
-        logger.info(f"Payment succeeded for order {order_id}")
-        
-    except stripe.error.StripeError as exc:
-        logger.error(f"Payment failed for order {order_id}: {str(exc)}")
-        # Celery will retry automatically
-        raise self.retry(exc=exc, countdown=5 * (2 ** self.request.retries))
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Caching Strategy
 
 **Redis Caching with TTL**
-```python
-from django.views.decorators.cache import cache_page
-from django.core.cache import cache
-
-# Cache view output (60 seconds)
-@cache_page(60)
-def get_trending_drinks(request):
-    return Response(Drink.objects.filter(trending=True).values())
-
-# Cache in code (1 hour)
-def get_user_recommendations(user_id):
-    cache_key = f'recommendations:{user_id}'
-    
-    # Try cache first
-    recommendations = cache.get(cache_key)
-    if recommendations:
-        return recommendations
-    
-    # Compute if not cached
-    recommendations = ml_model.recommend(user_id)
-    cache.set(cache_key, recommendations, timeout=3600)
-    
-    return recommendations
-
-# Invalidate on update
-def update_user_preference(user, preference):
-    preference.save()
-    cache.delete(f'recommendations:{user.id}')
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Concurrent Order Processing
 
 **Optimistic Locking**
-```python
-from django.db.models import F
-
-class Inventory(models.Model):
-    drink = models.ForeignKey(Drink, on_delete=models.CASCADE)
-    quantity = models.IntegerField()
-    version = models.IntegerField(default=0)
-
-def place_order(user, drink_id, quantity):
-    """
-    Update inventory with optimistic locking
-    """
-    inventory = Inventory.objects.get(drink_id=drink_id)
-    original_version = inventory.version
-    
-    if inventory.quantity < quantity:
-        raise ValueError("Out of stock")
-    
-    # Try to update
-    updated = Inventory.objects.filter(
-        id=inventory.id,
-        version=original_version
-    ).update(
-        quantity=F('quantity') - quantity,
-        version=F('version') + 1
-    )
-    
-    if not updated:
-        raise ValueError("Concurrent modification: retry order")
-    
-    # Create order
-    Order.objects.create(
-        user=user,
-        drink_id=drink_id,
-        quantity=quantity
-    )
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### External Service Integration Performance (NEW)
 
 **Stripe Payment Processing**
-```python
-@shared_task(
-    autoretry_for=(stripe.error.StripeError,),
-    retry_kwargs={'max_retries': 3},
-    bind=True
-)
-def process_stripe_payment(self, order_id):
-    """Process payment with retry logic & webhook fallback"""
-    order = Order.objects.get(id=order_id)
-    
-    try:
-        charge = stripe.Charge.create(
-            amount=int(order.total * 100),
-            currency='usd',
-            source=order.stripe_token,
-            idempotency_key=f"order_{order_id}"  # Prevent double-charging
-        )
-        
-        order.payment_status = 'completed'
-        order.stripe_charge_id = charge.id
-        order.save()
-        
-    except stripe.error.RateLimitError:
-        # Stripe is rate limiting: retry with exponential backoff
-        raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
-    
-    except stripe.error.APIError as exc:
-        logger.error(f"Stripe API error for order {order_id}: {str(exc)}")
-        raise self.retry(exc=exc, countdown=5 * (2 ** self.request.retries))
-
-# Webhook handler: verify Stripe signature & update order
-@csrf_exempt
-def stripe_webhook(request):
-    """Handle Stripe webhook (payment confirmation)"""
-    payload = request.body
-    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
-    
-    # Verify Stripe webhook signature
-    try:
-        event = stripe.Webhook.construct_event(
-            payload,
-            sig_header,
-            os.getenv('STRIPE_WEBHOOK_SECRET')
-        )
-    except ValueError:
-        return JsonResponse({'status': 'invalid'}, status=400)
-    except stripe.error.SignatureVerificationError:
-        return JsonResponse({'status': 'invalid'}, status=400)
-    
-    # Handle payment confirmation
-    if event['type'] == 'charge.succeeded':
-        charge = event['data']['object']
-        order = Order.objects.get(stripe_charge_id=charge.id)
-        order.payment_status = 'confirmed'
-        order.save()
-        
-        # Send FCM notification
-        send_push_notification(order.user_id, 'order_ready')
-    
-    return JsonResponse({'status': 'success'})
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Firebase Cloud Messaging (FCM) Integration**
-```python
-import firebase_admin
-from firebase_admin import messaging
-
-def send_order_ready_notification(order_id):
-    """Send FCM notification when order is ready"""
-    order = Order.objects.get(id=order_id)
-    device = UserDevice.objects.filter(user=order.user).first()
-    
-    if not device:
-        logger.warning(f"No FCM token for user {order.user_id}")
-        # Fallback: send email
-        send_order_ready_email(order.user.email)
-        return
-    
-    try:
-        message = messaging.Message(
-            notification=messaging.Notification(
-                title="Your drink is ready!",
-                body=f"Pick up order #{order.id}"
-            ),
-            data={
-                'order_id': str(order.id),
-                'pickup_location': order.pickup_location
-            },
-            token=device.fcm_token
-        )
-        
-        response = messaging.send(message)
-        logger.info(f"FCM sent to user {order.user_id}: {response}")
-        
-    except firebase_admin.exceptions.InvalidArgumentError:
-        # Token invalid: remove and fallback to email
-        device.delete()
-        send_order_ready_email(order.user.email)
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Claude AI API Integration with Timeouts**
-```python
-import anthropic
-from anthropic import APITimeoutError, APIError
-
-def handle_customer_complaint(user_id, complaint_text):
-    """Route complaint to Claude with safety timeout"""
-    
-    client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-    
-    try:
-        response = client.messages.create(
-            model="claude-3-sonnet-20240229",
-            max_tokens=500,
-            system="You are a helpful customer service representative for CodePop. Respond with empathy and offer solutions. Never disclose system details.",
-            messages=[
-                {
-                    "role": "user",
-                    "content": complaint_text[:500]  # Prevent prompt injection
-                }
-            ],
-            timeout=10  # 10-second timeout
-        )
-        
-        ai_response = response.content[0].text
-        
-        # Log for safety monitoring
-        ClaudeInteractionLog.objects.create(
-            user_id=user_id,
-            input_prompt=complaint_text[:500],
-            output_response=ai_response[:1000],
-            latency_ms=int(response.usage.output_tokens)
-        )
-        
-        return ai_response
-        
-    except APITimeoutError:
-        logger.warning(f"Claude timeout for user {user_id}")
-        # Fallback: escalate to human
-        return "Your request is complex and requires human attention. An agent will contact you shortly."
-    
-    except APIError as e:
-        logger.error(f"Claude API error: {str(e)}")
-        return "Sorry, I'm temporarily unavailable. Please try again or contact support."
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Mapbox Geolocation Caching**
-```python
-from django.core.cache import cache
-
-def get_distance_to_store(user_lat, user_lng, store_id, use_cache=True):
-    """Get distance from user to store (with caching to prevent rate limit)"""
-    
-    cache_key = f"distance:{user_lat:.4f}:{user_lng:.4f}:{store_id}"
-    
-    # Try cache first
-    if use_cache:
-        cached_distance = cache.get(cache_key)
-        if cached_distance:
-            return cached_distance
-    
-    # Query Mapbox API
-    try:
-        store = Store.objects.get(id=store_id)
-        
-        response = requests.get(
-            f"https://api.mapbox.com/directions/geojson",
-            params={
-                'coordinates': f"{user_lng},{user_lat};{store.longitude},{store.latitude}",
-                'access_token': os.getenv('MAPBOX_PUBLIC_TOKEN')
-            },
-            timeout=3
-        )
-        
-        if response.status_code == 200:
-            distance = response.json()['routes'][0]['distance']
-            
-            # Cache for 1 hour
-            cache.set(cache_key, distance, timeout=3600)
-            
-            return distance
-        else:
-            logger.warning(f"Mapbox error: {response.status_code}")
-            # Fallback to time-based pickup
-            return None
-            
-    except requests.Timeout:
-        logger.warning(f"Mapbox timeout for user at ({user_lat}, {user_lng})")
-        return None
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Decentralized Architecture & Load Balancing
@@ -5577,50 +3806,10 @@ Priority: critical services (payment, inventory) scale first
 ```
 
 **Decentralized Data Synchronization Performance**
-```python
-@shared_task
-def sync_inventory_with_regional_peers():
-    """Periodically sync inventory with peer stores in same region"""
-    
-    local_store = Store.objects.get(id=os.getenv('STORE_ID'))
-    peer_stores = Store.objects.filter(region=local_store.region).exclude(id=local_store.id)
-    
-    for peer in peer_stores:
-        try:
-            # Get local inventory snapshot
-            inventory_snapshot = Inventory.objects.filter(
-                store=local_store
-            ).values('item_name', 'quantity', 'last_updated')
-            
-            # Sign message
-            signed_message = sign_inter_store_message(
-                sender_store_id=local_store.id,
-                payload={'inventory': list(inventory_snapshot)},
-                private_key=os.getenv('STORE_PRIVATE_KEY')
-            )
-            
-            # Send to peer with 5-second timeout
-            response = requests.post(
-                f"{peer.api_url}/api/inter-store/inventory-sync",
-                json=signed_message,
-                timeout=5,
-                verify=True  # Verify SSL certificate
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Inventory synced with {peer.store_name}")
-            else:
-                logger.warning(f"Sync failed with {peer.store_name}: {response.status_code}")
-                
-        except requests.Timeout:
-            logger.warning(f"Timeout syncing with {peer.store_name}")
-            # Retry in background
-            sync_inventory_with_peer.apply_async(
-                args=[peer.id],
-                countdown=60
-            )
-        except Exception as e:
-            logger.error(f"Error syncing with {peer.store_name}: {str(e)}")
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ---
@@ -5822,522 +4011,101 @@ Auth  Perm  Data  Valid Crypt Cache Async Error
 ### Unit Test Patterns
 
 **Authentication Tests**
-```python
-import pytest
-from django.test import Client
-
-@pytest.mark.django_db
-def test_login_with_valid_credentials():
-    from backend.models import User
-    
-    user = User.objects.create_user(
-        username='alice',
-        password='SecurePass123'
-    )
-    
-    client = Client()
-    response = client.post('/api/auth/login/', {
-        'username': 'alice',
-        'password': 'SecurePass123'
-    })
-    
-    assert response.status_code == 200
-    assert 'access_token' in response.json()
-
-@pytest.mark.django_db
-def test_login_with_invalid_password():
-    from backend.models import User
-    
-    User.objects.create_user(
-        username='alice',
-        password='SecurePass123'
-    )
-    
-    client = Client()
-    response = client.post('/api/auth/login/', {
-        'username': 'alice',
-        'password': 'WrongPassword'
-    })
-    
-    assert response.status_code == 401
-
-@pytest.mark.django_db
-def test_account_lockout_after_5_attempts():
-    from backend.models import User
-    
-    user = User.objects.create_user(username='alice')
-    client = Client()
-    
-    for _ in range(5):
-        client.post('/api/auth/login/', {
-            'username': 'alice',
-            'password': 'WrongPassword'
-        })
-    
-    response = client.post('/api/auth/login/', {
-        'username': 'alice',
-        'password': 'SecurePass123'
-    })
-    
-    assert response.status_code == 429
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Authorization (RBAC) Tests**
-```python
-@pytest.mark.django_db
-def test_user_cannot_delete_other_user():
-    from backend.models import User
-    
-    user_a = User.objects.create_user(
-        username='alice',
-        role='user'
-    )
-    user_b = User.objects.create_user(
-        username='bob',
-        role='user'
-    )
-    
-    client = Client()
-    token = get_jwt_token(user_a)
-    
-    response = client.delete(
-        f'/api/users/{user_b.id}/',
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    
-    assert response.status_code == 403
-
-@pytest.mark.django_db
-def test_manager_can_delete_user():
-    from backend.models import User
-    
-    manager = User.objects.create_user(
-        username='alice',
-        role='manager'
-    )
-    user = User.objects.create_user(
-        username='bob',
-        role='user'
-    )
-    
-    client = Client()
-    token = get_jwt_token(manager)
-    
-    response = client.delete(
-        f'/api/users/{user.id}/',
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    
-    assert response.status_code == 204
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Data Protection Tests**
-```python
-@pytest.mark.django_db
-def test_email_encrypted_in_database():
-    from backend.models import User
-    from django.db import connection
-    
-    user = User.objects.create_user(
-        username='alice',
-        email='alice@example.com'
-    )
-    
-    # Read raw from DB
-    with connection.cursor() as cursor:
-        cursor.execute(
-            'SELECT email FROM auth_user WHERE id = %s',
-            [user.id]
-        )
-        encrypted_email = cursor.fetchone()[0]
-    
-    # Should be encrypted (not plaintext)
-    assert encrypted_email != 'alice@example.com'
-    assert encrypted_email.startswith('$enc$')
-
-@pytest.mark.django_db
-def test_password_not_logged():
-    """Ensure passwords don't appear in logs"""
-    import logging
-    
-    with pytest.LogCaptureFixture.for_logger(
-        logging.getLogger('backend')
-    ) as logs:
-        client = Client()
-        response = client.post('/api/auth/login/', {
-            'username': 'alice',
-            'password': 'SecurePass123'
-        })
-    
-    for record in logs.records:
-        assert 'SecurePass123' not in record.message
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Integration Test Patterns
 
 **API Endpoint Testing**
-```python
-@pytest.mark.django_db
-def test_create_order_with_mocked_stripe():
-    from unittest.mock import patch
-    from backend.models import User, Drink, Order
-    
-    user = User.objects.create_user(username='alice')
-    drink = Drink.objects.create(name='Cola', price=2.50)
-    
-    with patch('stripe.Charge.create') as mock_charge:
-        mock_charge.return_value = {
-            'id': 'ch_123',
-            'status': 'succeeded'
-        }
-        
-        client = Client()
-        token = get_jwt_token(user)
-        
-        response = client.post(
-            '/api/orders/',
-            {
-                'drink_id': drink.id,
-                'quantity': 2,
-                'payment_token': 'tok_visa'
-            },
-            HTTP_AUTHORIZATION=f'Bearer {token}'
-        )
-        
-        assert response.status_code == 201
-        assert mock_charge.called
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Database Integration Test**
-```python
-@pytest.mark.django_db
-def test_order_creation_updates_inventory():
-    from backend.models import User, Drink, Order, Inventory
-    
-    drink = Drink.objects.create(name='Cola', price=2.50)
-    inventory = Inventory.objects.create(drink=drink, quantity=100)
-    user = User.objects.create_user(username='alice')
-    
-    client = Client()
-    token = get_jwt_token(user)
-    
-    response = client.post(
-        '/api/orders/',
-        {
-            'drink_id': drink.id,
-            'quantity': 5
-        },
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    
-    inventory.refresh_from_db()
-    assert inventory.quantity == 95
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### E2E Test Patterns
 
 **Critical User Flow**
-```python
-@pytest.mark.django_db
-def test_end_to_end_order_flow():
-    from backend.models import User, Drink
-    
-    # 1. Login
-    client = Client()
-    response = client.post('/api/auth/login/', {
-        'username': 'alice',
-        'password': 'SecurePass123'
-    })
-    token = response.json()['access_token']
-    
-    # 2. Browse drinks
-    response = client.get(
-        '/api/drinks/',
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    assert response.status_code == 200
-    drinks = response.json()
-    assert len(drinks) > 0
-    
-    # 3. Add to cart
-    response = client.post(
-        '/api/cart/',
-        {
-            'drink_id': drinks[0]['id'],
-            'quantity': 2
-        },
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    assert response.status_code == 201
-    
-    # 4. Checkout (place order)
-    response = client.post(
-        '/api/orders/',
-        {
-            'payment_token': 'tok_visa'
-        },
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    assert response.status_code == 201
-    order = response.json()
-    
-    # 5. Verify order status
-    response = client.get(
-        f'/api/orders/{order["id"]}/',
-        HTTP_AUTHORIZATION=f'Bearer {token}'
-    )
-    assert response.status_code == 200
-    assert response.json()['status'] == 'pending'
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Integration Test Patterns (NEW - External Services & Decentralized)
 
 **Stripe Webhook Handling**
-```python
-@pytest.mark.django_db
-def test_stripe_webhook_payment_confirmation():
-    from backend.models import Order, Payment
-    
-    order = Order.objects.create(
-        user=create_test_user(),
-        total=10.00,
-        stripe_token='tok_visa',
-        payment_status='pending'
-    )
-    
-    # Simulate Stripe webhook
-    webhook_payload = {
-        'type': 'charge.succeeded',
-        'data': {
-            'object': {
-                'id': 'ch_123',
-                'amount': 1000,
-                'status': 'succeeded'
-            }
-        }
-    }
-    
-    response = client.post(
-        '/api/webhooks/stripe/',
-        data=json.dumps(webhook_payload),
-        content_type='application/json',
-        HTTP_STRIPE_SIGNATURE='sig_test'
-    )
-    
-    assert response.status_code == 200
-    order.refresh_from_db()
-    assert order.payment_status == 'confirmed'
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Inter-Store Message Signing & Verification**
-```python
-@pytest.mark.django_db
-def test_inter_store_message_signature_verification():
-    from backend.security import sign_inter_store_message, verify_inter_store_message
-    
-    # Store A sends inventory to Store B
-    sender_store = Store.objects.create(id='store_a', region='us_east')
-    recipient_store = Store.objects.create(id='store_b', region='us_east')
-    
-    payload = {
-        'inventory': [
-            {'item_name': 'Coke Syrup', 'quantity': 100},
-            {'item_name': 'Vanilla Syrup', 'quantity': 50}
-        ]
-    }
-    
-    # Sign message
-    signed = sign_inter_store_message('store_a', payload, 'private_key_a')
-    
-    # Verify signature (with public key)
-    is_valid = verify_inter_store_message(signed, 'store_a', 'public_key_a')
-    assert is_valid == True
-    
-    # Tampering should fail
-    signed['payload']['inventory'][0]['quantity'] = 999
-    is_valid = verify_inter_store_message(signed, 'store_a', 'public_key_a')
-    assert is_valid == False
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **CSV Import Validation**
-```python
-@pytest.mark.django_db
-def test_csv_supply_import_validation():
-    import csv
-    import tempfile
-    
-    # Create test CSV
-    csv_data = """date,item_name,quantity_used,store_location,region
-2026-02-25,Coke Syrup,50,123 Main St,us_east
-2026-02-25,Vanilla Syrup,30,123 Main St,us_east
-2026-02-25,Ice,100,123 Main St,us_east"""
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
-        f.write(csv_data)
-        csv_path = f.name
-    
-    # Import via logistics manager endpoint
-    manager = create_test_user(role='logistics_manager')
-    
-    with open(csv_path, 'rb') as f:
-        response = client.post(
-            '/api/supply/import/',
-            {'csv_file': f},
-            HTTP_AUTHORIZATION=f'Bearer {get_token(manager)}'
-        )
-    
-    assert response.status_code == 201
-    assert SupplyUsageLog.objects.count() == 3
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Claude API Timeout & Fallback**
-```python
-@pytest.mark.django_db
-def test_claude_complaint_handler_timeout():
-    from unittest.mock import patch, MagicMock
-    from anthropic import APITimeoutError
-    
-    user = create_test_user()
-    complaint = "I didn't get my drink!"
-    
-    with patch('anthropic.Anthropic.messages.create') as mock_claude:
-        # Simulate timeout
-        mock_claude.side_effect = APITimeoutError("Request timed out")
-        
-        response = client.post(
-            '/api/complaints/',
-            {'text': complaint},
-            HTTP_AUTHORIZATION=f'Bearer {get_token(user)}'
-        )
-    
-    assert response.status_code == 201
-    # Should fallback gracefully
-    assert 'human attention' in response.json()['ai_response'].lower()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Geolocation Purge Compliance (GDPR)**
-```python
-@pytest.mark.django_db
-def test_geolocation_24hour_purge():
-    from django.utils import timezone
-    
-    user = create_test_user()
-    order = Order.objects.create(user=user)
-    
-    # Create old geolocation data (25 hours old)
-    old_time = timezone.now() - timedelta(hours=25)
-    LocationData.objects.create(
-        user=user,
-        order=order,
-        latitude=40.7128,
-        longitude=-74.0060,
-        created_at=old_time
-    )
-    
-    # Create recent data (1 hour old)
-    recent_time = timezone.now() - timedelta(hours=1)
-    LocationData.objects.create(
-        user=user,
-        order=order,
-        latitude=40.7128,
-        longitude=-74.0060,
-        created_at=recent_time
-    )
-    
-    # Run purge task
-    purge_old_geolocation()
-    
-    # Old data should be deleted, recent data should remain
-    assert LocationData.objects.filter(created_at=old_time).count() == 0
-    assert LocationData.objects.filter(created_at=recent_time).count() == 1
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 **Firebase FCM Fallback to Email**
-```python
-@pytest.mark.django_db
-def test_fcm_fallback_to_email():
-    from unittest.mock import patch
-    import firebase_admin
-    
-    user = create_test_user()
-    order = Order.objects.create(user=user)
-    
-    with patch('firebase_admin.messaging.send') as mock_fcm:
-        # Simulate invalid FCM token
-        mock_fcm.side_effect = firebase_admin.exceptions.InvalidArgumentError("Invalid token")
-        
-        send_order_ready_notification(order.id)
-        
-        # Should fallback to email
-        assert len(mail.outbox) == 1
-        assert 'ready' in mail.outbox[0].subject.lower()
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Performance Test Pattern (Locust) - Updated for Multi-Store
 
-```python
-from locust import HttpUser, task, between
-
-class CodePopCustomer(HttpUser):
-    """Simulate customer behavior across stores"""
-    wait_time = between(1, 3)
-    token = None
-    store_id = None
-    
-    @task(3)
-    def browse_drinks(self):
-        self.client.get(
-            '/api/drinks/',
-            headers={'Authorization': f'Bearer {self.token}'}
-        )
-    
-    @task(1)
-    def place_order(self):
-        self.client.post(
-            '/api/orders/',
-            json={
-                'drink_id': 1,
-                'quantity': 1,
-                'payment_token': 'tok_visa'
-            },
-            headers={'Authorization': f'Bearer {self.token}'}
-        )
-    
-    def on_start(self):
-        # Login
-        response = self.client.post(
-            '/api/auth/login/',
-            json={'username': 'load_test_user', 'password': 'SecurePass123'}
-        )
-        self.token = response.json()['access_token']
-
-class CodePopLogisticsManager(HttpUser):
-    """Simulate logistics manager (supply coordination)"""
-    wait_time = between(5, 15)
-    token = None
-    
-    @task(1)
-    def check_regional_inventory(self):
-        self.client.get(
-            '/api/supply-hub/inventory/',
-            headers={'Authorization': f'Bearer {self.token}'}
-        )
-    
-    @task(1)
-    def upload_demand_forecast(self):
-        # Simulate CSV upload
-        self.client.post(
-            '/api/supply/import/',
-            {'csv_file': generate_test_csv()},
-            headers={'Authorization': f'Bearer {self.token}'}
-        )
-    
-    def on_start(self):
-        response = self.client.post(
-            '/api/auth/login/',
-            json={'username': 'logistics_manager', 'password': 'SecurePass123'}
-        )
-        self.token = response.json()['access_token']
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### CI/CD Integration
@@ -6421,70 +4189,16 @@ locust -f backend/tests/load_test.py --users=100 --run-time=5m --headless
   Implements: Test suite, CI/CD, load/security tests
 ```
 
-**Suggested Timeline**:
-1. **Week 1-2**: 5.1 (auth) + 5.2 (security controls)
-2. **Week 3**: 5.3 (data protection) + 5.4 (compliance)
-3. **Week 4**: 5.5 (performance) + 5.6 (monitoring)
-4. **Week 5**: 5.7 (testing) + refinement
 
 ---
 
 ## Quick-Start Guide
 
 ### Key Django Settings to Update
-```python
-# settings.py
-
-# Security
-SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = False
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
-
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000
-
-# Authentication
-AUTH_USER_MODEL = 'auth.CustomUser'
-
-# Encryption
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY')
-
-# Caching (Redis)
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-        'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'}
-    }
-}
-
-# Celery
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
-
-# Logging
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(timestamp)s %(level)s %(message)s'
-        }
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'json'
-        }
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO'
-    }
-}
+```text
+Pseudocode:
+- Follow the workflow described in the surrounding subsection.
+- Keep validation, persistence, and error handling in separate layers.
 ```
 
 ### Install Dependencies
@@ -6567,7 +4281,6 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
 - **Stripe Python SDK**: Payment processing
 - **Mapbox GL JS**: Mapping and geolocation
 - **Scikit-Learn**: Machine learning
-- **Anthropic SDK**: Claude API integration
 - **Firebase Admin SDK**: Push notifications
 - **PostgreSQL adapter (psycopg2)**: Database connectivity
 
@@ -6599,21 +4312,13 @@ locust -f backend/tests/load_test.py --users=100 --hatch-rate=10 --headless
    - Fallback: Email notifications
    - Alternatives considered: OneSignal, AWS SNS
 
-4. **Claude AI (Anthropic)**
-   - Integration type: REST API
-   - Authentication: API key
-   - Features: Complaint handling, drink recommendations
-   - Rate limits: 50K tokens/min
-   - Timeout handling: 10-second timeout, fallback to canned responses
-   - Alternatives considered: GPT-4, local models
-
-5. **Scikit-Learn**
+4. **Scikit-Learn**
    - Integration type: In-process Python library
    - Features: Content-based filtering, demand forecasting
    - Model storage: Serialized models on disk
    - Alternatives considered: TensorFlow, cloud ML services
 
-6. **Django Email (SMTP)**
+5. **Django Email (SMTP)**
    - Integration type: SMTP protocol
    - Provider: SendGrid (SMTP); alternatives: AWS SES, Mailgun
    - Features: Account verification, password reset

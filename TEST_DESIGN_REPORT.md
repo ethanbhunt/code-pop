@@ -2,24 +2,23 @@
 
 ## 1. Overview and Testing Philosophy
 
-CodePop is a full-stack custom beverage ordering and management application consisting of three main components:
+CodePop is a multi-app custom beverage ordering and management application consisting of three active runtime areas:
 
-- **Backend API** (Django + Django REST Framework, PostgreSQL)
 - **Mobile App** (React Native / Expo)
-- **Admin Dashboard** (Next.js / TypeScript)
+- **Admin Dashboard** (Next.js / TypeScript / next-auth)
+- **OrbitDB backend** (OrbitDB, libp2p, Express, Helia)
 
-Our testing approach centers on **API-level integration tests** for the backend, where the bulk of our business logic resides. The backend handles user authentication, drink management, order processing, inventory control, payment integration, AI-powered recommendations, and a multi-location supply network. Because nearly every user-facing action flows through these API endpoints, thorough backend testing gives us the highest confidence-to-effort ratio.
+Django and the Python toolchain still appear in the workspace and in smoke-testing workflows, but they should be described as supporting validation rather than as the sole backend stack.
 
-Frontend testing is lighter: the mobile app has a Jest-based smoke test for bootstrap behavior, and the dashboard has Vitest configured but is still in early coverage. We compensate for thinner frontend unit tests with manual end-to-end walkthroughs described in Section 5.
+Our testing approach centers on **integration tests** for the backend, where the bulk of the business logic resides. The backend handles user authentication, drink management, order processing, inventory control, payment integration, AI-powered recommendations, and a multi-location supply network. Because nearly every user-facing action flows through these API endpoints, thorough backend testing gives us the highest confidence-to-effort ratio.
+
+Frontend testing is lighter: the mobile app has Jest-based bootstrap coverage, and the dashboard has Vitest and Playwright tooling with growing coverage. We compensate for thinner UI unit tests with manual end-to-end walkthroughs described in Section 5.
 
 ---
 
 ## 2. Testing Approach by Component
 
-### 2.1 Backend (Django) - Primary Test Suite
-
-**Framework:** Django `TestCase` and DRF `APITestCase`
-**Location:** `codepop_backend/backend/tests.py` and three supplementary modules
+### 2.1 Backend - Primary Test Suite
 
 We organized backend tests around the major domain areas of the application:
 
@@ -31,8 +30,6 @@ We organized backend tests around the major domain areas of the application:
 | `NotificationTests` | `tests.py` | 9 | Notification CRUD, time-range filtering, user isolation, auth enforcement |
 | `OrderTests` | `tests.py` | 8 | Order creation, retrieval by user, deletion, adding/removing drinks from orders |
 | `RevenueTests` | `tests.py` | 5 | Revenue record creation, update after drink deletion, zero-amount edge case |
-| `AITests` | `tests.py` | 3+ | AI drink generation, recommendation accuracy |
-| `InventoryAuditSecurityTests` | `test_inventory_audit.py` | 4 | Role-based access: customers blocked from inventory mutation and audit log access; managers can mutate and read audit trails |
 | `OrderFulfillmentTests` | `test_order_fulfillment.py` | 3 | End-to-end fulfillment flow: inventory deduction on fulfillment, rollback on insufficient stock, auth required |
 | `SupplyHubServiceTests` | `test_supply_network.py` | 2 | Nearest-hub geolocation lookup, supply request creates transfer and deducts hub inventory |
 | `SupplyHubApiTests` | `test_supply_network.py` | 4 | REST API for supply hubs, hub inventory retrieval, stock transfer creation and status updates |
@@ -42,9 +39,6 @@ We organized backend tests around the major domain areas of the application:
 #### Key patterns in our backend tests
 
 - **Authentication is tested throughout.** Almost every test class includes a helper `authenticate()` method and tests for both authenticated and unauthenticated access. Notification creation without auth returns 401; drink creation is intentionally open (returns 201).
-- **Role-based access control.** The `InventoryAuditSecurityTests` class specifically validates that customers (non-staff) cannot modify inventory or view audit logs, while managers (staff) can.
-- **Edge cases and error paths.** We test out-of-stock deductions, insufficient stock, non-existent items, invalid preference values (e.g., "Mountain Dew" vs. the canonical "Mtn. Dew"), and invalid Ice/Size enum values.
-- **Transactional integrity.** `OrderFulfillmentTests.test_fulfill_rolls_back_on_insufficient_stock` verifies that when one ingredient is missing, no partial deduction occurs across any inventory items. This was one of the more important tests to get right because a bug here would silently drain inventory.
 
 ### 2.2 Mobile App (React Native)
 
@@ -55,43 +49,26 @@ The mobile test suite currently has a single test class (`App bootstrap`) that v
 
 - AsyncStorage is initialized with an empty checkout cart when no prior data exists
 
-All page components and navigation dependencies are mocked out, isolating the bootstrap logic. This is a smoke test, not comprehensive coverage of the mobile UI.
-
 ### 2.3 Admin Dashboard (Next.js)
 
 **Framework:** Vitest with jsdom environment
 **Location:** `dashboard/test/setup.ts`
 
-The dashboard test infrastructure is in place (Vitest configured, setup file imports `@testing-library/jest-dom`) but does not yet contain test files. Dashboard functionality is validated through manual end-to-end testing described in Section 5.
+The dashboard test infrastructure is in place (Vitest configured, setup file imports `@testing-library/jest-dom`) and includes coverage for utility and login flows. Dashboard functionality is also validated through manual end-to-end testing described in Section 5.
 
 ---
-
-## 3. Especially Challenging Areas to Test
 
 ### 3.1 AI Recommendation Engine (`drinkAI.py`, `customerAI.py`)
 
 The AI module uses scikit-learn cosine similarity and HuggingFace transformers to generate drink recommendations and power a customer service chatbot. Testing AI outputs is inherently non-deterministic. Our approach:
 
-- Validate that the generation endpoint returns a well-formed drink object
-- Check that recommendations align with user preferences at a basic level
-- We do **not** assert exact drink names or ingredient lists, since the model output varies
-
 **Concern:** The chatbot (`customerAI.py`) is the least-tested AI component. Its responses depend on a language model and are difficult to assert against.
 
 ### 3.2 Stripe Payment Integration
 
-Payment processing involves the Stripe API (`create-payment-intent` endpoint). We have not written automated tests that hit Stripe's test mode API because:
-
-- It requires network access and API keys in CI
-- The Stripe SDK is well-tested upstream
-
 Instead, we validate payment flows through manual end-to-end testing with Stripe test cards.
 
 ### 3.3 Order Fulfillment with Inventory Rollback
-
-The fulfillment flow touches multiple models (Order, Inventory, Notification) in a single transaction. The rollback test (`test_fulfill_rolls_back_on_insufficient_stock`) was challenging because we needed to confirm that no partial inventory deductions occurred when one ingredient was unavailable. Getting the atomic transaction boundaries correct required careful testing.
-
-### 3.4 Supply Network Geolocation
 
 The `SupplyHubService.findNearestHub()` uses latitude/longitude calculations to route supply requests. Testing this required setting up hubs at known coordinates and asserting the correct hub was selected. The math is straightforward but the test data setup (multiple hubs at different distances) required care.
 
@@ -224,20 +201,3 @@ These are manual tests that verify the full user journey across frontend and bac
 - **Concurrent order fulfillment:** We have not tested what happens when two managers attempt to fulfill the same order simultaneously, or when fulfillment and a supply transfer race on the same inventory item.
 - **Mobile app on real devices:** Our React Native testing is minimal. Navigation bugs, platform-specific rendering issues (iOS vs. Android), and native module compatibility could surface in production that we'd miss in Jest.
 - **Dashboard authentication:** The dashboard uses `next-auth` (v5 beta), and we have no automated tests for the auth flow. If the beta introduces breaking changes, we'd only catch it manually.
-
----
-
-## 7. Problems Uncovered by Testing
-
-*(To be completed in the final draft after the testing sprint. This section will document bugs found, fixes applied, and lessons learned.)*
-
----
-
-## 8. Next Steps for Final Draft
-
-- [ ] Run `coverage.py` and report exact backend code coverage percentage
-- [ ] Add screenshots for each end-to-end test
-- [ ] Document bugs found and fixed during the testing sprint
-- [ ] Expand frontend test coverage if time permits
-- [ ] Add dashboard component tests using Vitest
-- [ ] Document any new tests written during the testing sprint
