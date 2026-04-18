@@ -1,5 +1,10 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Testing
+
+- **Unit / component tests** (Vitest): `npm run test` — see [TESTING.md](./TESTING.md) for coverage, manual checklists, and how to add tests.
+- **E2E** (Playwright): start `npm run dev`, then `npx playwright install` once, then `npm run test:e2e`.
+
 ## Getting Started
 
 First, run the development server:
@@ -22,22 +27,17 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Authentication
 
-Login is handled by [Auth.js](https://authjs.dev/) and validated against the OrbitDB API.
+Login is handled by [Auth.js](https://authjs.dev/) and validated against the **OrbitDB peer** REST API (same contract as the mobile app).
 
 1. Copy `.env.example` to `.env.local` and set:
    - `AUTH_SECRET` — run `openssl rand -base64 32` to generate one.
-   - `ORBITDB_API_URL` — base URL of your OrbitDB API (e.g. `http://localhost:3001`).
+   - `ORBITDB_API_URL` or `DJANGO_API_URL` — base URL including `/backend` when required (e.g. `http://127.0.0.1:3001/backend`). See `lib/orbit-fetch.ts`.
 
-2. **OrbitDB backend** (`codepop_backend/orbitdb`): the dashboard calls the existing login endpoint.
+2. **Orbit peer** (`codepop_backend/orbitdb`): the dashboard calls `POST {baseUrl}/auth/login` with `{ "username", "password" }`. Success returns a `token` and user fields; failures show “Invalid username or password.”
 
-   - **URL**: `POST {ORBITDB_API_URL}/backend/auth/login/`
-   - **Body**: `{ "username": "...", "password": "..." }` (the login form sends the email field as `username`)
-   - **Success (200)**: `{ "token", "user_id", "first_name", "is_admin", "is_manager" }`
-   - **Failure (4xx)**: dashboard shows “Invalid email or password.”
+3. Optional **dev bypass**: set `NEXT_PUBLIC_DEV_AUTH_BYPASS=true` (non-production) to skip Orbit login and pick a dashboard role from the login page. Orbit BFF routes still need a real `accessToken` unless you test only static UI.
 
-   Ensure CORS allows your dashboard origin (e.g. `http://localhost:3000`) so the browser can call the API. Run the OrbitDB peer with `npm run peer` and set `ORBITDB_API_URL=http://localhost:3001`.
-
-3. Protected routes (everything except `/login` and `/signup`) redirect to `/login` when not signed in. After login, users are redirected back to the page they tried to open or to `/`.
+4. Protected routes redirect to `/login` when not signed in. After login, users return to the requested page or `/`.
 
 ## Learn More
 
