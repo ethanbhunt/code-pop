@@ -10,7 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Role } from "@/lib/roles";
+import { RevenueReportCharts } from "@/components/revenue/revenue-report-charts";
+import { hasOrbitRevenueReportDashboardRole } from "@/lib/orbit-session";
+import { dailyRevenueSeries } from "@/lib/revenue-buckets";
+import type { RevenueReportPayload } from "@/lib/revenue-report-types";
 
 type LowStockAlert = {
   item: string;
@@ -58,9 +61,10 @@ type OrbitReorderRow = {
 
 export function ManagerDashboard() {
   const { data: session } = useSession();
-  const roles = session?.user?.roles ?? [];
-  const canViewRevenue =
-    roles.includes(Role.Admin) || roles.includes(Role.SuperAdmin);
+  const canViewRevenue = useMemo(
+    () => (session ? hasOrbitRevenueReportDashboardRole(session) : false),
+    [session]
+  );
 
   const [storeId, setStoreId] = useState<string>("1");
   const [alerts, setAlerts] = useState<LowStockAlert[] | null>(null);
@@ -68,7 +72,8 @@ export function ManagerDashboard() {
   const [inventory, setInventory] = useState<OrbitInventoryItem[] | null>(null);
   const [loadingInv, setLoadingInv] = useState(false);
   const [revenueNote, setRevenueNote] = useState<string | null>(null);
-  const [revenueTotal, setRevenueTotal] = useState<number | null>(null);
+  const [revenueReport, setRevenueReport] = useState<RevenueReportPayload | null>(null);
+  const [loadingRevenue, setLoadingRevenue] = useState(true);
   const [orderItemName, setOrderItemName] = useState<string>("");
   const [orderQty, setOrderQty] = useState<string>("");
   const [aiRecommendations, setAiRecommendations] = useState<AiReorderRow[] | null>(
@@ -85,6 +90,19 @@ export function ManagerDashboard() {
     () => (inventory ? dedupeInventoryByItemName(inventory) : null),
     [inventory]
   );
+
+  const revenueDaily = useMemo(() => {
+    if (!revenueReport) return [];
+    const start = revenueReport.startDate
+      ? new Date(revenueReport.startDate)
+      : (() => {
+          const d = new Date();
+          d.setUTCDate(d.getUTCDate() - 30);
+          return d;
+        })();
+    const end = revenueReport.endDate ? new Date(revenueReport.endDate) : new Date();
+    return dailyRevenueSeries(revenueReport.revenues ?? [], start, end);
+  }, [revenueReport]);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,28 +258,35 @@ export function ManagerDashboard() {
 
   useEffect(() => {
     if (!canViewRevenue) {
-      setRevenueNote("Revenue reports require an admin account on the OrbitDB backend.");
-      setRevenueTotal(null);
+      setRevenueReport(null);
+      setRevenueNote(null);
+      setLoadingRevenue(false);
       return;
     }
     let cancelled = false;
     async function loadRev() {
+      setLoadingRevenue(true);
+      setRevenueNote(null);
       const end = new Date().toISOString();
       const start = new Date();
       start.setUTCDate(start.getUTCDate() - 30);
       const url = `/api/orbit/revenues/report?startDate=${encodeURIComponent(
         start.toISOString()
       )}&endDate=${encodeURIComponent(end)}`;
-      const res = await fetch(url);
-      if (cancelled) return;
-      if (!res.ok) {
-        setRevenueNote("Could not load revenue report.");
-        setRevenueTotal(null);
-        return;
+      try {
+        const res = await fetch(url);
+        if (cancelled) return;
+        if (!res.ok) {
+          setRevenueNote("Could not load revenue report.");
+          setRevenueReport(null);
+          return;
+        }
+        const json = (await res.json()) as RevenueReportPayload;
+        setRevenueReport(json);
+        setRevenueNote(null);
+      } finally {
+        if (!cancelled) setLoadingRevenue(false);
       }
-      const json = (await res.json()) as { totalRevenue?: number };
-      setRevenueTotal(json.totalRevenue ?? 0);
-      setRevenueNote(null);
     }
     void loadRev();
     return () => {
@@ -275,8 +300,8 @@ export function ManagerDashboard() {
         <CardHeader>
           <CardTitle>Manager Dashboard</CardTitle>
           <CardDescription>
-            Store-scoped inventory and reorder notifications use Orbit; revenue and AI blocks stay
-            as before.
+            Store-scoped inventory, reorder notifications, revenue, and supply recommendations for
+            the selected store.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -299,40 +324,44 @@ export function ManagerDashboard() {
               </select>
             </div>
             <p className="text-xs text-muted-foreground">
-              Inventory:{" "}
-              <code className="text-xs">GET /api/orbit/stores/{"{id}"}/inventory</code>
+              Inventory reflects the store you select above.
             </p>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Store Revenue Reports</h3>
+            <h3 className="text-sm font-medium">Store revenue (last 30 days)</h3>
             <div className="rounded-lg border p-3">
-              {revenueNote ? (
+              {!canViewRevenue ? (
+                <p className="text-sm text-muted-foreground">
+                  Revenue reports are available to store managers, staff, and logistics leads.
+                </p>
+              ) : revenueNote ? (
                 <p className="text-sm text-muted-foreground">{revenueNote}</p>
               ) : (
-                <p className="text-sm">
-                  Last 30 days total revenue:{" "}
-                  <span className="font-semibold">
-                    ${(revenueTotal ?? 0).toLocaleString()}
-                  </span>
-                </p>
+                <RevenueReportCharts
+                  series={revenueDaily}
+                  totalRevenue={revenueReport?.totalRevenue ?? 0}
+                  transactionCount={revenueReport?.transactionCount ?? 0}
+                  averageTransaction={revenueReport?.averageTransaction ?? 0}
+                  loading={loadingRevenue}
+                />
               )}
-              <div className="mt-3 h-40 rounded-md bg-muted/40" aria-hidden="true" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                Chart placeholder; data from{" "}
-                <code className="text-xs">/api/orbit/revenues/report</code>.
-              </p>
+              {canViewRevenue ? (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Figures aggregate transactions for the selected period.
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Low Inventory Notifications</h3>
+              <h3 className="text-sm font-medium">Inventory Notifications</h3>
               <div className="rounded-lg border p-3">
                 {orbitReorders && orbitReorders.length > 0 ? (
                   <div className="mb-3 border-b pb-3">
                     <p className="text-xs font-medium text-muted-foreground">
-                      Orbit reorder notifications
+                      Reorder notifications
                     </p>
                     <ul className="mt-2 space-y-2 text-sm">
                       {orbitReorders.map((n) => (
@@ -453,8 +482,7 @@ export function ManagerDashboard() {
                   <p className="mt-2 text-xs text-muted-foreground">{reorderActionMessage}</p>
                 ) : null}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Creates an Orbit reorder notification via
-                  <code className="text-xs"> POST /api/orbit/notifications/reorder</code>.
+                  Submits a reorder request for the item and quantity above.
                 </p>
               </div>
             </div>
@@ -499,7 +527,8 @@ export function ManagerDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              On-hand from OrbitDB for the selected store; usage/trend columns need usage telemetry.
+              On-hand counts are for the selected store. Usage and trend columns appear when usage data
+              is available.
             </p>
           </div>
 
@@ -507,7 +536,7 @@ export function ManagerDashboard() {
             <h3 className="text-sm font-medium">AI Supply Ordering Recommendations</h3>
             <div className="rounded-lg border p-3">
               {loadingAiRec && !aiRecommendations ? (
-                <p className="text-sm text-muted-foreground">Loading mock forecast…</p>
+                <p className="text-sm text-muted-foreground">Loading forecast…</p>
               ) : aiRecommendations?.length ? (
                 <ul className="space-y-2 text-sm">
                   {aiRecommendations.map((r) => (
@@ -524,7 +553,7 @@ export function ManagerDashboard() {
                 </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No recommendations (placeholder API unavailable).
+                  No recommendations could be loaded.
                 </p>
               )}
               <div className="mt-3 flex gap-2">
@@ -536,11 +565,7 @@ export function ManagerDashboard() {
                 </Button>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Data from{" "}
-                <code className="text-xs">
-                  /api/orbit/placeholders/logistics/ai-demand-prediction
-                </code>{" "}
-                (mock). Applying orders requires inventory write access.
+                Suggestions are illustrative. Applying them may require inventory write access.
               </p>
             </div>
           </div>

@@ -1,10 +1,6 @@
 import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
-import {
-  getAccessToken,
-  hasOrbitManagerDashboardRole,
-  hasOrbitStaffDashboardRole,
-} from "@/lib/orbit-session";
+import { getAccessToken, hasOrbitStaffDashboardRole } from "@/lib/orbit-session";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -17,7 +13,7 @@ export async function GET(req: Request) {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }
@@ -38,12 +34,12 @@ export async function POST(req: Request) {
   if (!token) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!hasOrbitManagerDashboardRole(session)) {
+  if (!hasOrbitStaffDashboardRole(session)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }

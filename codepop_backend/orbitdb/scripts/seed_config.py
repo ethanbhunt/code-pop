@@ -2,7 +2,7 @@
 Seed Configuration for CodePop Testing Data - Store-Tied Peer Node Architecture
 
 This file defines all test data for the CodePop application:
-- 4 test users (superadmin, manager, admin, customer)
+- Test users (superadmin, store manager, logistics manager, admin, customers, repair)
 - 8 seasonal drinks
 - 9 user preferences
 - 50 inventory items across 3 stores
@@ -36,9 +36,21 @@ SEED_USERS = [
         "username": "manager",
         "email": "manager@example.com",
         "password": "Manager123",
-        "firstName": "Manager",
+        "firstName": "Store",
         "lastName": "Manager",
-        "role": "manager"
+        "role": "staff",
+        "userRole": "manager",
+        "enum": "manager",
+    },
+    {
+        "username": "logistics",
+        "email": "logistics@example.com",
+        "password": "Logistics123",
+        "firstName": "Logistics",
+        "lastName": "Lead",
+        "role": "staff",
+        "userRole": "logistics_manager",
+        "enum": "logistics_manager",
     },
     {
         "username": "admin",
@@ -777,7 +789,13 @@ TEST_CREDENTIALS = {
         "username": "manager",
         "email": "manager@example.com",
         "password": "Manager123",
-        "description": "Store Manager - can manage store operations and staff"
+        "description": "Store Manager (Orbit userRole manager) — store ops, not logistics"
+    },
+    "logistics": {
+        "username": "logistics",
+        "email": "logistics@example.com",
+        "password": "Logistics123",
+        "description": "Logistics Manager — transfers / delivery coordination"
     },
     "admin": {
         "username": "admin",

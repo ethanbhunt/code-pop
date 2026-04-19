@@ -1,7 +1,7 @@
 // src/routes/notifications.js
 import express from "express"
 import { asyncHandler } from "../middleware/errorHandler.js"
-import { authenticate, requireManager } from "../middleware/auth.js"
+import { authenticate, requireReorderActor } from "../middleware/auth.js"
 import * as notificationService from "../services/notificationService.js"
 import * as reorderService from "../services/reorderService.js"
 
@@ -27,7 +27,7 @@ router.get("/filter_by_time", authenticate, asyncHandler(async (req, res) => {
 /**
  * POST /backend/notifications/reorder — must be registered before /:id so "reorder" is not captured as an id.
  */
-router.post("/reorder", authenticate, requireManager, asyncHandler(async (req, res) => {
+router.post("/reorder", authenticate, requireReorderActor, asyncHandler(async (req, res) => {
   const { storeId, inventoryId } = req.body
 
   if (!storeId || !inventoryId) {

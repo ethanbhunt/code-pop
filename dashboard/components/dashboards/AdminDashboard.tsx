@@ -70,10 +70,6 @@ type OrbitUser = {
   enum?: string;
 };
 
-function normalizeUserManagementRole(role: Role): Role {
-  return role === Role.Staff ? Role.Manager : role;
-}
-
 type AdminMetrics = {
   totalUsers: number;
   activeAccounts: number;
@@ -172,8 +168,10 @@ export function AdminDashboard() {
       const list = json.data ?? [];
       const picks: Record<number, Role> = {};
       for (const u of list) {
-        picks[u.userId] = normalizeUserManagementRole(
-          defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+        picks[u.userId] = defaultDashboardRoleForOrbitAccess(
+          u.role,
+          u.userRole,
+          u.enum
         );
       }
       setInitialRolePick(picks);
@@ -274,14 +272,10 @@ export function AdminDashboard() {
     setUserMgmtError(null);
     const draft =
       roleDraft[u.userId] ??
-      normalizeUserManagementRole(
-        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
-      );
+      defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum);
     const baseline =
       initialRolePick[u.userId] ??
-      normalizeUserManagementRole(
-        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
-      );
+      defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum);
     if (draft === baseline) return;
     if (myUserId != null && u.userId === myUserId) {
       setUserMgmtError("You cannot change your own role.");
@@ -397,8 +391,7 @@ export function AdminDashboard() {
         <CardHeader>
           <CardTitle>Admin Dashboard</CardTitle>
           <CardDescription>
-            Inventory, users, and revenue metrics from the OrbitDB API (admin role on
-            backend).
+            Inventory, user accounts, and revenue metrics for administrators.
           </CardDescription>
         </CardHeader>
 
@@ -416,7 +409,7 @@ export function AdminDashboard() {
                 {loadingMetrics ? "…" : (metrics?.activeAccounts ?? "—")}
               </p>
               <p className="text-xs text-muted-foreground">
-                No separate &quot;active&quot; flag in OrbitDB yet.
+                Reflects accounts returned for this list.
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -579,9 +572,7 @@ export function AdminDashboard() {
                           <td className="p-2">{u.username}</td>
                           <td className="p-2">
                             {isSelf ? (
-                              <span className="text-muted-foreground">
-                                {normalizeUserManagementRole(draft)}
-                              </span>
+                              <span className="text-muted-foreground">{draft}</span>
                             ) : (
                               <select
                                 className="h-8 w-full min-w-36 rounded-md border border-input bg-transparent px-2 text-sm"
@@ -632,8 +623,8 @@ export function AdminDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Role changes call <code className="text-xs">PUT /api/orbit/users/:id</code> (Orbit
-              role tier). Grant manager/logistics/repair by selecting the matching dashboard role.
+              Save updates the user&apos;s dashboard role. Grant manager, logistics, or repair by
+              selecting the matching role.
             </p>
           </div>
 
@@ -673,7 +664,7 @@ export function AdminDashboard() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {inventoryOnHandValue.withCost} of {inventoryOnHandValue.totalLines} rows
-                      include unit cost. Maintenance spend is not aggregated in Orbit yet.
+                      include unit cost. Maintenance spend is shown separately when available.
                     </p>
                     <Button
                       type="button"
@@ -705,9 +696,8 @@ export function AdminDashboard() {
               </div>
               <div className="rounded-lg border p-3 space-y-2">
                 <p className="text-sm">
-                  Today (KPI tile) and trailing{" "}
-                  <span className="font-medium">30 days</span> from{" "}
-                  <code className="text-xs">/api/orbit/revenues/report</code>.
+                  Today (KPI tile) and trailing <span className="font-medium">30 days</span> use the
+                  same revenue report window.
                 </p>
                 <p className="text-sm">
                   Last 30 days revenue:{" "}
@@ -737,8 +727,8 @@ export function AdminDashboard() {
             </div>
             <div className="rounded-lg border p-3">
               <p className="mb-2 text-xs text-muted-foreground">
-                Orbit notifications feed (types such as <code className="text-xs">complaint</code>{" "}
-                surface here when recorded). There is no separate complaints table yet.
+                Inbound notifications and messages (for example complaint or support types) appear here
+                when recorded.
               </p>
               {loadingNotif && !notifications ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>

@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
   const alerts = toAlerts(result.data.data ?? []);
   return Response.json({
     storeId,
-    note: "Inventory is global in OrbitDB; storeId is informational until multi-store exists.",
+    note: "Inventory is returned globally; the selected store is used for context in this view.",
     generatedAt: new Date().toISOString(),
     alerts,
   });

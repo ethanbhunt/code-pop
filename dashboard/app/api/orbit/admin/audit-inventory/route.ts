@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     storeId: storeIdLabel,
-    note: "Derived from inventory lastUpdated; no dedicated audit log in OrbitDB.",
+    note: "Derived from inventory last-updated timestamps; a dedicated audit log is not available yet.",
     generatedAt: new Date().toISOString(),
     logs,
   });

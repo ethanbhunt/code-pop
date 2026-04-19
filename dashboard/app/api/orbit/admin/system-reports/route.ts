@@ -61,7 +61,7 @@ export async function GET() {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }
@@ -215,9 +215,9 @@ export async function GET() {
     hubActivity: hubActivityOut,
     note:
       machines.length > 0 || pendingTransfers.length > 0
-        ? "Revenue, inventory, users, store counts, maintenance machines, and regional transfer activity from Orbit when authorized."
+        ? "Revenue, inventory, users, store counts, maintenance machines, and regional transfer activity when authorized."
         : storeCountFromMulti != null
-          ? "Revenue and inventory/users from OrbitDB; store count from multi-store report. Maintenance/transfers returned no rows or were not permitted."
-          : "Revenue and inventory/users from OrbitDB; maintenance, transfers, and store list are best-effort.",
+          ? "Revenue, inventory, and user metrics are live; store count comes from the multi-store report. Maintenance and transfers returned no rows or were not permitted."
+          : "Revenue, inventory, and user metrics are live; maintenance, transfers, and the full store list are best-effort.",
   });
 }

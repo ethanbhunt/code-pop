@@ -42,7 +42,11 @@ router.get("/machines", authenticate, async (req, res, next) => {
     } else if (hasAdminPrivileges(req.user.role) && !req.query.storeId) {
       // Orbit `admin` / `superadmin` role: list all machines when no storeId (dashboard BFF).
       result = await maintenanceService.listAllMachines(offset, limit)
-    } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+    } else if (
+      req.user.userRole === "manager" ||
+      req.user.userRole === "logistics_manager" ||
+      req.user.userRole === "admin"
+    ) {
       const storeId = parseInt(req.query.storeId)
       if (!storeId) {
         return res.status(400).json({
@@ -130,7 +134,11 @@ router.post("/status-transitions", authenticate, async (req, res, next) => {
            code: "STORE_ACCESS_DENIED"
          })
        }
-     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+     } else if (
+      req.user.userRole === "manager" ||
+      req.user.userRole === "logistics_manager" ||
+      req.user.userRole === "admin"
+    ) {
        // Managers can update machines in their stores
        if (!req.user.assignedStores.includes(machine.storeId)) {
          return res.status(403).json({
@@ -189,7 +197,11 @@ router.get("/history", authenticate, async (req, res, next) => {
            code: "STORE_ACCESS_DENIED"
          })
        }
-     } else if (req.user.userRole === "manager" || req.user.userRole === "admin") {
+     } else if (
+      req.user.userRole === "manager" ||
+      req.user.userRole === "logistics_manager" ||
+      req.user.userRole === "admin"
+    ) {
        if (!req.user.assignedStores.includes(machine.storeId)) {
          return res.status(403).json({
            error: "Access denied",

@@ -2,7 +2,10 @@ import type { NextRequest } from "next/server";
 
 import { auth } from "@/auth";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
-import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
+import {
+  getAccessToken,
+  hasOrbitRevenueReportDashboardRole,
+} from "@/lib/orbit-session";
 
 function unwrapOrbitRevenueReportBody(root: unknown): unknown {
   if (!root || typeof root !== "object") return root;
@@ -17,12 +20,12 @@ export async function GET(req: NextRequest) {
   if (!token) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!hasOrbitAdminDashboardRole(session)) {
+  if (!hasOrbitRevenueReportDashboardRole(session)) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }

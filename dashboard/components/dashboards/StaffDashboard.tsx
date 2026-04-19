@@ -21,7 +21,7 @@ export function StaffDashboard() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            You are signed in with staff-level access on the backend.
+            You are signed in with staff-level access.
           </p>
         </CardContent>
       </Card>

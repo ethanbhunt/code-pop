@@ -2,7 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 import { Role } from "@/lib/roles";
-import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
+import {
+  dashboardRolesFromOrbitLogin,
+  sanitizeDashboardRoles,
+} from "@/lib/orbit-role-map";
 
 /**
  * Auth.js config: validates users against codepop_backend/orbitdb REST API.
@@ -14,7 +17,7 @@ import { orbitRoleToDashboardRoles } from "@/lib/orbit-role-map";
  *
  * API auth header for protected routes: Authorization: Token {token}
  *
- * OrbitDB roles map to dashboard `Role` via `orbitRoleToDashboardRoles`.
+ * OrbitDB roles map to dashboard `Role` via `dashboardRolesFromOrbitLogin` (uses userRole/enum when present).
  */
 const orbitDbBaseUrl = (
   process.env.ORBITDB_API_URL ?? process.env.DJANGO_API_URL
@@ -51,11 +54,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               ? credentials.username
               : devUsername;
           const selected = coerceRole((credentials as { role?: unknown }).role);
+          const r = selected ?? Role.Customer;
           return {
             id: "dev",
             email: usernameValue,
             name: "Dev",
-            roles: [selected ?? Role.Customer],
+            roles: sanitizeDashboardRoles([r]),
           };
         }
 
@@ -83,6 +87,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             firstName?: string;
             lastName?: string;
             role?: string;
+            userRole?: string;
+            enum?: string;
             token?: string;
           };
         };
@@ -94,7 +100,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           data.username ||
           (credentials.username as string);
         
-        const roles = orbitRoleToDashboardRoles(data.role);
+        const roles = sanitizeDashboardRoles(
+          dashboardRolesFromOrbitLogin(
+            data.role,
+            data.userRole,
+            data.enum
+          )
+        );
 
         return {
           id: String(data.userId),
@@ -116,7 +128,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
-        token.roles = (user as unknown as { roles?: Role[] }).roles ?? [];
+        const raw = (user as unknown as { roles?: Role[] }).roles ?? [];
+        token.roles = sanitizeDashboardRoles(
+          Array.isArray(raw) ? raw : []
+        );
         token.accessToken = (user as { accessToken?: string }).accessToken;
       }
       return token;
@@ -126,8 +141,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        const raw = (token.roles ?? []) as Role[];
         (session.user as unknown as { roles?: Role[] }).roles =
-          (token.roles ?? []) as Role[];
+          sanitizeDashboardRoles(Array.isArray(raw) ? raw : []);
         session.user.accessToken = token.accessToken as string | undefined;
       }
       return session;

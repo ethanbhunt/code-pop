@@ -43,9 +43,27 @@ export function hasOrbitManagerDashboardRole(session: Session | null): boolean {
   );
 }
 
-/** Logistics transfers / delivery assignments BFF gate. */
+/** Logistics transfers / delivery assignments — logistics lead or admins only. */
 export function hasOrbitLogisticsDashboardRole(session: Session | null): boolean {
-  return hasOrbitManagerDashboardRole(session);
+  const roles = session?.user?.roles ?? [];
+  return (
+    roles.includes(Role.LogisticsManager) ||
+    roles.includes(Role.Admin) ||
+    roles.includes(Role.SuperAdmin)
+  );
+}
+
+/** Aggregate revenue report (`GET /revenues/report`) — store ops + logistics + admins. */
+export function hasOrbitRevenueReportDashboardRole(
+  session: Session | null
+): boolean {
+  const roles = session?.user?.roles ?? [];
+  return (
+    hasOrbitAdminDashboardRole(session) ||
+    roles.includes(Role.Manager) ||
+    roles.includes(Role.Staff) ||
+    roles.includes(Role.LogisticsManager)
+  );
 }
 
 /** Repair store-scoped machines list (`/maintenance/assignments/me`); admins may preview the same proxy. */

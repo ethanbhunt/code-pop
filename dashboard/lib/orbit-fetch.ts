@@ -1,5 +1,5 @@
 /**
- * Server-only OrbitDB REST client. Base URL must include `/backend`
+ * Server-only upstream REST client. Base URL must include `/backend`
  * (e.g. http://127.0.0.1:3001/backend).
  */
 
@@ -16,7 +16,7 @@ export async function orbitFetch(
 ): Promise<Response> {
   const base = getOrbitBaseUrl();
   if (!base) {
-    throw new Error("ORBITDB_API_URL or DJANGO_API_URL is not set");
+    throw new Error("Data service URL is not set");
   }
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const headers = new Headers(init?.headers);
@@ -35,7 +35,7 @@ export async function orbitFetch(
 export async function orbitFetchPublic(path: string, init?: RequestInit): Promise<Response> {
   const base = getOrbitBaseUrl();
   if (!base) {
-    throw new Error("ORBITDB_API_URL or DJANGO_API_URL is not set");
+    throw new Error("Data service URL is not set");
   }
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const headers = new Headers(init?.headers);

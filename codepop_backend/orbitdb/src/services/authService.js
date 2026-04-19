@@ -9,6 +9,7 @@ import {
   validatePassword,
   validateUserRole,
 } from "../utils/validation.js"
+import { mergeAccessFromUserRecord } from "../middleware/auth.js"
 
 /** Persist customer | staff | admin | repair; map seed/legacy names. */
 function normalizeOrbitRoleForStorage(role) {
@@ -204,6 +205,8 @@ export async function loginUser(username, password) {
   const tokensDb = getTokensDb()
   await tokensDb.put(`token:${tokenKey}`, token)
 
+  const access = mergeAccessFromUserRecord(user)
+
   // Return user data without password hash
   return {
     userId: user.userId,
@@ -212,6 +215,8 @@ export async function loginUser(username, password) {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    userRole: access.userRole,
+    enum: access.enum,
     token: tokenKey
   }
 }

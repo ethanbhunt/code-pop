@@ -33,10 +33,10 @@ type RepairWorkflowMachine = {
   type: string;
   status: string;
   lastServiceDate: string;
-  /** From Orbit when present */
+  /** From the server when present */
   name?: string;
   model?: string;
-  /** Store ID from Orbit (numeric). Placeholder/workflow rows omit this. */
+  /** Store ID from the server (numeric). Workflow rows may omit this. */
   storeId?: number;
 };
 
@@ -117,7 +117,7 @@ const STATUS_FORM_OPTIONS = [
   "out-of-order",
 ] as const;
 
-/** Map Orbit / scaffold status strings onto the update form select values. */
+/** Map server and workflow status strings onto the update form select values. */
 function mapMachineStatusToFormValue(raw: string | undefined): string {
   const s = (raw ?? "")
     .trim()
@@ -253,7 +253,7 @@ export function RepairStaffDashboard() {
 
   const selectedStoreIdNum = useMemo(() => parseInt(storeId, 10), [storeId]);
 
-  /** Orbit rows narrowed to the store selected in the picker (same scope as repair, filtered by UI store). */
+  /** Rows narrowed to the store selected in the picker (same scope as repair, filtered by UI store). */
   const apiMachinesForSelectedStore = useMemo(() => {
     if (apiMachines.length === 0) return [];
     if (!Number.isInteger(selectedStoreIdNum) || selectedStoreIdNum < 1) {
@@ -392,12 +392,12 @@ export function RepairStaffDashboard() {
   async function submitStatusTransition() {
     setStatusActionError(null);
     if (!statusMachineId) {
-      setStatusActionError("No Orbit machines in your assigned stores.");
+      setStatusActionError("No machines in your assigned stores.");
       return;
     }
     const machineId = parseInt(statusMachineId, 10);
     if (Number.isNaN(machineId)) {
-      setStatusActionError("Selected machine is invalid for Orbit status updates.");
+      setStatusActionError("Selected machine is invalid for status updates.");
       return;
     }
     setStatusSaving(true);
@@ -485,9 +485,9 @@ export function RepairStaffDashboard() {
         <CardHeader>
           <CardTitle>Repair Staff Dashboard</CardTitle>
           <CardDescription>
-            Machines are scoped to stores; repair staff see machines in stores they cover. Status
-            and history use Orbit maintenance when your session is repair-capable; workflow mock
-            still loads as a fallback. {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
+            Machines are scoped to stores; repair staff see machines in stores they cover. Status and
+            history load from maintenance when your session allows it; a local workflow view is used
+            when needed. {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -521,8 +521,7 @@ export function RepairStaffDashboard() {
             <div className="rounded-lg border p-3">
               <h4 className="text-xs font-medium text-muted-foreground">Add machine</h4>
               <p className="mt-1 text-xs text-muted-foreground">
-                Creates the machine in Orbit for the store below (must be in your repair store
-                scope).
+                Creates the machine for the store below (must be within your repair store scope).
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1">
@@ -627,9 +626,9 @@ export function RepairStaffDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Status filters below apply to the table. When Orbit data is loaded, the rows shown are
-              machines whose <code className="text-xs">storeId</code> matches the Store number in
-              the region picker (within your account’s store scope).
+              Status filters below apply to the table. When maintenance data is loaded, the rows
+              shown are machines whose <code className="text-xs">storeId</code> matches the Store
+              number in the region picker (within your account’s store scope).
             </p>
           </div>
 
@@ -689,7 +688,8 @@ export function RepairStaffDashboard() {
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Parsed locally for review. Applying rows to Orbit requires a maintenance API.
+                    Parsed locally for review. Applying imported rows to the server is available when
+                    your account can submit maintenance updates.
                   </p>
                 )}
               </div>
@@ -797,8 +797,7 @@ export function RepairStaffDashboard() {
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Persists via <code className="text-xs">POST /maintenance/status-transitions</code>{" "}
-                  (Orbit allows updates when the machine’s store is in your scope).
+                  Saves your change when the machine’s store is within your scope.
                 </p>
                 {statusMachines.length === 0 ? (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -876,8 +875,8 @@ export function RepairStaffDashboard() {
                     })}
                 </ul>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Computed client-side from `lastServiceDate` vs workflow timestamp; telemetry would
-                  refine this in Orbit.
+                  Computed from last service date versus the workflow timestamp; live telemetry can
+                  refine these estimates.
                 </p>
               </div>
             </div>
@@ -982,7 +981,7 @@ export function RepairStaffDashboard() {
               <h3 className="text-sm font-medium">Export Repair Schedules to CSV</h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Download the optimized schedule from placeholder data as CSV.
+                  Download the optimized schedule as CSV.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <Button

@@ -68,8 +68,6 @@ router.post(
 
     const user = await loginUser(username, password)
 
-    console.log(user);
-
     res.json({
       status: "authenticated",
       data: user

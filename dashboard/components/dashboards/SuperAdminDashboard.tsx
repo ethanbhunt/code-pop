@@ -32,7 +32,7 @@ type SystemReports = {
     inventoryLowCount: number;
     totalStores: number;
     totalRevenueToday: number;
-    /** Same window as default Orbit multi-store report (last 30 days). */
+    /** Default multi-store report window (last 30 days). */
     totalRevenueLast30Days?: number;
   };
   revenue: { today: number; week: number; month: number };
@@ -57,10 +57,6 @@ type OrbitUser = {
   userRole?: string;
   enum?: string;
 };
-
-function normalizeUserManagementRole(role: Role): Role {
-  return role === Role.Staff ? Role.Manager : role;
-}
 
 type OrbitStoreRow = {
   storeId: number;
@@ -250,8 +246,10 @@ export function SuperAdminDashboard() {
     const list = json.data ?? [];
     const picks: Record<number, Role> = {};
     for (const u of list) {
-      picks[u.userId] = normalizeUserManagementRole(
-        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+      picks[u.userId] = defaultDashboardRoleForOrbitAccess(
+        u.role,
+        u.userRole,
+        u.enum
       );
     }
     setInitialRolePick(picks);
@@ -277,9 +275,7 @@ export function SuperAdminDashboard() {
     setUserActionError(null);
     const draft =
       roleDraft[u.userId] ??
-      normalizeUserManagementRole(
-        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
-      );
+      defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum);
     const nextOrbit = dashboardRoleToOrbitAccess(draft);
     if (myUserId != null && u.userId === myUserId) {
       setUserActionError("You cannot change your own role.");
@@ -351,13 +347,13 @@ export function SuperAdminDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Super Admin Dashboard</CardTitle>
-          <CardDescription>System-wide visibility and cross-store control (scaffold).</CardDescription>
+          <CardDescription>System-wide visibility and cross-store control.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                {canListStores ? "Stores (Orbit)" : "Hubs online"}
+                {canListStores ? "Stores" : "Hubs online"}
               </p>
               <p className="text-2xl font-semibold">
                 {canListStores
@@ -370,11 +366,11 @@ export function SuperAdminDashboard() {
               </p>
               <p className="text-xs text-muted-foreground">
                 {canListStores
-                  ? "GET /api/orbit/stores"
+                  ? "Live store directory"
                   : reports?.note
                     ? "Partially live"
                     : reports
-                      ? "OrbitDB"
+                      ? "Connected"
                       : "—"}
               </p>
             </div>
@@ -384,7 +380,7 @@ export function SuperAdminDashboard() {
                 {loadingReports ? "…" : machinesNeedingRepair}
               </p>
               <p className="text-xs text-muted-foreground">
-                From system report when Orbit maintenance data is available
+                From system report when maintenance data is available
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -392,7 +388,7 @@ export function SuperAdminDashboard() {
               <p className="text-2xl font-semibold">
                 {loadingReports ? "…" : reports?.metrics.inventoryLowCount ?? 0}
               </p>
-              <p className="text-xs text-muted-foreground">From OrbitDB inventory</p>
+              <p className="text-xs text-muted-foreground">From inventory metrics</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">System revenue</p>
@@ -406,7 +402,7 @@ export function SuperAdminDashboard() {
                     ).toLocaleString()}`}
               </p>
               <p className="text-xs text-muted-foreground">
-                Primary figure: last 30 days (multi-store aggregate). Today (UTC): $
+                Primary figure: last 30 days (multi-store aggregate). Today: $
                 {(reports?.metrics.totalRevenueToday ?? 0).toLocaleString()} · Week: $
                 {(reports?.revenue.week ?? 0).toLocaleString()}
               </p>
@@ -425,13 +421,12 @@ export function SuperAdminDashboard() {
               <div className="rounded-lg border p-3">
                 {!canListStores ? (
                   <p className="text-sm text-muted-foreground">
-                    Listing all stores requires a Super Admin session (Orbit{" "}
-                    <code className="text-xs">GET /stores</code>).
+                    Listing all stores requires a Super Admin session.
                   </p>
                 ) : loadingStores && !orbitStores?.length ? (
                   <p className="text-sm text-muted-foreground">Loading stores…</p>
                 ) : !orbitStores?.length ? (
-                  <p className="text-sm text-muted-foreground">No stores returned from Orbit.</p>
+                  <p className="text-sm text-muted-foreground">No stores returned.</p>
                 ) : (
                   <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
                     {orbitStores.map((s) => (
@@ -463,12 +458,11 @@ export function SuperAdminDashboard() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">Multi-store report (Orbit)</h3>
+              <h3 className="text-sm font-medium">Multi-store report</h3>
               <div className="rounded-lg border p-3">
                 {!canMultiStoreReport ? (
                   <p className="text-sm text-muted-foreground">
-                    Admin-level session required for{" "}
-                    <code className="text-xs">GET /admin/system-reports/multi-store</code>.
+                    An admin-level session is required for the multi-store revenue report.
                   </p>
                 ) : (
                   <>
@@ -552,9 +546,8 @@ export function SuperAdminDashboard() {
                       <p className="mt-2 text-xs text-muted-foreground">No report data yet.</p>
                     )}
                     <p className="mt-3 text-xs text-muted-foreground">
-                      Snapshot card above still uses{" "}
-                      <code className="text-xs">/api/orbit/admin/system-reports</code> (global
-                      inventory slice). Multi-store rows use Orbit store and order/revenue data.
+                      The snapshot cards above summarize system-wide metrics. This table breaks results
+                      down by store.
                     </p>
                   </>
                 )}
@@ -564,7 +557,7 @@ export function SuperAdminDashboard() {
                     <table className="w-full text-sm">
                       <tbody>
                         <tr className="border-b">
-                          <td className="p-2 text-muted-foreground">Revenue (today, UTC)</td>
+                          <td className="p-2 text-muted-foreground">Revenue (today)</td>
                           <td className="p-2 font-medium">
                             {loadingReports
                               ? "…"
@@ -594,7 +587,7 @@ export function SuperAdminDashboard() {
                           </td>
                         </tr>
                         <tr>
-                          <td className="p-2 text-muted-foreground">Maintenance (placeholder)</td>
+                          <td className="p-2 text-muted-foreground">Maintenance</td>
                           <td className="p-2 text-xs">
                             {loadingReports
                               ? "…"
@@ -621,8 +614,7 @@ export function SuperAdminDashboard() {
               <div className="rounded-lg border p-4">
                 <h4 className="text-sm font-medium">Create user</h4>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Admin-level accounts can register users on the OrbitDB backend (same as{" "}
-                  <code className="text-xs">POST /backend/auth/register</code>).
+                  Admin-level accounts can register new users from this form.
                 </p>
                 <form onSubmit={createUser} className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -719,7 +711,7 @@ export function SuperAdminDashboard() {
                   {!users?.length ? (
                     <tr className="border-t">
                       <td className="p-2 text-muted-foreground" colSpan={3}>
-                        No users loaded (forbidden or API unavailable).
+                        No users loaded. Check permissions or try again later.
                       </td>
                     </tr>
                   ) : (
@@ -756,12 +748,10 @@ export function SuperAdminDashboard() {
                                 ))}
                               </select>
                             ) : (
-                              normalizeUserManagementRole(
-                                defaultDashboardRoleForOrbitAccess(
-                                  u.role,
-                                  u.userRole,
-                                  u.enum
-                                )
+                              defaultDashboardRoleForOrbitAccess(
+                                u.role,
+                                u.userRole,
+                                u.enum
                               )
                             )}
                           </td>
@@ -799,9 +789,7 @@ export function SuperAdminDashboard() {
               <h3 className="text-sm font-medium">System-Wide Reports</h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Summaries from{" "}
-                  <code className="text-xs">/api/orbit/admin/system-reports</code> (inventory,
-                  revenue reports, maintenance machines when Orbit returns them).
+                  Summaries combine inventory, revenue, and maintenance machine counts when available.
                 </p>
                 {reports?.note ? (
                   <p className="mt-2 text-xs text-muted-foreground">{reports.note}</p>
@@ -814,7 +802,7 @@ export function SuperAdminDashboard() {
                     </span>
                   </li>
                   <li>
-                    Revenue today (UTC):{" "}
+                    Revenue today:{" "}
                     <span className="font-medium">
                       {loadingReports
                         ? "…"
@@ -888,8 +876,8 @@ export function SuperAdminDashboard() {
             <h3 className="text-sm font-medium">See Any Page</h3>
             <div className="rounded-lg border p-3">
               <p className="text-sm text-muted-foreground">
-                Open another role dashboard in a preview panel (navigation only). Requires Orbit:
-                enforced page-level permissions and middleware.
+                Open another role dashboard in a preview panel (navigation only). Your account still
+                controls which areas you can access.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" asChild>
