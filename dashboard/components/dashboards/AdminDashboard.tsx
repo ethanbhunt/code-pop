@@ -10,10 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ALL_ROLES, Role } from "@/lib/roles";
+import { Role, USER_MANAGEMENT_ROLES } from "@/lib/roles";
 import {
-  dashboardRoleToOrbit,
-  defaultDashboardRoleForOrbit,
+  dashboardRoleToOrbitAccess,
+  defaultDashboardRoleForOrbitAccess,
 } from "@/lib/orbit-role-map";
 import { downloadTextFile, rowsToCsv } from "@/lib/csv";
 
@@ -66,7 +66,13 @@ type OrbitUser = {
   firstName?: string;
   lastName?: string;
   role: string;
+  userRole?: string;
+  enum?: string;
 };
+
+function normalizeUserManagementRole(role: Role): Role {
+  return role === Role.Staff ? Role.Manager : role;
+}
 
 type AdminMetrics = {
   totalUsers: number;
@@ -166,7 +172,9 @@ export function AdminDashboard() {
       const list = json.data ?? [];
       const picks: Record<number, Role> = {};
       for (const u of list) {
-        picks[u.userId] = defaultDashboardRoleForOrbit(u.role);
+        picks[u.userId] = normalizeUserManagementRole(
+          defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+        );
       }
       setInitialRolePick(picks);
       setRoleDraft(picks);
@@ -264,8 +272,16 @@ export function AdminDashboard() {
 
   async function saveUserRole(u: OrbitUser) {
     setUserMgmtError(null);
-    const draft = roleDraft[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
-    const baseline = initialRolePick[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
+    const draft =
+      roleDraft[u.userId] ??
+      normalizeUserManagementRole(
+        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+      );
+    const baseline =
+      initialRolePick[u.userId] ??
+      normalizeUserManagementRole(
+        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+      );
     if (draft === baseline) return;
     if (myUserId != null && u.userId === myUserId) {
       setUserMgmtError("You cannot change your own role.");
@@ -273,10 +289,11 @@ export function AdminDashboard() {
     }
     setSavingUserId(u.userId);
     try {
+      const access = dashboardRoleToOrbitAccess(draft);
       const res = await fetch(`/api/orbit/users/${u.userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: dashboardRoleToOrbit(draft) }),
+        body: JSON.stringify(access),
       });
       if (!res.ok) {
         setUserMgmtError(await res.text().catch(() => res.statusText));
@@ -549,7 +566,12 @@ export function AdminDashboard() {
                     users.map((u) => {
                       const isSelf = myUserId != null && u.userId === myUserId;
                       const baseline =
-                        initialRolePick[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
+                        initialRolePick[u.userId] ??
+                        defaultDashboardRoleForOrbitAccess(
+                          u.role,
+                          u.userRole,
+                          u.enum
+                        );
                       const draft = roleDraft[u.userId] ?? baseline;
                       const roleDirty = draft !== baseline;
                       return (
@@ -557,7 +579,9 @@ export function AdminDashboard() {
                           <td className="p-2">{u.username}</td>
                           <td className="p-2">
                             {isSelf ? (
-                              <span className="text-muted-foreground">{draft}</span>
+                              <span className="text-muted-foreground">
+                                {normalizeUserManagementRole(draft)}
+                              </span>
                             ) : (
                               <select
                                 className="h-8 w-full min-w-36 rounded-md border border-input bg-transparent px-2 text-sm"
@@ -569,7 +593,7 @@ export function AdminDashboard() {
                                   }))
                                 }
                               >
-                                {ALL_ROLES.map((r) => (
+                                {USER_MANAGEMENT_ROLES.map((r) => (
                                   <option key={r} value={r}>
                                     {r}
                                   </option>

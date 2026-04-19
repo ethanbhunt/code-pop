@@ -18,3 +18,13 @@ export const ALL_ROLES: readonly Role[] = [
   Role.RepairStaff,
   Role.Customer,
 ] as const;
+
+/** Roles shown in user management forms (legacy Staff maps to Manager). */
+export const USER_MANAGEMENT_ROLES: readonly Role[] = [
+  Role.SuperAdmin,
+  Role.Admin,
+  Role.LogisticsManager,
+  Role.Manager,
+  Role.RepairStaff,
+  Role.Customer,
+] as const;

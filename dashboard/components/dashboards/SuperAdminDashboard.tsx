@@ -13,10 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ALL_ROLES, Role } from "@/lib/roles";
+import { Role, USER_MANAGEMENT_ROLES } from "@/lib/roles";
 import {
-  dashboardRoleToOrbit,
-  defaultDashboardRoleForOrbit,
+  dashboardRoleToOrbitAccess,
+  defaultDashboardRoleForOrbitAccess,
 } from "@/lib/orbit-role-map";
 import {
   hasOrbitAdminDashboardRole,
@@ -54,7 +54,13 @@ type OrbitUser = {
   userId: number;
   username: string;
   role: string;
+  userRole?: string;
+  enum?: string;
 };
+
+function normalizeUserManagementRole(role: Role): Role {
+  return role === Role.Staff ? Role.Manager : role;
+}
 
 type OrbitStoreRow = {
   storeId: number;
@@ -244,7 +250,9 @@ export function SuperAdminDashboard() {
     const list = json.data ?? [];
     const picks: Record<number, Role> = {};
     for (const u of list) {
-      picks[u.userId] = defaultDashboardRoleForOrbit(u.role);
+      picks[u.userId] = normalizeUserManagementRole(
+        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+      );
     }
     setInitialRolePick(picks);
     setRoleDraft(picks);
@@ -268,8 +276,11 @@ export function SuperAdminDashboard() {
   async function saveRoleForUser(u: OrbitUser) {
     setUserActionError(null);
     const draft =
-      roleDraft[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
-    const nextOrbit = dashboardRoleToOrbit(draft);
+      roleDraft[u.userId] ??
+      normalizeUserManagementRole(
+        defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum)
+      );
+    const nextOrbit = dashboardRoleToOrbitAccess(draft);
     if (myUserId != null && u.userId === myUserId) {
       setUserActionError("You cannot change your own role.");
       return;
@@ -279,7 +290,7 @@ export function SuperAdminDashboard() {
       const res = await fetch(`/api/orbit/users/${u.userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: nextOrbit }),
+        body: JSON.stringify(nextOrbit),
       });
       if (!res.ok) {
         const text = await res.text();
@@ -314,7 +325,7 @@ export function SuperAdminDashboard() {
           email: createEmail.trim(),
           firstName: createFirstName.trim() || undefined,
           lastName: createLastName.trim() || undefined,
-          role: dashboardRoleToOrbit(createRole),
+          ...dashboardRoleToOrbitAccess(createRole),
         }),
       });
       if (!res.ok) {
@@ -672,7 +683,7 @@ export function SuperAdminDashboard() {
                       value={createRole}
                       onChange={(e) => setCreateRole(e.target.value as Role)}
                     >
-                      {ALL_ROLES.map((r) => (
+                      {USER_MANAGEMENT_ROLES.map((r) => (
                         <option key={r} value={r}>
                           {r}
                         </option>
@@ -716,7 +727,11 @@ export function SuperAdminDashboard() {
                       const isSelf = myUserId != null && u.userId === myUserId;
                       const baseline =
                         initialRolePick[u.userId] ??
-                        defaultDashboardRoleForOrbit(u.role);
+                        defaultDashboardRoleForOrbitAccess(
+                          u.role,
+                          u.userRole,
+                          u.enum
+                        );
                       const draft = roleDraft[u.userId] ?? baseline;
                       const unchanged = draft === baseline;
                       return (
@@ -734,14 +749,20 @@ export function SuperAdminDashboard() {
                                   }))
                                 }
                               >
-                                {ALL_ROLES.map((r) => (
+                                {USER_MANAGEMENT_ROLES.map((r) => (
                                   <option key={r} value={r}>
                                     {r}
                                   </option>
                                 ))}
                               </select>
                             ) : (
-                              defaultDashboardRoleForOrbit(u.role)
+                              normalizeUserManagementRole(
+                                defaultDashboardRoleForOrbitAccess(
+                                  u.role,
+                                  u.userRole,
+                                  u.enum
+                                )
+                              )
                             )}
                           </td>
                           <td className="p-2">
