@@ -491,30 +491,6 @@ export function RepairStaffDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium">Repair Workflow</h3>
-            <div className="rounded-lg border p-3">
-              {loadingMaintenance && !repairWorkflow ? (
-                <p className="text-sm text-muted-foreground">Loading workflow…</p>
-              ) : repairWorkflow ? (
-                <ol className="space-y-2 text-sm">
-                  {repairWorkflow.workflow.map((s) => (
-                    <li
-                      key={s.step}
-                      className="flex items-start gap-2"
-                    >
-                      <span className={s.done ? "text-emerald-600" : "text-muted-foreground"}>
-                        {s.done ? "✓" : "•"}
-                      </span>
-                      <span>{s.step}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="text-sm text-destructive">Workflow unavailable.</p>
-              )}
-            </div>
-          </div>
 
           <div className="space-y-3">
             <h3 className="text-sm font-medium">Machines in your stores</h3>
