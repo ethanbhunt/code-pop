@@ -9,6 +9,7 @@ import {
   validatePassword,
   validateUserRole,
 } from "../utils/validation.js"
+import { mergeAccessFromUserRecord } from "../middleware/auth.js"
 
 /** Persist customer | staff | admin | repair; map seed/legacy names. */
 function normalizeOrbitRoleForStorage(role) {
@@ -29,9 +30,20 @@ function normalizeOrbitRoleForStorage(role) {
  * @param {string} role - User's role default is 'customer'
  * @param {string} firstName - First name (optional)
  * @param {string} lastName - Last name (optional)
+ * @param {string} [userRoleOpt] - Optional finer-grained role (manager, staff, …)
+ * @param {string} [enumOpt] - Optional enum mirror of userRole
  * @returns {Object} User data without password + token
  */
-export async function registerUser(username, password, email, role = "customer",  firstName = "", lastName = "") {
+export async function registerUser(
+  username,
+  password,
+  email,
+  role = "customer",
+  firstName = "",
+  lastName = "",
+  userRoleOpt = undefined,
+  enumOpt = undefined,
+) {
   // Validate inputs
   if (!validateUsername(username)) {
     throw new Error("Invalid username. Must be 3-50 characters, alphanumeric and underscores only")
@@ -90,6 +102,22 @@ export async function registerUser(username, password, email, role = "customer",
     lastLogin: null
   }
 
+  if (userRoleOpt !== undefined && userRoleOpt !== null && String(userRoleOpt).trim() !== "") {
+    const ur = String(userRoleOpt).trim().toLowerCase().replace(/\s+/g, "_")
+    if (!validateUserRole(ur)) {
+      throw new Error("Invalid userRole")
+    }
+    user.userRole = ur
+  }
+
+  if (enumOpt !== undefined && enumOpt !== null && String(enumOpt).trim() !== "") {
+    const en = String(enumOpt).trim().toLowerCase().replace(/\s+/g, "_")
+    if (!validateUserRole(en)) {
+      throw new Error("Invalid enum")
+    }
+    user.enum = en
+  }
+
   // Save user to database
   await usersDb.put(`user:${userId}`, user)
 
@@ -113,6 +141,8 @@ export async function registerUser(username, password, email, role = "customer",
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    ...(user.userRole !== undefined && { userRole: user.userRole }),
+    ...(user.enum !== undefined && { enum: user.enum }),
     token: tokenKey
   }
 }
@@ -175,6 +205,8 @@ export async function loginUser(username, password) {
   const tokensDb = getTokensDb()
   await tokensDb.put(`token:${tokenKey}`, token)
 
+  const access = mergeAccessFromUserRecord(user)
+
   // Return user data without password hash
   return {
     userId: user.userId,
@@ -183,6 +215,8 @@ export async function loginUser(username, password) {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    userRole: access.userRole,
+    enum: access.enum,
     token: tokenKey
   }
 }

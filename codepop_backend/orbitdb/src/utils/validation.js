@@ -233,6 +233,14 @@ export function validateReorderStatus(status) {
  */
 export function validateUserRole(role) {
   if (!role || typeof role !== "string") return false
-  const allowedRoles = ["customer", "staff", "repair", "manager", "admin", "super_admin"]
+  const allowedRoles = [
+    "customer",
+    "staff",
+    "repair",
+    "manager",
+    "logistics_manager",
+    "admin",
+    "super_admin",
+  ]
   return allowedRoles.includes(role.toLowerCase())
 }

@@ -1,7 +1,7 @@
 // src/routes/revenues.js
 import express from "express"
 import { asyncHandler } from "../middleware/errorHandler.js"
-import { authenticate, requireAdmin } from "../middleware/auth.js"
+import { authenticate, requireAdmin, requireRevenueReportAccess } from "../middleware/auth.js"
 import * as revenueService from "../services/revenueService.js"
 
 const router = express.Router()
@@ -18,7 +18,7 @@ router.post("/", asyncHandler(async (req, res) => {
    res.status(201).json({ status: "created", data: revenue })
 }))
 
-router.get("/report", authenticate, requireAdmin, asyncHandler(async (req, res) => {
+router.get("/report", authenticate, requireRevenueReportAccess, asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query
   const report = await revenueService.generateRevenueReport(startDate, endDate)
   res.json({ status: "success", data: report })

@@ -10,10 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ALL_ROLES, Role } from "@/lib/roles";
+import { Role, USER_MANAGEMENT_ROLES } from "@/lib/roles";
 import {
-  dashboardRoleToOrbit,
-  defaultDashboardRoleForOrbit,
+  dashboardRoleToOrbitAccess,
+  defaultDashboardRoleForOrbitAccess,
 } from "@/lib/orbit-role-map";
 import { downloadTextFile, rowsToCsv } from "@/lib/csv";
 
@@ -66,6 +66,8 @@ type OrbitUser = {
   firstName?: string;
   lastName?: string;
   role: string;
+  userRole?: string;
+  enum?: string;
 };
 
 type AdminMetrics = {
@@ -111,6 +113,19 @@ export function AdminDashboard() {
     return 0;
   }
 
+  /** Global inventory lists one row per store; sort so same item name groups are readable. */
+  const sortedInventory = useMemo(() => {
+    const rows = inventory ?? [];
+    return [...rows].sort((a, b) => {
+      const sa = a.storeId ?? 0;
+      const sb = b.storeId ?? 0;
+      if (sa !== sb) return sa - sb;
+      return (a.itemName ?? "").localeCompare(b.itemName ?? "", undefined, {
+        sensitivity: "base",
+      });
+    });
+  }, [inventory]);
+
   const loadMetrics = useCallback(async () => {
     setLoadingMetrics(true);
     try {
@@ -153,7 +168,11 @@ export function AdminDashboard() {
       const list = json.data ?? [];
       const picks: Record<number, Role> = {};
       for (const u of list) {
-        picks[u.userId] = defaultDashboardRoleForOrbit(u.role);
+        picks[u.userId] = defaultDashboardRoleForOrbitAccess(
+          u.role,
+          u.userRole,
+          u.enum
+        );
       }
       setInitialRolePick(picks);
       setRoleDraft(picks);
@@ -251,8 +270,12 @@ export function AdminDashboard() {
 
   async function saveUserRole(u: OrbitUser) {
     setUserMgmtError(null);
-    const draft = roleDraft[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
-    const baseline = initialRolePick[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
+    const draft =
+      roleDraft[u.userId] ??
+      defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum);
+    const baseline =
+      initialRolePick[u.userId] ??
+      defaultDashboardRoleForOrbitAccess(u.role, u.userRole, u.enum);
     if (draft === baseline) return;
     if (myUserId != null && u.userId === myUserId) {
       setUserMgmtError("You cannot change your own role.");
@@ -260,10 +283,11 @@ export function AdminDashboard() {
     }
     setSavingUserId(u.userId);
     try {
+      const access = dashboardRoleToOrbitAccess(draft);
       const res = await fetch(`/api/orbit/users/${u.userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: dashboardRoleToOrbit(draft) }),
+        body: JSON.stringify(access),
       });
       if (!res.ok) {
         setUserMgmtError(await res.text().catch(() => res.statusText));
@@ -367,8 +391,7 @@ export function AdminDashboard() {
         <CardHeader>
           <CardTitle>Admin Dashboard</CardTitle>
           <CardDescription>
-            Inventory, users, and revenue metrics from the OrbitDB API (admin role on
-            backend).
+            Inventory, user accounts, and revenue metrics for administrators.
           </CardDescription>
         </CardHeader>
 
@@ -386,7 +409,7 @@ export function AdminDashboard() {
                 {loadingMetrics ? "…" : (metrics?.activeAccounts ?? "—")}
               </p>
               <p className="text-xs text-muted-foreground">
-                No separate &quot;active&quot; flag in OrbitDB yet.
+                Reflects accounts returned for this list.
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -418,6 +441,7 @@ export function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30">
                   <tr className="text-left">
+                    <th className="p-2">Store</th>
                     <th className="p-2">Item</th>
                     <th className="p-2">Type</th>
                     <th className="p-2">Qty</th>
@@ -429,24 +453,27 @@ export function AdminDashboard() {
                 <tbody>
                   {loadingInv && !inventory ? (
                     <tr>
-                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                      <td className="p-2 text-muted-foreground" colSpan={7}>
                         Loading inventory…
                       </td>
                     </tr>
                   ) : !inventory?.length ? (
                     <tr>
-                      <td className="p-2 text-muted-foreground" colSpan={6}>
+                      <td className="p-2 text-muted-foreground" colSpan={7}>
                         No inventory rows (or failed to load).
                       </td>
                     </tr>
                   ) : (
-                    inventory.map((row) => {
+                    sortedInventory.map((row) => {
                       const thr = rowThreshold(row);
                       const low = thr > 0 && row.quantity < thr;
                       const draft =
                         draftQty[row.inventoryId] ?? String(row.quantity);
                       return (
                         <tr key={row.inventoryId} className="border-t">
+                          <td className="p-2 tabular-nums">
+                            {row.storeId != null ? row.storeId : "—"}
+                          </td>
                           <td className="p-2">{row.itemName}</td>
                           <td className="p-2">{row.itemType}</td>
                           <td className="p-2">
@@ -487,6 +514,10 @@ export function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-muted-foreground">
+              The list is all stores combined: the same item name can appear once per store (not a
+              duplicate row).
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -528,7 +559,12 @@ export function AdminDashboard() {
                     users.map((u) => {
                       const isSelf = myUserId != null && u.userId === myUserId;
                       const baseline =
-                        initialRolePick[u.userId] ?? defaultDashboardRoleForOrbit(u.role);
+                        initialRolePick[u.userId] ??
+                        defaultDashboardRoleForOrbitAccess(
+                          u.role,
+                          u.userRole,
+                          u.enum
+                        );
                       const draft = roleDraft[u.userId] ?? baseline;
                       const roleDirty = draft !== baseline;
                       return (
@@ -548,7 +584,7 @@ export function AdminDashboard() {
                                   }))
                                 }
                               >
-                                {ALL_ROLES.map((r) => (
+                                {USER_MANAGEMENT_ROLES.map((r) => (
                                   <option key={r} value={r}>
                                     {r}
                                   </option>
@@ -587,8 +623,8 @@ export function AdminDashboard() {
               </table>
             </div>
             <p className="text-xs text-muted-foreground">
-              Role changes call <code className="text-xs">PUT /api/orbit/users/:id</code> (Orbit
-              role tier). Grant manager/logistics/repair by selecting the matching dashboard role.
+              Save updates the user&apos;s dashboard role. Grant manager, logistics, or repair by
+              selecting the matching role.
             </p>
           </div>
 
@@ -628,7 +664,7 @@ export function AdminDashboard() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {inventoryOnHandValue.withCost} of {inventoryOnHandValue.totalLines} rows
-                      include unit cost. Maintenance spend is not aggregated in Orbit yet.
+                      include unit cost. Maintenance spend is shown separately when available.
                     </p>
                     <Button
                       type="button"
@@ -660,9 +696,8 @@ export function AdminDashboard() {
               </div>
               <div className="rounded-lg border p-3 space-y-2">
                 <p className="text-sm">
-                  Today (KPI tile) and trailing{" "}
-                  <span className="font-medium">30 days</span> from{" "}
-                  <code className="text-xs">/api/orbit/revenues/report</code>.
+                  Today (KPI tile) and trailing <span className="font-medium">30 days</span> use the
+                  same revenue report window.
                 </p>
                 <p className="text-sm">
                   Last 30 days revenue:{" "}
@@ -692,8 +727,8 @@ export function AdminDashboard() {
             </div>
             <div className="rounded-lg border p-3">
               <p className="mb-2 text-xs text-muted-foreground">
-                Orbit notifications feed (types such as <code className="text-xs">complaint</code>{" "}
-                surface here when recorded). There is no separate complaints table yet.
+                Inbound notifications and messages (for example complaint or support types) appear here
+                when recorded.
               </p>
               {loadingNotif && !notifications ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>

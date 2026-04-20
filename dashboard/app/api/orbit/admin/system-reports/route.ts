@@ -1,15 +1,14 @@
 import { auth } from "@/auth";
+import {
+  countLowStockRows,
+  fetchInventoryMergedAcrossStores,
+  storeIdsFromOrbitStoresPayload,
+} from "@/lib/orbit-inventory-by-store";
 import { getOrbitBaseUrl, orbitJson } from "@/lib/orbit-fetch";
 import { getAccessToken, hasOrbitAdminDashboardRole } from "@/lib/orbit-session";
+import { totalRevenueFromOrbitRevenueReportBody } from "@/lib/orbit-revenue-report";
 
 type UsersPayload = { data?: unknown[] };
-type InventoryPayload = {
-  data?: Array<{
-    quantity?: number;
-    thresholdLevel?: number;
-    minThreshold?: number;
-  }>;
-};
 
 type MachineRow = { status?: string };
 type TransferRow = {
@@ -18,15 +17,6 @@ type TransferRow = {
   status?: string;
 };
 type StoreRow = { storeId: number; region?: string };
-
-function itemThreshold(i: {
-  thresholdLevel?: number;
-  minThreshold?: number;
-}): number {
-  if (typeof i.thresholdLevel === "number") return i.thresholdLevel;
-  if (typeof i.minThreshold === "number") return i.minThreshold;
-  return 0;
-}
 
 function orbitInnerDataArray<T>(res: {
   ok: boolean;
@@ -71,16 +61,17 @@ export async function GET() {
   }
   if (!getOrbitBaseUrl()) {
     return Response.json(
-      { error: "ORBITDB_API_URL or DJANGO_API_URL is not configured" },
+      { error: "Data service URL is not configured" },
       { status: 503 }
     );
   }
 
-  type MultiStorePayload = { aggregates?: { storeCount?: number } };
+  type MultiStorePayload = {
+    aggregates?: { storeCount?: number; totalRevenue?: number; totalOrders?: number };
+  };
   const now = new Date().toISOString();
   const [
     usersR,
-    invR,
     revToday,
     revWeek,
     revMonth,
@@ -90,18 +81,17 @@ export async function GET() {
     storesR,
   ] = await Promise.all([
     orbitJson<UsersPayload>(token, "/users", { method: "GET" }),
-    orbitJson<InventoryPayload>(token, "/inventory", { method: "GET" }),
-    orbitJson<{ totalRevenue?: number }>(
+    orbitJson<unknown>(
       token,
       `/revenues/report?startDate=${encodeURIComponent(startOfTodayIso())}&endDate=${encodeURIComponent(now)}`,
       { method: "GET" }
     ),
-    orbitJson<{ totalRevenue?: number }>(
+    orbitJson<unknown>(
       token,
       `/revenues/report?startDate=${encodeURIComponent(startOfWeekIso())}&endDate=${encodeURIComponent(now)}`,
       { method: "GET" }
     ),
-    orbitJson<{ totalRevenue?: number }>(
+    orbitJson<unknown>(
       token,
       `/revenues/report?startDate=${encodeURIComponent(startOfMonthIso())}&endDate=${encodeURIComponent(now)}`,
       { method: "GET" }
@@ -117,9 +107,6 @@ export async function GET() {
   if (!usersR.ok) {
     return new Response(usersR.body, { status: usersR.status });
   }
-  if (!invR.ok) {
-    return new Response(invR.body, { status: invR.status });
-  }
   if (!revToday.ok) {
     return new Response(revToday.body, { status: revToday.status });
   }
@@ -130,16 +117,16 @@ export async function GET() {
     return new Response(revMonth.body, { status: revMonth.status });
   }
 
-  const items = invR.data.data ?? [];
-  const lowCount = items.filter((i) => {
-    if (typeof i.quantity !== "number") return false;
-    const thr = itemThreshold(i);
-    return thr > 0 && i.quantity < thr;
-  }).length;
+  const storesList = orbitInnerDataArray<StoreRow>(storesR);
+  const storeIds = storeIdsFromOrbitStoresPayload(storesR.ok ? storesR.data : null);
+  const inventoryRows = await fetchInventoryMergedAcrossStores(
+    token,
+    storeIds.length ? storeIds : [1, 2, 3]
+  );
+  const lowCount = countLowStockRows(inventoryRows);
 
   const machines = orbitInnerDataArray<MachineRow>(machR);
   const transfers = orbitInnerDataArray<TransferRow>(transR);
-  const storesList = orbitInnerDataArray<StoreRow>(storesR);
 
   const inWarning = machines.filter(
     (m) => String(m.status ?? "").toLowerCase() === "warning"
@@ -177,9 +164,9 @@ export async function GET() {
     };
   });
 
-  const today = revToday.data.totalRevenue ?? 0;
-  const week = revWeek.data.totalRevenue ?? 0;
-  const month = revMonth.data.totalRevenue ?? 0;
+  const today = totalRevenueFromOrbitRevenueReportBody(revToday.data);
+  const week = totalRevenueFromOrbitRevenueReportBody(revWeek.data);
+  const month = totalRevenueFromOrbitRevenueReportBody(revMonth.data);
   const multiBody = multiStoreR.ok ? multiStoreR.data : null;
   const multiInner =
     multiBody &&
@@ -191,6 +178,11 @@ export async function GET() {
       : (multiBody as MultiStorePayload | null);
   const storeCountFromMulti =
     multiInner?.aggregates?.storeCount != null ? multiInner.aggregates.storeCount : null;
+  const totalRevenueLast30Days =
+    multiInner?.aggregates?.totalRevenue != null &&
+    typeof multiInner.aggregates.totalRevenue === "number"
+      ? multiInner.aggregates.totalRevenue
+      : undefined;
 
   const useHubRows =
     hubActivity.some((h) => h.pendingShipments > 0) || storesList.length > 0;
@@ -211,6 +203,7 @@ export async function GET() {
       inventoryLowCount: lowCount,
       totalStores: storeCountFromMulti ?? (storesList.length > 0 ? storesList.length : 1),
       totalRevenueToday: today,
+      totalRevenueLast30Days,
     },
     revenue: { today, week, month },
     maintenance: {
@@ -222,9 +215,9 @@ export async function GET() {
     hubActivity: hubActivityOut,
     note:
       machines.length > 0 || pendingTransfers.length > 0
-        ? "Revenue, inventory, users, store counts, maintenance machines, and regional transfer activity from Orbit when authorized."
+        ? "Revenue, inventory, users, store counts, maintenance machines, and regional transfer activity when authorized."
         : storeCountFromMulti != null
-          ? "Revenue and inventory/users from OrbitDB; store count from multi-store report. Maintenance/transfers returned no rows or were not permitted."
-          : "Revenue and inventory/users from OrbitDB; maintenance, transfers, and store list are best-effort.",
+          ? "Revenue, inventory, and user metrics are live; store count comes from the multi-store report. Maintenance and transfers returned no rows or were not permitted."
+          : "Revenue, inventory, and user metrics are live; maintenance, transfers, and the full store list are best-effort.",
   });
 }

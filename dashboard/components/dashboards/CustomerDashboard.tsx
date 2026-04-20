@@ -15,8 +15,8 @@ export function CustomerDashboard() {
         <CardHeader>
           <CardTitle>Customer</CardTitle>
           <CardDescription>
-            Account home for customer-tier users. Hook up orders, favorites, and menu
-            when those APIs are wired.
+            Account home for customer-tier users. Orders, favorites, and menu appear here when
+            available.
           </CardDescription>
         </CardHeader>
         <CardContent>

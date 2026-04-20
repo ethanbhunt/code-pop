@@ -24,9 +24,9 @@
     "store-3-revenues": "/orbitdb/zdpuApYTjAyxmisHn8DBuUpizLSC6dvXKVGNTSt4yWq6V8nHb"
   },
   "multiaddrs": [
-    "/ip4/10.0.0.105/tcp/4000/p2p/12D3KooWMnMM7RJpwz1WsY7TNFJaH8bTqWqFyaUhTagh8MAMzEiu",
-    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWMnMM7RJpwz1WsY7TNFJaH8bTqWqFyaUhTagh8MAMzEiu"
+    "/ip4/127.0.0.1/tcp/4000/p2p/12D3KooWKPTEnBujuDgQEEJJytEGz6PgBMXcFe1B7sx26rgdeHUE",
+    "/ip4/100.64.23.230/tcp/4000/p2p/12D3KooWKPTEnBujuDgQEEJJytEGz6PgBMXcFe1B7sx26rgdeHUE"
   ],
-  "peerId": "12D3KooWMnMM7RJpwz1WsY7TNFJaH8bTqWqFyaUhTagh8MAMzEiu",
-  "timestamp": "2026-04-09T02:11:59.991Z"
+  "peerId": "12D3KooWKPTEnBujuDgQEEJJytEGz6PgBMXcFe1B7sx26rgdeHUE",
+  "timestamp": "2026-04-17T18:56:28.437Z"
 }

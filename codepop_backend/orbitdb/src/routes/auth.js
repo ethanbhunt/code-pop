@@ -25,7 +25,7 @@ router.post(
   "/register",
   asyncHandler(async (req, res) => {
     
-    const { username, password, email, role, firstName, lastName } = req.body
+    const { username, password, email, role, firstName, lastName, userRole, enum: enumField } = req.body
 
     // Validate required fields
     const missing = validateRequiredFields(req.body, ["username", "password", "email"])
@@ -33,7 +33,7 @@ router.post(
       throw new ValidationError(`Missing required fields: ${missing.join(", ")}`)
     }
 
-    // registerUser(username, password, email, role, firstName, lastName) — role must come before names
+    // registerUser(..., userRole?, enum?) — optional finer-grained access (manager vs staff, etc.)
     const user = await registerUser(
   username,
       password,
@@ -41,6 +41,8 @@ router.post(
       typeof role === "string" && role.trim() ? role.trim() : "customer",
       firstName,
       lastName,
+      userRole,
+      enumField,
     )
 
     res.status(201).json({
@@ -65,8 +67,6 @@ router.post(
     }
 
     const user = await loginUser(username, password)
-
-    console.log(user);
 
     res.json({
       status: "authenticated",

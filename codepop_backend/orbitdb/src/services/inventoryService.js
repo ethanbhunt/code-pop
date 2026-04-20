@@ -169,16 +169,39 @@ export async function getLowStockItems(storeId = null) {
 export async function getStoreInventory(storeId, offset = 0, limit = 50) {
   const inventoryDb = getInventoryDb()
   const allItems = await inventoryDb.all()
-  
+
+  const sid = parseInt(storeId, 10)
   const storeItems = allItems
-    .filter(entry => entry.value && entry.value.storeId === storeId)
-    .map(entry => entry.value)
-    .sort((a, b) => a.itemName.localeCompare(b.itemName))
-  
-  const paginatedItems = storeItems.slice(offset, offset + limit)
-  
+    .filter((entry) => {
+      const v = entry.value
+      if (!v || v.inventoryId == null) return false
+      if (v.storeId === undefined || v.storeId === null) return false
+      return parseInt(v.storeId, 10) === sid
+    })
+    .map((entry) => entry.value)
+
+  // Multi-peer / repeated seeds can recreate the same logical item with different inventoryIds.
+  // One row per (store, item name) — keep the newest record (highest id).
+  const byItemName = new Map()
+  for (const item of storeItems) {
+    const key = String(item.itemName || "")
+      .trim()
+      .toLowerCase()
+    if (!key) continue
+    const prev = byItemName.get(key)
+    if (!prev || item.inventoryId > prev.inventoryId) {
+      byItemName.set(key, item)
+    }
+  }
+
+  const uniqueSorted = Array.from(byItemName.values()).sort((a, b) =>
+    String(a.itemName).localeCompare(String(b.itemName))
+  )
+
+  const paginatedItems = uniqueSorted.slice(offset, offset + limit)
+
   return {
-    count: storeItems.length,
+    count: uniqueSorted.length,
     data: paginatedItems
   }
 }

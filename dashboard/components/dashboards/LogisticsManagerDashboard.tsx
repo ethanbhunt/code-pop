@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { parseCsvText, rowsToCsv, downloadTextFile } from "@/lib/csv";
 import {
   Card,
@@ -126,6 +126,25 @@ export function LogisticsManagerDashboard() {
     return 0;
   }
 
+  /**
+   * Same store can contain multiple inventory rows for one flavor (e.g. repeated seed runs).
+   * Show one row per item+type; keep the row with the largest inventoryId for transfers.
+   */
+  const inventoryRowsForDisplay = useMemo(() => {
+    const rows = orbitInventory ?? [];
+    const byKey = new Map<string, OrbitInventoryItem>();
+    for (const r of rows) {
+      const k = `${(r.itemName ?? "").trim().toLowerCase()}\0${(r.itemType ?? "").trim().toLowerCase()}`;
+      const prev = byKey.get(k);
+      if (!prev || r.inventoryId > prev.inventoryId) {
+        byKey.set(k, r);
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) =>
+      (a.itemName ?? "").localeCompare(b.itemName ?? "", undefined, { sensitivity: "base" })
+    );
+  }, [orbitInventory]);
+
   const loadInventory = useCallback(async () => {
     setLoadingInv(true);
     setInventoryError(null);
@@ -172,7 +191,7 @@ export function LogisticsManagerDashboard() {
         const body = await trRes.text().catch(() => trRes.statusText);
         if (trRes.status === 403) {
           setLogisticsApiError(
-            "Transfers blocked (403). Sign in with an Orbit staff/manager user; the dashboard role must include Logistics Manager, Manager, or Admin."
+            "Transfers are not available for this session. Sign in with an account whose role includes Logistics Manager, Manager, or Admin."
           );
         } else if (body) {
           setLogisticsApiError(body);
@@ -187,7 +206,7 @@ export function LogisticsManagerDashboard() {
           setLogisticsApiError(
             (p) =>
               p ??
-              "Delivery assignments blocked (403) while transfers succeeded—check Orbit logistics permissions."
+              "Delivery assignments are not available for this session while transfers loaded. Check logistics permissions for your account."
           );
         } else if (asgRes.status !== 403) {
           const msg = await asgRes.text().catch(() => asgRes.statusText);
@@ -212,7 +231,7 @@ export function LogisticsManagerDashboard() {
   }, [loadLogisticsApi]);
 
   async function createOrbitTransfer() {
-    const inv = orbitInventory?.[0];
+    const inv = inventoryRowsForDisplay[0];
     if (!inv) {
       setLogisticsApiError("Need at least one inventory row to draft a transfer line.");
       return;
@@ -410,7 +429,7 @@ export function LogisticsManagerDashboard() {
     downloadTextFile(`demand-summary-${storeId}.csv`, rowsToCsv(rows));
   }
 
-  const lowStockItems = (orbitInventory ?? []).filter((i) => {
+  const lowStockItems = inventoryRowsForDisplay.filter((i) => {
     const thr = itemThreshold(i);
     return thr > 0 && i.quantity < thr;
   });
@@ -425,8 +444,8 @@ export function LogisticsManagerDashboard() {
           <CardTitle>Logistics Manager Dashboard</CardTitle>
           <CardDescription>
             Inventory is loaded{" "}
-            <span className="font-medium">per selected store</span> (Orbit staff cannot list global
-            inventory). Transfers and assignments require an Orbit staff/manager account.{" "}
+            <span className="font-medium">per selected store</span>. Global inventory is not listed in
+            this view. Transfers and delivery assignments need a staff or manager-capable account.{" "}
             {ctx ? `Context: ${ctx.region} / ${ctx.storeLabel}` : ""}
           </CardDescription>
         </CardHeader>
@@ -450,7 +469,7 @@ export function LogisticsManagerDashboard() {
                         Loading inventory…
                       </td>
                     </tr>
-                  ) : !orbitInventory?.length ? (
+                  ) : !inventoryRowsForDisplay.length ? (
                     <tr>
                       <td className="p-2 text-muted-foreground" colSpan={4}>
                         {inventoryError
@@ -459,7 +478,7 @@ export function LogisticsManagerDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    orbitInventory.map((inv) => {
+                    inventoryRowsForDisplay.map((inv) => {
                       const thr = itemThreshold(inv);
                       const low = thr > 0 && inv.quantity < thr;
                       return (
@@ -486,6 +505,12 @@ export function LogisticsManagerDashboard() {
                 Refresh inventory
               </Button>
             </div>
+            {orbitInventory && orbitInventory.length > inventoryRowsForDisplay.length ? (
+              <p className="text-xs text-muted-foreground">
+                Multiple records matched the same item for this store.
+                Showing one line per item using the newest record.
+              </p>
+            ) : null}
             {inventoryError && orbitInventory && orbitInventory.length > 0 ? (
               <p className="text-xs text-destructive">{inventoryError}</p>
             ) : null}
@@ -515,7 +540,7 @@ export function LogisticsManagerDashboard() {
                     disabled={!csvPreview}
                     onClick={() => void reloadAiPlaceholders()}
                   >
-                    Refetch mock AI forecast
+                    Refresh AI forecast
                   </Button>
                   <Button
                     type="button"
@@ -563,7 +588,8 @@ export function LogisticsManagerDashboard() {
                   </div>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Choose a CSV to preview locally. Persisted usage ingestion requires Orbit.
+                    Choose a CSV to preview locally. Saving usage to the server is available when your
+                    account can upload usage data.
                   </p>
                 )}
               </div>
@@ -575,9 +601,8 @@ export function LogisticsManagerDashboard() {
               </h3>
               <div className="rounded-lg border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Creates a persisted delivery assignment via{" "}
-                  <code className="text-xs">POST /logistics/delivery-assignments</code> using your
-                  session user id as <code className="text-xs">driverId</code>.
+                  Creates a delivery assignment for the selected route and transfer. You are recorded
+                  as the driver for the assignment.
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -686,8 +711,7 @@ export function LogisticsManagerDashboard() {
             <div className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted-foreground">
-                  Scoped to context store <span className="font-medium">{storeId}</span> via{" "}
-                  <code className="text-xs">GET /logistics/transfers?storeId=</code>.
+                  Transfers are scoped to store <span className="font-medium">{storeId}</span>.
                 </p>
                 <Button
                   type="button"
@@ -906,8 +930,8 @@ export function LogisticsManagerDashboard() {
                       </table>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Mock confidence bands come from forecast `lower`/`upper` in the AI payload.
-                      Deeper analytics need historical actuals in Orbit.
+                      Confidence bands use the forecast lower and upper range. Deeper analytics need
+                      enough historical actuals in the dataset.
                     </p>
                   </div>
                 ) : (
@@ -924,7 +948,7 @@ export function LogisticsManagerDashboard() {
                 {reorderNotifications && reorderNotifications.length > 0 ? (
                   <div className="mb-3">
                     <p className="text-xs font-medium text-muted-foreground">
-                      Orbit reorder queue (store {storeId})
+                      Reorder queue (store {storeId})
                     </p>
                     <ul className="mt-2 space-y-2 text-sm">
                       {reorderNotifications.map((n) => (
@@ -971,8 +995,8 @@ export function LogisticsManagerDashboard() {
                   </ul>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Reorder notifications from Orbit when available; remainder from live inventory +
-                  mock AI suggestions.
+                  Reorder notifications appear when recorded; suggestions may also come from live
+                  inventory and AI-assisted forecasts.
                 </p>
               </div>
             </div>
@@ -983,7 +1007,7 @@ export function LogisticsManagerDashboard() {
                 {exportMeta ? (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Mock CSV export payload for this region/store context.
+                      Sample export for this region and store context.
                     </p>
                     <div className="rounded-md bg-muted/30 p-2 text-xs text-muted-foreground">
                       Filename: {exportMeta.filename}
@@ -1011,7 +1035,7 @@ export function LogisticsManagerDashboard() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Load export metadata from the placeholder API (region/store context).
+                    Load export metadata for the current region and store context.
                   </p>
                 )}
                 <div className="mt-3 flex gap-2">
