@@ -3,10 +3,16 @@
 ## 1. Introduction
 
 **1.1 Overview of CodePop**
-CodePop is an innovative beverage application that leverages AI, automation, and distributed systems to redefine soda customization and ordering. The platform supports mobile and desktop usage and is designed for minimal human intervention, relying on AI-driven inventory management, ordering, logistics coordination, and maintenance tracking.
+CodePop is a multi-app beverage platform with a mobile app, a desktop dashboard, and a decentralized backend. The visible stack uses Expo React Native for the mobile experience, Next.js and next-auth for the dashboard, and OrbitDB/libp2p/Express for the peer backend. Django and the Python toolchain still appear in the repository, but they should be described as supporting backend-related workflows rather than the only runtime architecture.
 
 **1.2 Purpose of This Document**
-This document defines the complete functional, non-functional, business, and system requirements for CodePop. It aligns developers, stakeholders, and system architects on scope, priorities, and responsibilities, including newly introduced multi-store, logistics, and maintenance capabilities.
+This document defines the functional, non-functional, business, and system requirements for the current project state. It keeps planned features that are not yet implemented, but marks them clearly so the docs distinguish between what exists in code and what remains future work.
+
+**1.3 Implementation Status Legend**
+
+- **Implemented**: visible in code, scripts, or tests in this workspace.
+- **Partial**: some UI, tests, or wiring exists, but the feature is not complete end to end.
+- **Not implemented**: described in earlier docs or UI scaffolding, but no working runtime implementation is visible.
 
 **1.3 MoSCoW Analysis**
 Requirements are categorized as:
@@ -16,11 +22,39 @@ Requirements are categorized as:
 - **C** – Could Have  
 - **W** – Won’t Have  
 
+**Must Have (implemented in code/tests):**
+- Multi-app runtime: Expo mobile app, Next.js dashboard, OrbitDB/libp2p peer backend
+- Core account auth flows (register/login/token-based access) and role-aware dashboard access
+- Core ordering flow (drink browsing/customization, cart, checkout, order confirmation/tracking screens)
+- Distributed backend foundation: bootstrap + peer nodes, service discovery, multi-bootstrap failover, peer sync tests
+- Multi-store and supply-hub data model with seeding automation (7 hubs, 55+ stores)
+- Store-scoped operational APIs for inventory, orders, supply transfers, and audit logging
+
+**Should Have (partial):**
+- Maintenance workflows (core models/routes present, advanced scheduling/optimization still incomplete)
+- Inventory reporting and low-stock operations (core APIs present, full alert/report UX still in progress)
+- Post-checkout/pickup operational automation (status UX implemented; stale-order disposal automation incomplete)
+- Refund and complaint handling coverage (present in design/runtime paths but not fully end-to-end validated)
+
+**Could Have (deferred):**
+- Saved payment methods for faster checkout
+- Loyalty points and rewards program
+- Social sharing features
+- Advanced recommendation quality improvements based on drink ratings/history
+
+**Won't Have (current release scope):**
+- Global external-trend-based inventory forecasting as a production dependency
+- Shared user accounts across multiple individuals
+- Stored-value wallets or gift card systems
+- Cash payment processing at locations
+
 ---
 
 ## 2. Functional Requirements
 
 ### 2.1 System Scope Expansion
+
+Status note: the project is multi-app and partly decentralized. Features that exist only as UI scaffolding or earlier design intent should be treated as partial or not implemented, not as complete runtime behavior.
 
 **2.1.1 Multi-Store, Nationwide Support (M)**
 
@@ -44,6 +78,8 @@ In the event of connectivity loss:
 - Local store operations (ordering, inventory tracking, machine operation) must continue uninterrupted
 - Synchronization of data (inventory usage, maintenance logs, demand metrics) must resume automatically once connectivity is restored
 - Conflicts during synchronization must be resolved using timestamp-based or priority-based reconciliation rules
+
+Status: implemented at the platform level through OrbitDB/libp2p peer services, with the local stack booting a bootstrap node, peer/API node, and dashboard together.
 
 ### 2.2 Supply & Logistics System
 
@@ -268,39 +304,16 @@ To prevent cooler capacity issues and maintain drink quality:
 
 ---
 
-### 4.4 Customer Engagement & Loyalty
-
-**AI Customer Support (S)**
-
-To reduce customer service costs while maintaining satisfaction:
-- AI-powered chatbot to guide customers through common issues and questions.
-- Automated complaint intake and initial triage to reduce human intervention.
-- Continuous learning from customer interactions to improve response quality.
-
-**Member Loyalty Program (C)**
-
-To encourage repeat business and increase customer lifetime value:
-- Points accumulation system tied to purchase amounts.
-- Redeemable rewards for free items or discounts once point thresholds are reached.
-- Loyalty status visible within user accounts.
-
-**Social Media Integration (C)**
-
-To generate organic marketing and brand awareness:
-- In-app sharing functionality to post favorite drinks to social platforms (X, Instagram, Facebook).
-- User-generated content to promote CodePop through personal networks.
-
----
-
-### 4.5 Business Requirements MoSCoW Summary
+### 4.4 Business Requirements MoSCoW Summary
 
 **Must Have (M):**
 - Minimal human intervention operational model with robotic drink preparation
-- Complete payment processing with refund capabilities
-- Per-location revenue tracking and reporting
-- Comprehensive inventory tracking with low-stock warnings
+- Payment-enabled checkout flow with Stripe integration
+- Core inventory and multi-store supply operations
+- Role-based operations across customer and dashboard users
 
 **Should Have (S):**
+- Refund and complaint handling fully validated end-to-end
 - Order pickup tracking with automated stale order disposal
 - Repair schedule optimization for travel efficiency and preventive maintenance compliance
 - AI customer support chatbot for issue resolution
@@ -309,6 +322,7 @@ To generate organic marketing and brand awareness:
 - Saved payment methods for streamlined checkout
 - Member loyalty program with points and rewards
 - Social media sharing integration for organic marketing
+- Advanced forecast analytics and recommendation tuning
 
 **Won't Have (W):**
 - Global trend-based inventory forecasting (unreliable external data)
@@ -386,7 +400,6 @@ The application should integrate with social media platforms to enhance user eng
 
 **repair_staff**
 - Manage repair schedules for machines they are in charge of at store locations they manage
-- Import repair schedules from CSV file containing:
   - store location: address field
   - machine type: enumerated code of machine types
   - machine status: one of:
@@ -410,7 +423,6 @@ The application should integrate with social media platforms to enhance user eng
 
 ### 6.2 Updated Existing Roles
 
-**admin**
 - Can access their own store information only
 - Has access to manage user account data
 - Has ability to update/remove/unlock user accounts
@@ -437,12 +449,19 @@ The application should integrate with social media platforms to enhance user eng
 
 ## 7. Use Case Stories
 
+Implementation alignment note (April 2026): the story list below is retained for traceability, but priority tags were normalized where needed to match current implementation status in Sections 1.3 and 4.5.
+
+- M = implemented and required in the current release baseline
+- S = partially implemented or required next for release hardening
+- C = planned/deferred enhancements
+- W = explicitly out of scope
+
 **Logistics Manager**
 - *(M)* 1. As a Logistics Manager, I want to view real-time inventory levels across all stores in my assigned region so that I can make informed supply distribution decisions.
 - *(M)* 2. As a Logistics Manager, I want to assign deliveries from my regional supply hub to stores within and outside my region (up to 1000 miles) so that supply shortages are prevented.
 - *(M)* 3. As a Logistics Manager, I want to coordinate supply transfers between local stores and shared regional suppliers so that demand spikes can be handled without over-reliance on a single hub.
-- *(M)* 4. As a Logistics Manager, I want to import historical supply usage data from CSV files so that AI-assisted demand prediction can generate accurate forecasts.
-- *(M)* 5. As a Logistics Manager, I want to generate and update supply schedules for stores in my region so that deliveries align with predicted demand and inventory thresholds.
+- *(C)* 4. As a Logistics Manager, I want to import historical supply usage data from CSV files so that AI-assisted demand prediction can generate accurate forecasts.
+- *(S)* 5. As a Logistics Manager, I want to generate and update supply schedules for stores in my region so that deliveries align with predicted demand and inventory thresholds.
 - *(S)* 6. As a Logistics Manager, I want to receive AI-generated alerts when projected demand exceeds available regional supply so that I can proactively adjust delivery plans.”
 - *(S)* 7. As a Logistics Manager, I want to visualize hub-to-store routing on a regional dashboard so that I can optimize delivery efficiency and reduce travel distance.
 - *(C)* 8. As a Logistics Manager, I want to compare historical demand forecasts against actual supply usage so that I can evaluate the accuracy of AI predictions.
@@ -451,10 +470,10 @@ The application should integrate with social media platforms to enhance user eng
 
 **Repair Staff**
 - *(M)* 11. As a repair staff member, I want to view all machines assigned to the store locations I manage so that I can monitor their operational status.
-- *(M)* 12. As a repair staff member, I want to import machine repair schedules from a CSV file so that maintenance data can be populated efficiently and consistently.
+- *(S)* 12. As a repair staff member, I want to import machine repair schedules from a CSV file so that maintenance data can be populated efficiently and consistently.
 - *(M)* 13. As a repair staff member, I want to see the current maintenance status of each machine so that I can prioritize repairs appropriately.
 - *(M)* 14. As a repair staff member, I want to update machine statuses (e.g., warning, error, out-of-order) so that the system reflects real-world conditions.
-- *(M)* 15. As a repair staff member, I want the system to generate an optimized repair schedule that minimizes travel time so that maintenance can be completed efficiently.
+- *(S)* 15. As a repair staff member, I want the system to generate an optimized repair schedule that minimizes travel time so that maintenance can be completed efficiently.
 - *(S)* 16. As a repair staff member, I want the system to alert me when a machine in a warning state is approaching its maximum allowed operational time so that I can service it before shutdown.
 - *(S)* 17. As a repair staff member, I want repair schedules to respect maximum time limits between service visits so that machines remain compliant with maintenance requirements.
 - *(C)* 18. As a repair staff member, I want to view historical maintenance records for machines so that I can identify recurring issues.
@@ -477,8 +496,8 @@ The application should integrate with social media platforms to enhance user eng
 - *(M)* 31. As an account user, I want to be able to have my drink fresh and ready for me right as I arrive to pick it up.
 - *(S)* 32. As an account user, I want the option to deny access to my geolocation and instead choose a time for my drink to be ready.
 - *(M)* 33. As an account user, I want to receive a notification when my soda is ready to pick up.
-- *(M)* 34. As an account user, I want to be able to add payment options to my account so I can pay through the app when I order my drinks.
-- *(M)* 35. As an account user, I want to be refunded if I cancel my drink order.
+- *(C)* 34. As an account user, I want to be able to add payment options to my account so I can pay through the app when I order my drinks.
+- *(S)* 35. As an account user, I want to be refunded if I cancel my drink order.
 - *(C)* 36. As an account user, I want to be able to rate the sodas I have tried out of 5.
 - *(C)* 37. As an account user, I want AI to use my drink ratings to recommend future soda combinations.
 - *(M)* 38. As an account user, I want to be able to pay for my drink on the application when I order it.
@@ -494,23 +513,23 @@ The application should integrate with social media platforms to enhance user eng
 - *(S)* 46. As a general user, I want to be able to see drink suggestions based on popular drinks so I have ideas to order
 - *(M)* 47. As a general user I want to be able to see all possible combinations of syrups, sodas, and add-ins so I can craft my drink.
 - *(S)* 48. As a general user, I want to receive a notification when my soda is ready to pick up.
-- *(M)* 49. As a general user, I want to be able to receive a refund if I cancel my order. 
+- *(S)* 49. As a general user, I want to be able to receive a refund if I cancel my order. 
 
 **Admin User stories**
 - *(M)* 50. As an admin, I want to be able to keep track of inventory.
 - *(M)* 51. As an admin, I want to be able to access certain user data such as the number of user accounts.
 - *(M)* 52. As an admin, I want to be able to see and keep track of the cost of inventory and maintenance of the shop.
 - *(M)* 53. As an admin, I want to be able to see how much money the shop is bringing in.
-- *(M)* 54. As an admin, I want to be able to see general and account user complaints.
+- *(C)* 54. As an admin, I want to be able to see general and account user complaints.
 - *(S)* 55. As an admin, I want to receive all available data in the form of easily understandable and regular reports.
 - *(M)* 56. As an admin, I want the ability to manage user accounts. This includes overriding locked accounts, disabling accounts, and deleting user accounts.
 - *(M)* 57. As an admin, I want to be able to add permissions to manager accounts.
 
 **Manager User stories**
 - *(S)* 58. As a manager, I want to be able to see store revenue reports from the database.
-- *(M)* 59. As a manager, I want to be notified when inventory is low. 
+- *(S)* 59. As a manager, I want to be notified when inventory is low. 
 - *(S)* 60. As a manager, I want to be able to order more inventory when it is low.
-- *(M)* 61. As a manager, I want to be able to see inventory and usage data pertinent to running the store in the form of regular reports.
+- *(S)* 61. As a manager, I want to be able to see inventory and usage data pertinent to running the store in the form of regular reports.
 
 **General system stories**
 - *(M)* 62. As a user, I want all my options to be easily accessible and useful. 

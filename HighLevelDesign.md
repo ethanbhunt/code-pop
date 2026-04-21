@@ -1,6 +1,388 @@
-This document was created with assistance from ChatGPT.
+# Code Pop High-Level Design Document
 
-# **Code Pop High-Level Design Document**
+**Introduction**
+
+* Purpose  
+* Scope  
+* Audience  
+  **System Overview**  
+* Problem Statement  
+* Proposed Solution  
+* Hardware Platform  
+  * Mobile  
+  * Laptop and Desktop
+
+  **Architecture Design**
+
+* Architecture Overview: Explanation of the overall architecture (distributed peer-replicated client-server)  
+* Component Diagram: Diagram showing major system components and their relationships  
+* Technology Stack: Technologies and frameworks used (e.g., languages, databases, servers)  
+  * Expo / React Native  
+  * Next.js / React  
+  * OrbitDB / libp2p / Helia  
+  * PostgreSQL (supporting service in local stack)  
+  * AI (partial) and Stripe
+
+  **Modules and Components (Internal Interfaces)**
+
+* Module Overview: Description of key modules or components, their responsibilities, and interactions  
+* Data Flow Diagram (DFD): Illustration of how data moves between components  
+* Component Interaction: Details on how system components communicate (e.g., APIs, web services)  
+  **Data Design**  
+* Data Model: High-level structure of data, including key entities and relationships  
+* Database Design: Type of database used (relational, NoSQL, etc.), major stores and relationships  
+* Data Access Layer: Overview of how data is accessed, stored, and retrieved  
+  **Integration Points (External Interfaces)**  
+* External Systems: Description of external systems or services the app integrates with  
+* APIs: List of public/external APIs, endpoints, methods, and data contracts  
+  * Payment System: Stripe  
+  * Geolocator: MapBox (planned, not implemented)  
+  * AI Chatbot: DialoGPT/Claude-style assistant (planned, not implemented)  
+  * Notifications: Firebase Cloud Messaging (planned, not implemented)
+
+  **User Interface (UI) Design Overview**
+
+* UI/UX Principles: High-level UI/UX principles (e.g., responsiveness, accessibility)  
+* Mockups: High-level mockups or wireframes of key screens  
+* Navigation Flow: Overview of how users navigate the app  
+  **Input and Output (I/O)**  
+* Input  
+* Output  
+  **Security and Privacy**  
+* Authentication and Authorization: Description of user roles and permission management  
+* Data Encryption: Explanation of how data is encrypted (at rest and in transit)  
+* Compliance: Relevant data protection laws (GDPR, HIPAA)  
+* Privacy  
+  **Testing Strategy**  
+* Unit Testing  
+* Manual Testing  
+  **Risks and Mitigations**  
+* Identified Risks: List of known risks (e.g., technology choice, dependencies)  
+* Mitigation Plans: Strategies for addressing these risks
+
+---
+
+## 1. Introduction
+
+**Purpose**: This document provides a shared high-level reference for CodePop's current architecture so teams can implement features across mobile, dashboard, and backend services without architectural drift.
+
+**Scope**: This document reflects the current project implementation and keeps previously planned features in scope with explicit implementation status notes.
+
+**Audience**: Developers, reviewers, and stakeholders validating architecture and design decisions.
+
+## 2. System Overview
+
+**Problem Statement**: Customers need a faster and simpler dirty soda ordering experience, while store operations require coordinated inventory, logistics, maintenance, and reporting across locations.
+
+**Proposed Solution**: CodePop uses a mobile ordering client, a role-based operations dashboard, and a distributed backend based on OrbitDB peer replication and REST APIs.
+
+**Hardware Platform**:  
+CodePop supports customer and staff usage on mobile devices and staff usage on laptop/desktop browsers. Backend services run in containers for repeatable startup and test workflows.
+
+**Platform Architecture Overview**:  
+CodePop currently follows a distributed, peer-replicated architecture.
+
+* A bootstrap node initializes shared OrbitDB databases and peer metadata.
+* Peer nodes expose REST endpoints and replicate data over libp2p pubsub.
+* Mobile and dashboard clients consume those endpoints.
+
+This architecture supersedes the original Django-centric implementation plan as the primary runtime path.
+
+* **Mobile**:  
+  * **Expo Mobile Application (Current)**: Implemented in React Native + Expo with store selection, guest mode, authentication, drink creation, cart, checkout, and post-checkout pages.
+  * **Touchscreen Interaction**: Implemented as the default interaction model.
+  * **Portrait vs. Landscape**: Primarily optimized for portrait flows.
+  * **Offline Capability & Security**: Full offline ordering is not implemented. Local token/state storage exists, but core features require network access.
+
+* **Desktop/Laptop Platform (Secondary Support)**:  
+  * **Web Application for Administrative Users (Current)**: Implemented in Next.js with role dashboards for super admin, admin, logistics manager, manager, staff, repair staff, and customer roles.
+  * **Browser Compatibility & Security**: Designed for modern browser support with NextAuth session management.
+  * **Touchscreen Laptops**: Supported through responsive layout; no separate dedicated hybrid-touch mode is implemented.
+
+* **Hardware Platform Justification & Security Architecture**:  
+  The split client model enables a lightweight ordering experience on mobile and broader operational control in dashboard UI while sharing one replicated backend data layer.
+
+## 3. Architecture Design
+
+* **Architecture Overview**:  
+  * Distributed client-server architecture with peer replication. Mobile and dashboard are clients, OrbitDB peer services are the backend API layer.
+
+* **Component Diagram** (logical):
+
+```
+Mobile App (Expo) ----\
+                        ---> OrbitDB Peer API (Express) <--> OrbitDB Bootstrap
+Dashboard (Next.js) --/           |
+                                  +--> Route Domains: auth/users/drinks/orders/
+                                       inventory/stores/payments/stripe/
+                                       notifications/revenues/qrcodes/
+                                       logistics/maintenance/admin/audit/peers
+```
+
+* **Technology Stack**:
+
+  * **Expo / React Native (Frontend)**:
+    * Implemented mobile app navigation and customer ordering flow.
+
+  * **Next.js + NextAuth (Dashboard)**:
+    * Implemented role-based dashboard UI and API proxy layer.
+    * Credentials auth calls backend `/backend/auth/login`.
+
+  * **OrbitDB + libp2p + Helia + Express (Backend)**:
+    * Implemented bootstrap and peer nodes.
+    * Implemented route handlers for core business domains.
+
+  * **PostgreSQL**:
+    * Present in local compose stack as supporting service.
+    * Not the primary active business data path in the current runtime architecture.
+
+  * **Artificial Intelligence (AI)**:
+    * Implemented: heuristic AI-style endpoints for demand and maintenance views in dashboard API routes.
+    * Not implemented: full production ML model training/serving pipeline.
+    * Not implemented: external AI chatbot integration for complaints.
+
+## 4. Modules and Components (Internal Interfaces)
+
+* **User Management Module**:
+  * Responsibilities:
+    * Registration/login/session validation
+    * Role and permission resolution
+    * Profile and preference linkage
+    * Guest-mode behavior
+  * Components:
+    * Auth routes
+    * User routes
+    * Dashboard role mapping
+
+* **Catalog and Ordering Module**:
+  * Responsibilities:
+    * Drink management and customization
+    * Cart/checkout lifecycle
+    * Order state transitions
+  * Components:
+    * Drinks routes
+    * Orders routes
+    * Mobile ordering pages
+
+* **Operations Module**:
+  * Responsibilities:
+    * Inventory management
+    * Store and revenue reporting
+    * Logistics transfers
+    * Maintenance tracking
+    * Admin and audit workflows
+  * Components:
+    * Inventory/stores/revenues/logistics/maintenance/admin/audit routes
+    * Role dashboard components
+
+* **Payment and Notification Module**:
+  * Responsibilities:
+    * Payment flow orchestration
+    * Stripe callback handling
+    * Notification records
+    * QR code generation
+  * Components:
+    * Payments and stripe routes
+    * Notifications routes
+    * QR code routes
+
+* **Peer Coordination Module**:
+  * Responsibilities:
+    * Bootstrap failover coordination
+    * Peer registration/heartbeat
+    * Health and discovery
+  * Components:
+    * Bootstrap node
+    * Peer node
+    * Peer/registry services
+
+### Additional Internal Interfaces
+
+* **Component to Component Paths**
+  * Mobile App <-> OrbitDB Peer API
+  * Dashboard API/BFF <-> OrbitDB Peer API
+  * OrbitDB Peer <-> OrbitDB Bootstrap
+  * Operations Module <-> User/Catalog modules
+
+* **Interaction Styles**
+  * REST over HTTP for client-to-service calls
+  * Server-side dashboard proxy for authenticated backend calls
+  * libp2p pubsub replication for peer-to-peer data sync
+
+* **Shared Data and/or Services**
+  * Shared domains: users, preferences, drinks, orders, inventory, stores, revenues, maintenance, logistics, notifications
+  * Externalized payment processing through Stripe
+
+* **Error Handling**
+  * Backend middleware and route-level response handling
+  * Mobile/dashboard user-facing error messages for auth/network/action failures
+  * Health endpoint support for service startup checks
+
+## 5. Data Design
+
+### Data Model
+
+* **Key Entities**
+  * User
+  * Preference
+  * Store
+  * Drink
+  * Order
+  * Inventory
+  * Payment
+  * Notification
+  * QRCode
+  * Revenue
+  * AuditLog
+  * MaintenanceRecord
+  * TransferRecord
+
+* **Relationships**
+  * User -> Order (one-to-many)
+  * User -> Preference (one-to-many)
+  * Store -> Order (one-to-many)
+  * Store -> Inventory (one-to-many)
+  * Order -> Drink (many-to-many logical composition)
+  * Order -> QRCode (one-to-one)
+  * User -> Notification (one-to-many)
+
+### Database Design
+
+* **Primary Data Layer (Current)**: OrbitDB replicated stores exposed by backend route domains.
+* **Supporting Service**: PostgreSQL container remains in compose for local stack compatibility.
+
+### Data Access Layer
+
+* Mobile app accesses backend REST endpoints.
+* Dashboard accesses backend through authenticated API proxy routes.
+* Route-level guards enforce role/store filtering.
+* Peer replication keeps distributed data synchronized.
+
+## 6. Integration Points (External Interfaces)
+
+### 6.1 External Systems
+
+| External System | Purpose | Status |
+| --- | --- | --- |
+| Stripe | Payments and webhooks | Implemented |
+| Map support in mobile | Location/map UI support | Partially implemented |
+| MapBox | Advanced mapping/routing | Planned, not implemented |
+| FCM | Push notifications | Planned, not implemented |
+| AI chatbot provider | Complaint assistant | Planned, not implemented |
+
+### 6.2 APIs and Endpoints
+
+* Backend route families (implemented):
+  * `/backend/auth`
+  * `/backend/users`
+  * `/backend/preferences`
+  * `/backend/drinks`
+  * `/backend/orders`
+  * `/backend/inventory`
+  * `/backend/stores`
+  * `/backend/payments`
+  * `/backend/stripe`
+  * `/backend/notifications`
+  * `/backend/revenues`
+  * `/backend/qrcodes`
+  * `/backend/logistics`
+  * `/backend/maintenance`
+  * `/backend/admin`
+  * `/backend/audit`
+  * `/backend/peers`
+
+* Dashboard BFF APIs (implemented): `/api/orbit/*` proxy routes for role-safe backend access.
+
+### 6.3 Planned Features Retained (Status)
+
+* AI chatbot for complaint responses: **Not implemented**
+* MapBox geolocation and routing workflows: **Not implemented**
+* FCM push delivery pipeline: **Not implemented**
+* Full ML demand/recommendation production pipeline: **Partially implemented via heuristics, not complete**
+
+## 7. User Interface (UI) Design Overview
+
+* **UI/UX Principles**
+  * Simple ordering flow for customers
+  * Role-driven dashboard pages for operations
+  * Consistent interaction patterns and readability
+
+* **Mockups**
+  * Existing mockups remain design references.
+
+* **Navigation Flow**
+  * Mobile: StoreSelect -> Guest/Auth -> GeneralHome -> CreateDrink/Cart -> Checkout -> PostCheckout
+  * Dashboard: Login -> RoleDashboard -> Role-specific modules
+
+## 8. Input and Output (I/O)
+
+### Input
+
+* User credentials and profile data
+* Store selection and ordering selections
+* Cart and payment details
+* Staff operations inputs (inventory, logistics, maintenance, admin)
+
+### Output
+
+* Auth/session outcomes
+* Order status and QR code outputs
+* Inventory/revenue/maintenance/logistics dashboard data
+* Notifications and audit events
+
+## 9. Security and Privacy
+
+* **Authentication and Authorization**
+  * Role-based route access control in backend and dashboard
+  * Token/session validation in mobile and dashboard flows
+
+* **Data Encryption**
+  * HTTPS/TLS required in deployment
+  * Payment-sensitive data delegated to Stripe
+
+* **Compliance**
+  * Compliance targets remain part of design intent
+  * Full GDPR/HIPAA workflow automation is not implemented
+
+* **Privacy**
+  * Guest mode limits required user account data for ordering
+
+## 10. Testing Strategy
+
+* **Unit Testing**
+  * Mobile tests (Jest)
+  * Dashboard tests (Vitest)
+  * Backend tests (Jest / Python smoke)
+
+* **Manual Testing**
+  * Local stack startup
+  * Auth/login flows
+  * Role dashboards
+  * Ordering and checkout
+  * Inventory/logistics/maintenance workflows
+
+## 11. Risks and Mitigations
+
+* **Identified Risks**
+  * Distributed synchronization and peer availability
+  * External dependency failures (Stripe)
+  * Incomplete planned features vs original requirement scope
+
+* **Mitigation Plans**
+  * Health checks and startup scripts
+  * Explicit route guards and role mapping
+  * Keep incomplete features documented with implementation status
+  * Expand integration and E2E coverage
+
+## 12. UML Diagrams
+
+This section contains UML references for class, sequence, and use case artifacts.
+
+* Class Diagram
+* Sequence Diagrams
+* Use Case Diagrams
+
+# Code Pop High-Level Design Document
 
 **Introduction**
 
@@ -70,7 +452,7 @@ This document was created with assistance from ChatGPT.
 
 ---
 
-## **1\. Introduction**
+## 1. Introduction
 
 **Purpose**: This document exists to provide a reference for developers while working on the CodePop app to ensure that the development team can work independent of each other and still have code that will work together to form the final project at the end. 
 
@@ -78,7 +460,7 @@ This document was created with assistance from ChatGPT.
 
 **Audience**: This document is meant for developers and stakeholders of the project to ensure development is going in the right direction and everyone is on the same page.
 
-## **2\. System Overview**
+## 2. System Overview
 
 **Problem Statement**: In the world of dirty soda shops, there are too many options and many long lines, resulting in a confusing and overwhelming customer experience.
 
@@ -163,7 +545,7 @@ This decentralized model was chosen over alternatives (traditional client-server
   5. **Simplify multi-store synchronization**: Web technologies and standard protocols (HTTPS, WebSockets) facilitate the secure store-to-store and store-to-hub communication required by the decentralized model
   6. **Enhanced security posture**: Web-based architecture allows centralized security policy enforcement while maintaining operational decentralization
 
-## **3\. Architecture Design**
+## 3. Architecture Design
 
 * **Architecture Overview**:   
   * This will be a client-server architecture where the app run on the phone will be a client that will communicate and get information from our server and then display that information for the user.  
@@ -202,16 +584,9 @@ This decentralized model was chosen over alternatives (traditional client-server
       * **Diverse Recommendations:** Unlike the content-based model, this model suggests items that the users might not have considered on their own  
       * **Captures popularity trends**  
 - The downsides of this model is that new items can’t be recommended to users until there has been enough interaction. For this reason, we decided to use the content-based filtering model for more personal suggestions (especially because our drink preference data will be very scattered at the beginning)  
-  * **Gemini (AI Images)**  
-    * AI images will be used for smaller items like Loading Screens, Icons, Logos, etc.  
-      * Although AI is the future, we want to give our front-end team the opportunity to learn how to create a variety of custom images, animations, and backgrounds. AI Images will be a smaller part of the front-end team’s bigger creation.  
-    *   
-    * ![AISoda](misc/AISodaResized.jpg)
-    ![SodaRobot](misc/SodaRobotResized.jpg)
-    ![bob](misc/bobResized.jpg)
-    ![robotDrinkingSoda](misc/robotDrinkingSodaResized.jpg)
 
-## **4\. Modules and Components (Internal Interfaces)** 
+
+## 4. Modules and Components (Internal Interfaces) 
 
 * **User Management Module:** Manages customer profiles, authentication, and user interactions.  
   * Responsibilities  
@@ -262,7 +637,7 @@ This decentralized model was chosen over alternatives (traditional client-server
     * Repair services: Based on machine status dispatch a technician to repair  
     * Optimization services: Optimize repair and maintenance schedules using AI-assisted planning
 
-### **Additional Internal Interfaces**
+### Additional Internal Interfaces
 
 * **Component to Component Paths**
     * User Management Module <-> Soda Catalog Module <-> Order Management Module <-> AI Recommendation Module
@@ -284,9 +659,9 @@ This decentralized model was chosen over alternatives (traditional client-server
     * User side errors should be handled on the user end and display a short but informative message
     * External service errors should be handled server side and if it affects the user side display a simple message
 
-## **5\. Data Design**
+## 5. Data Design
 
-### **Data Model:**
+### Data Model:
 
 * **Key Entities**  
   * **User:** Represents a person who uses the application, whether as a general user or an account user. The User entity stores all the necessary information about the user, such as login credentials and profile details.  
@@ -362,7 +737,7 @@ This decentralized model was chosen over alternatives (traditional client-server
   * **Order to QRCode:** One-to-One (A QR code is generated an order)  
   * **Notification to QRCode:** One-to-One (The QR code is sent to the user as  notification)
 
-### **Database Design:**
+### Database Design:
 
 * **Relational Database (PostgreSQL):** Well-suited for managing complex relationships and ensuring transactional integrity. PostgreSQL supports advanced features like JSONB fields, which can be useful for storing unstructured data like user preferences or dynamic order details  
 * **Major Tables in PostgreSQL** (Mapped from Django Models):  
@@ -400,7 +775,7 @@ This decentralized model was chosen over alternatives (traditional client-server
 
 ![diagram0](misc/diagram0.png)
 
-### **Data Access Layer:**
+### Data Access Layer:
 
 * In Django, the data access layer is primarily handled through the ORM, which abstracts SQL queries into Python code.  
 * **Data Access Patterns:**   
@@ -422,7 +797,7 @@ This decentralized model was chosen over alternatives (traditional client-server
   * Regularly back up the PostgreSQL database using tools like pg\_dump. Automate this process with cron jobs or Django management commands.  
   * Test recovery procedures to ensure data can be restored effectively.
 
-## **6\. Integration Points (External Interfaces)**
+## 6. Integration Points (External Interfaces)
 
 ### 6.1 Identify External Systems
 
@@ -556,7 +931,7 @@ External dependencies introduce availability, performance, and operational risks
 - Alert on-call engineer: if critical dependency unavailable >5 minutes or error rate >5%
 - Post-mortem procedure: document all external dependency outages and improve mitigation
 
-## **2. Appendices (External Interfaces)**
+## 2. Appendices (External Interfaces)
 
 ### 2.1 Dependency Matrix & Risk Scoring
 
@@ -664,117 +1039,14 @@ Recommendation Engine:
 4. **Dashboards**: Grafana dashboard showing health of all external dependencies
 5. **Post-Mortems**: Document outages and lessons learned
 
----
 
-## **7\. User Interface (UI) Design Overview**
-
-* **UI/UX Principles**: High-level UI/UX principles (e.g., responsiveness, accessibility).  
-  * We aim to keep the app simple and intuitive so as to provide a frustration free user experience for all our users as our app has a wide target audience.  
-  * The design focus will be primarily for a phone application but we will also make sure the interface is responsive and compatible with any interface. We will utilize flex-box in the CSS design to ensure this because it is good for responsive design.   
-  * Design color choices and navigation style will stay consistent for all types of users including managers and admin accounts so users remain familiar with the layout.   
-  * Navigation will primarily happen through a nav bar containing descriptive graphic icons that will persist on all pages of the app. With this, a user is able to access all the app’s functionality more easily from one to two clicks.   
-    * Some exceptions to this include obvious and brightly colored buttons for navigation to pages such as the account creation page or the payment page which is accessed from the cart.   
-  * Accessibility  
-    * Color blindness  
-      * The color palette chosen is shown in the following graphics as seen by some of the more common forms of color blindness.   
-      * Based on this analysis, colors like teal and purple will not be used right next to each other in the app so as to keep easy readability for all users.   
-      ![ColorPallet0](misc/ColorPallet0.png) 
-      ![ColorPallet1](misc/ColorPallet1.png)
-    * Each page will have screen-reader compatibility and tab-controlled navigation options.   
-    * Web Content Accessibility Guidelines (WCAG) 
-    
-* **Mockups**: High-level mockups or wireframes of key screens.  
-  * Color way  
-    * The color way has been chosen specifically to reflect the bright colorful nature of the app while also providing good contrast for useability.   
-    * Hex values (L-R)  
-      * D30C7B  
-      * 8DF1D3  
-      * C6C8EE  
-      * F92758  
-      * FFA686  
-  * Style Guide  
-    * Corners of boxes and buttons will be rounded.
-    ![ColorPallet2](misc/ColorPallet2.png)
-
-* **Navigation Flow**: Overview of how users will navigate the app.  
-  * Pages will not be more than 2-3 clicks deep  
-  * Pages:  
-    * Home page  
-      * Nav bar  
-        * Cart button \- link to cart page  
-        * Link to drink design page  
-        * Link to Account user home page  
-        * Link to complaints page  
-      * Seasonal drinks menu carousel  
-      * Generate random button (from AI)  
-      * Create account button (for non-account users)  
-    * Sign in page  
-      * Simple page with text entry boxes for username and password  
-      * Login button  
-      * Automatically displayed error message or taken to home page after login  
-    * Complaints page  
-      * Simple page with a text entry box with a complaint prompt \- users will receive AI generated response messages after entering complaints  
-    * Account user home page  
-      * Saved drinks  
-      * Update preferences button  
-        * Favorite drinks and favorite ingredients for users to take into account  
-        * Option to enable/disable geolocation  
-    * Payment page  
-      * User is taken here from the “checkout” button in the cart  
-      * Stripe API used to take user payment information  
-      * After payment information is submitted, there is a notification for users   
-      * Option for user to track with geolocation (default selected) or select a time for it to be ready  
-        * If geolocation is disabled this button should be grayed out and there should be a message letting the user know how to enable geolocation  
-    * Cart page  
-      * Drinks   
-      * Options to remove things from cart  
-      * Button to checkout  
-    * Confirmation page  
-      * After a user pays for their drink, they are taken to a page with a link to the complaints page (Didn’t get their drink?” button) as well as a rate your drink section where a user can rate their drink out of 5\.   
-    * Drink design page  
-      * generative/responsive graphic created when a user makes drinks  
-      * Add-in options are displayed with easily identifiable graphics instead of a list so options are easy to choose  
-      * There is a way to search for options  
-      * A van bar for different add in options  
-      * Also a way to remove options \- have the graphics be selected (added) or unselected (removed) with a visible difference for ingredients that are added  
-      * Drink graphic, nav bar (soda (can choose more than one), syrups, juices (lemon, lime, pineapple, coconut etc.), ice (light, regular), extra, no ice), search bar  
-      * An add to cart button  
-      * A size and soda selection are required to add to cart, everything else is optional and the default is “none”. An error will pop up if the user tries to add a drink to the cart without selecting a drink size or soda.   
-    * Manager dashboard  
-      * A dashboard that contains links to a store revenue report and a store inventory report.   
-        * Data such as total revenue, inventory costs, total user accounts will be displayed in an easily understandable format  
-      * AI will be used to estimate when supplies need to be ordered to notify the manager and also find the best places to purchase ingredients.  
-    * Admin dashboard  
-      * A simple dashboard to view all functional user accounts with options to delete, disable, and reinstate accounts. An admin also has the permissions necessary to create manager accounts and grant managers permission to view certain data.   
-    * Loading screens  
-      * Typical loading screen:  
-      ![SodaRobot](misc/SodaRobotResized.jpg)
-      * Loading screen for customer service:  
-        * Bob  
-      ![bob](misc/bobResized.jpg)
-      *   
-  * UI diagrams:  
-  ![Proto0](misc/Front_Page.png)
-  ![Proto1](misc/Login.png)
-  ![Proto2](misc/Order.png)
-  ![Proto3](misc/Confirm_Order.png)
-  ![Proto4](misc/Confirmed_Order.png)
-  ![Proto5](misc/Manager_DashBoard.png)
-  ![Proto6](misc/Admin_DashBoard.png)
-  ![Proto7](misc/Repair_DashBoard.png)
-  ![Proto8](misc/Super_Admin_DashBoard.png)
-  ![Proto9](misc/Logistics_DashBoard.png)
-
-
-
-
-## **8. Input and Output (I/O)**
+## 7. Input and Output (I/O)
 
 Note: Much of this section may be a repeat of what has already been documented, but it is repeated here to make I/O items easier to find and relate to each other.
 
-### **Input**
+### Input
 
-#### **Customer-Facing Inputs**
+#### Customer-Facing Inputs
 
 * **User Information**
   * Username
@@ -805,7 +1077,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Favorite drink marking/unmarking
   * Drink ratings (1-5 stars)
 
-#### **Multi-Store & Decentralized Architecture Inputs**
+#### Multi-Store & Decentralized Architecture Inputs
 
 * **Inter-Store Communication**
   * Inventory synchronization data between stores in the same region
@@ -823,7 +1095,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Cross-region fulfillment requests (within 1000-mile radius)
   * Supplier lead time updates
 
-#### **Supply & Logistics System Inputs**
+#### Supply & Logistics System Inputs
 
 * **CSV File Imports (Logistics Manager)**
   * Historical supply usage data via CSV files containing:
@@ -844,7 +1116,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Seasonal demand factors
   * Store-specific usage patterns
 
-#### **Machine Maintenance Tracking Inputs**
+#### Machine Maintenance Tracking Inputs
 
 * **CSV File Imports (Repair Staff)**
   * Repair schedule imports via CSV files containing:
@@ -868,7 +1140,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Store geographic coordinates
   * Machine priority levels
 
-#### **Role-Specific Administrative Inputs**
+#### Role-Specific Administrative Inputs
 
 * **Logistics Manager**
   * Supply distribution commands within assigned region
@@ -901,9 +1173,9 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Manager account creation and permission grants
   * Store-specific data access
 
-### **Output**
+### Output
 
-#### **Customer-Facing Outputs**
+#### Customer-Facing Outputs
 
 * **Notifications**
   * Email notifications (sign up confirmation)
@@ -931,7 +1203,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Seasonal drink menu carousel
   * Drink customization interface
 
-#### **Multi-Store & Decentralized Architecture Outputs**
+#### Multi-Store & Decentralized Architecture Outputs
 
 * **Inter-Store Synchronization & Data Consistency**
   * Synchronization status indicators
@@ -946,7 +1218,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * New store registration confirmations
   * Regional peer connection confirmations
 
-#### **Supply Hub & Logistics Outputs**
+#### Supply Hub & Logistics Outputs
 
 * **Supply Hub Dashboards (Logistics Manager)**
   * Real-time inventory levels across all stores in assigned region
@@ -968,7 +1240,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Supplier lead time displays
   * Regional supply availability maps
 
-#### **Machine Maintenance Outputs**
+#### Machine Maintenance Outputs
 
 * **Maintenance Dashboards (Repair Staff)**
   * Machine status displays for all assigned store locations
@@ -988,7 +1260,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Critical error notifications requiring immediate attention
   * Preventive maintenance reminders
 
-#### **Store Information & Reporting Outputs**
+#### Store Information & Reporting Outputs
 
 * **Manager Dashboards**
   * Store revenue reports (real-time and historical)
@@ -1019,7 +1291,7 @@ Note: Much of this section may be a repeat of what has already been documented, 
   * Multi-store comparison data
   * Regional performance metrics
 
-#### **Security & Communication Outputs**
+#### Security & Communication Outputs
 
 * **Digital Signature Verification**
   * PKI (Public Key Infrastructure) verification results for inter-store communications
@@ -1035,56 +1307,56 @@ Note: Much of this section may be a repeat of what has already been documented, 
 * **Data Encryption Confirmations**
   * Encryption status for sensitive data (payment information, email, geolocation)
   * Secure transmission confirmations for inter-store communications
-## **9. UML Diagrams**
+## 8. UML Diagrams
 
 This section contains all Unified Modeling Language (UML) diagrams that illustrate various aspects of the CodePop system architecture, including class structures, system behavior sequences, and use cases for different user roles.
 
-### **Class Diagram**
+### Class Diagram
 
 The following class diagram shows the overall structure and relationships between major classes in the CodePop system:
 
 ![Class Diagram](UML%20Diagrams/Class.png)
 
-### **Sequence Diagrams**
+### Sequence Diagrams
 
 Sequence diagrams illustrate the interactions and message flow between different components for critical system operations:
 
-#### **User Registration Sequence**
+#### User Registration Sequence
 ![User Registration Sequence](UML%20Diagrams/Sequence/User%20Registration.png)
 
-#### **Order Processing Sequence**
+#### Order Processing Sequence
 ![Order Sequence](UML%20Diagrams/Sequence/Order.png)
 
-#### **Order Pickup Sequence**
+#### Order Pickup Sequence
 ![Order Pickup Sequence](UML%20Diagrams/Sequence/Order%20Pickup.png)
 
-#### **AI Drink Recommendation Sequence**
+#### AI Drink Recommendation Sequence
 ![AI Drink Sequence](UML%20Diagrams/Sequence/AI%20Drink.png)
 
-#### **Inventory Management Sequence**
+#### Inventory Management Sequence
 ![Inventory Sequence](UML%20Diagrams/Sequence/Inventory.png)
 
-#### **Machine Repair Sequence**
+#### Machine Repair Sequence
 ![Repair Sequence](UML%20Diagrams/Sequence/Repair.png)
 
-### **Use Case Diagrams**
+### Use Case Diagrams
 
 Use case diagrams show the interactions between different user roles and system functionality:
 
-#### **Customer Use Cases**
+#### Customer Use Cases
 ![Customer Use Cases](UML%20Diagrams/Use%20Cases/Customer%20Use%20Cases.png)
 
-#### **Manager Use Cases**
+#### Manager Use Cases
 ![Manager Use Cases](UML%20Diagrams/Use%20Cases/Manger%20Use%20Cases.png)
 
-#### **Admin Use Cases**
+#### Admin Use Cases
 ![Admin Use Cases](UML%20Diagrams/Use%20Cases/Admin.png)
 
-#### **Super Admin Use Cases**
+#### Super Admin Use Cases
 ![Super Admin Use Cases](UML%20Diagrams/Use%20Cases/Super%20Admin.png)
 
-#### **Logistics Manager Use Cases**
+#### Logistics Manager Use Cases
 ![Logistics Manager Use Cases](UML%20Diagrams/Use%20Cases/Logistics%20Manager.png)
 
-#### **Repair Staff Use Cases**
+#### Repair Staff Use Cases
 ![Repair Staff Use Cases](UML%20Diagrams/Use%20Cases/Repair%20Staff.png)
