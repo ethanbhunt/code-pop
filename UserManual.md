@@ -53,6 +53,8 @@ Look at the bottom of the screen for the navigation bar. It has 5 tabs:
 - **Tracking** (location icon)
 - **Support** (chat icon)
 
+![Alt text](misc/usr_mnl/navbar.png)
+
 If you ever get lost, tap **Home**.
 
 ---
@@ -100,6 +102,8 @@ You can place orders as a guest, but **Preferences** is designed for logged-in u
   - **Create Account**
   - **Login**
 
+![Alt text](misc/usr_mnl/login_screen.png)
+
 #### Create an account
 
 1. On the login screen, tap **Create Account** (teal button).
@@ -110,6 +114,8 @@ You can place orders as a guest, but **Preferences** is designed for logged-in u
   - **Password**
 3. Tap **Create Account** (teal button).
 4. You’ll return to the login screen. Tap **Login**.
+
+![Alt text](misc/usr_mnl/create_accnt_screen.png)
 
 ---
 
@@ -139,23 +145,36 @@ You’ll see one of these depending on your state:
 - **Guest**: “Browsing as Guest” + **Login** (teal button)
 - **Not logged in**: “Sign in to save preferences…” + **Login** (teal button)
 
+![Alt text](misc/usr_mnl/home_screen.png)
+
 ##### D) Drinks of The Day
 
 - Header: **Drinks of The Day**
 - 3 drink cards labeled **Drink #1**, **Drink #2**, **Drink #3**
 - Each card has a teal button: **Add to Cart**
 
+![Alt text](misc/usr_mnl/home_screen_drinkoftheday.png)
+
 #### Common Home actions
 
 ##### Start building a drink
 
 1. Tap **Start AI Drink Builder** (big teal button in the dark navy card).
-2. You go to the **Order** screen.
+2. You go to the **Order** screen from the navbar.
+
+![Alt text](misc/usr_mnl/order_screen.png)
 
 ##### Track an order
 
-1. Tap the **Track Order** card.
+1. Tap the **Track Order** button on the navbar.
+
+![Alt text](misc/usr_mnl/tracking_screen.png)
+
 2. If you don’t have an order yet, you’ll see a message telling you to place one first.
+
+![Alt text](misc/usr_mnl/make_order_to_track.png)
+
+
 
 ##### Add a daily drink to your cart
 
@@ -198,6 +217,8 @@ What you’ll see:
 - Button below: **Surprise Me**
   - This is usually a lighter blue button with dark text.
 
+![Alt text](misc/usr_mnl/ai_drink.png)
+
 ##### Use AI with a prompt (Go)
 
 1. Tap the prompt box.
@@ -210,6 +231,8 @@ What you’ll see:
 1. Tap **Surprise Me**.
 2. Wait for “Generating...” to finish.
 3. A result pop-up appears.
+
+![Alt text](misc/usr_mnl/ai_drink_deets.png)
 
 ##### In the AI result pop-up
 
@@ -239,6 +262,8 @@ Look for the **Ice** box with pill buttons:
 
 When selected, the pill turns **teal** with white text.
 
+![Alt text](misc/usr_mnl/size_ice.png)
+
 ##### Step 3 — Choose ingredients (search + dropdowns)
 
 1. Use the **Search ingredients** box to find items quickly.
@@ -247,6 +272,8 @@ When selected, the pill turns **teal** with white text.
   - **Syrups**
   - **AddIns**
 3. Tap items to select/deselect them.
+
+![Alt text](misc/usr_mnl/drinks_drpdn.png)
 
 Inventory note:
 
@@ -267,6 +294,8 @@ Scroll down to see **Current Drink** showing:
 #### Add your drink to Cart
 
 At the bottom, tap **Add to Cart** (large teal button).
+
+![Alt text](misc/usr_mnl/order_btn.png)
 
 If something is missing, you may see an alert like:
 
@@ -297,6 +326,8 @@ Each drink card shows:
   - Add-ins (if any)
 - Price shown in bold (example: `$2.60`)
 
+![Alt text](misc/usr_mnl/cart_screen.png)
+
 At the bottom-right of each drink card, you’ll see two small buttons:
 
 - **Edit** (pencil icon, teal text)
@@ -307,6 +338,8 @@ At the bottom-right of each drink card, you’ll see two small buttons:
 1. Tap **Edit** on the drink card.
 2. Make changes.
 3. Tap **Update** to save and return to Cart.
+
+![Alt text](misc/usr_mnl/edit_screen.png)
 
 ##### Remove a drink
 
@@ -319,6 +352,8 @@ Below the list you’ll see:
 
 - **Cart Total: $X.XX** displayed in a dark navy bar with white text.
 
+![Alt text](misc/usr_mnl/cart_screen.png)
+
 #### Pay Now (checkout)
 
 At the bottom, tap **Pay Now** (big teal button with a card icon).
@@ -327,6 +362,8 @@ If the app needs a store selection first:
 
 - A **Select a Store** pop-up appears
 - Tap a store row to continue (the payment flow may open right after)
+
+![Alt text](misc/usr_mnl/stripe.png)
 
 After checkout:
 
@@ -345,6 +382,8 @@ You’ll see:
 
 - **Create an order to track it**
 
+![Alt text](misc/usr_mnl/make_order_to_track.png)
+
 #### If you have an order
 
 At the top you’ll see a dark navy **Live Tracking** card showing:
@@ -357,6 +396,8 @@ At the top you’ll see a dark navy **Live Tracking** card showing:
 - **ETA** countdown timer (MM:SS)
 - “Last update” line
 - A progress bar and 3 dots labeled **Queued / Mixing / Ready**
+
+![Alt text](misc/usr_mnl/tracking_screen.png)
 
 #### Presentation fallback (network issues)
 
@@ -432,6 +473,8 @@ Tap the **Support** tab.
 - Bottom:
   - Text box: **Type your complaint...**
   - Send button (paper-plane icon) in a teal square
+
+![Alt text](misc/usr_mnl/chatbot_screen.png)
 
 #### Steps
 
