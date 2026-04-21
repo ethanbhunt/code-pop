@@ -1,4 +1,5 @@
 ## Sprint 0 - Requirements
+We held three fully attended meetings during the sprint where we focused on setting up the project, establishing our Git workflow, and collaboratively drafting and finalizing the requirements document. We were all working on getting the project running locally as well as srarting on our planning documentation. Overall, we had a smooth and productive sprint with no major issues, it was pretty chill since it was the first few weeks and we were mostly just reading through documentation and planning.
 
 ## Sprint 1 - High Level Design
 
