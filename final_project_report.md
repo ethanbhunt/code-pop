@@ -3,6 +3,8 @@ We held three fully attended meetings during the sprint where we focused on sett
 
 ## Sprint 1 - High Level Design
 
+We again held three meetings where the majority of people were able to attend. During the meetings we focused on reasearching the high level requirements and things we wanted to add to the project. We setup different tasks for the different things we wanted to add. Using `monday.com` to keep track of progress, we found it quicker to just keep track our selves as using `monday.com` just for tracking tasks wasn't worth it. But during meetings we also reporting on our progress, questions, or anything else that popped up during our tasks. After researching we drafted up our High Level design document with our research and content.
+
 ## Sprint 2 - Low Level Design
 
 ## Sprint 3 - Development (1)
